@@ -1,0 +1,22 @@
+# DeepSeek provider profiles (portable).
+#
+# Model ids are concrete; the API key is the environment-driven value, read at
+# runtime from `api_key_env` and never written here. DeepSeek exposes an
+# OpenAI-compatible Chat Completions surface (Bearer auth) and adds a
+# `reasoning_content` field on reasoning models.
+
+providers:
+  deepseek_main:
+    family: deepseek
+    protocol: deepseek_chat
+    model: deepseek-v4-flash
+    base_url: "https://api.deepseek.com/v1"
+    api_key_env: DEEPSEEK_API_KEY
+    privacy_class: cloud
+    certification_level: shape_tested
+    capabilities:
+      text: supported
+      streaming: supported
+      json: supported
+      tools: supported
+      vision: unverified

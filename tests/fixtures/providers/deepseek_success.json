@@ -1,0 +1,17 @@
+{
+  "id": "chatcmpl_deepseek_0001",
+  "object": "chat.completion",
+  "model": "deepseek-v4-flash",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "A single quiet line.",
+        "reasoning_content": "Think: keep it short and calm."
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {"prompt_tokens": 5, "completion_tokens": 7, "total_tokens": 12}
+}

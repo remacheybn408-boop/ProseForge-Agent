@@ -20,6 +20,7 @@ from .providers.openai import OPENAI_ALIASES, build_provider as _build_openai
 from .providers.anthropic import ANTHROPIC_ALIASES, build_provider as _build_anthropic
 from .providers.gemini import GEMINI_ALIASES, build_provider as _build_gemini
 from .providers.grok import GROK_ALIASES, build_provider as _build_grok
+from .providers.deepseek import DEEPSEEK_ALIASES, build_provider as _build_deepseek
 from .http import HttpTransport
 
 # Profile-driven builders keyed by provider family / protocol alias. Concrete
@@ -33,6 +34,7 @@ PROFILE_BUILDERS: dict[str, Callable[..., LLMProvider]] = {
     "gemini_generate": _build_gemini,
     **{alias: _build_grok for alias in GROK_ALIASES},
     "xai_chat": _build_grok,
+    **{alias: _build_deepseek for alias in DEEPSEEK_ALIASES},
 }
 
 
