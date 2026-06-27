@@ -1,0 +1,13 @@
+{
+  "id": "chatcmpl_grok_0001",
+  "object": "chat.completion",
+  "model": "grok-3",
+  "choices": [
+    {
+      "index": 0,
+      "message": {"role": "assistant", "content": "A single quiet line."},
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {"prompt_tokens": 5, "completion_tokens": 7, "total_tokens": 12}
+}

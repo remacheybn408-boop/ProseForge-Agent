@@ -1,0 +1,21 @@
+# xAI / Grok provider profiles (portable).
+#
+# Model ids are concrete; the API key is the environment-driven value, read at
+# runtime from `api_key_env` and never written here. xAI exposes an
+# OpenAI-style API surface (Bearer auth, /chat/completions).
+
+providers:
+  grok_main:
+    family: xai
+    protocol: xai_chat
+    model: grok-3
+    base_url: "https://api.x.ai/v1"
+    api_key_env: XAI_API_KEY
+    privacy_class: cloud
+    certification_level: shape_tested
+    capabilities:
+      text: supported
+      streaming: supported
+      json: supported
+      tools: supported
+      vision: unverified
