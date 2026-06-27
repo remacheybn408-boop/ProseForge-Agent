@@ -17,12 +17,16 @@ from .base import LLMProvider, ProviderSpec
 from .fake import FakeProvider
 from .profiles import ProviderProfile
 from .providers.openai import OPENAI_ALIASES, build_provider as _build_openai
+from .providers.anthropic import ANTHROPIC_ALIASES, build_provider as _build_anthropic
 from .http import HttpTransport
 
 # Profile-driven builders keyed by provider family / protocol alias. Concrete
-# vendor profiles (OpenAI, ...) register here; the fake/kind path is separate.
+# vendor profiles (OpenAI, Anthropic, ...) register here; the fake/kind path is
+# separate.
 PROFILE_BUILDERS: dict[str, Callable[..., LLMProvider]] = {
-    alias: _build_openai for alias in OPENAI_ALIASES
+    **{alias: _build_openai for alias in OPENAI_ALIASES},
+    **{alias: _build_anthropic for alias in ANTHROPIC_ALIASES},
+    "anthropic_messages": _build_anthropic,
 }
 
 
