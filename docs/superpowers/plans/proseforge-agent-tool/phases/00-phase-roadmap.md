@@ -76,7 +76,7 @@ python -m pytest tests/test_config.py -q
 
 ```powershell
 python -m pytest tests/test_proseforge_adapter.py -q
-python $PROSEFORGE_ROOT\plugin\proseforge-codex\scripts\nf_project.py --action status --project-root $PROSEFORGE_ROOT
+pf-agent proseforge inspect --root "${PROSEFORGE_ROOT}" --dry-run
 ```
 
 ## Phase 3: Model Provider Layer
@@ -252,7 +252,7 @@ python -m pytest tests/test_rewrite_accept_workflow.py -q
 
 ## Phase 10: CLI, Reports, Extensions, Release
 
-**Purpose:** Make the tool usable from command line and ready for future plugin surfaces.
+**Purpose:** Make the writing workflow usable from command line and ready for future plugin surfaces.
 
 **Outputs**
 
@@ -269,4 +269,98 @@ python -m pytest tests/test_rewrite_accept_workflow.py -q
 python -m pytest -q
 pf-agent phase-plan --project-title "Demo Novel" --start-date 2026-06-26
 pf-agent daily-workbook --date 2026-06-26 --project-title "Demo Novel" --phase-name "Foundation" --main-target "Create package skeleton"
+```
+
+## Phase 11: Agent Runtime And Chat
+
+**Purpose:** Turn the tool into a complete conversational agent, not only a novel workflow runner.
+
+**Outputs**
+
+- Agent Kernel.
+- Intent router.
+- Conversation modes.
+- Tool registry and permissions.
+- Chat session store.
+- Chat CLI REPL.
+- Chat retrieval and citations.
+- Chat memory candidates.
+- Chat-to-workflow handoff.
+- Agent event bus.
+
+**Core Decisions**
+
+- Chat works without a novel project.
+- Project chat can bind to a project and cite memory, reports, plans, and workflow state.
+- Chat cannot mutate project, engine, secrets, or shell integration without permission.
+- Chat creates memory candidates, not automatically accepted canon.
+- The same kernel must support CLI chat, future TUI, future desktop UI, and local API.
+
+**Verification**
+
+```powershell
+python -m pytest tests/test_agent_kernel.py tests/test_intent_router.py tests/test_chat_cli_repl.py -q
+pf-agent chat --message "hello" --provider fake --no-project
+pf-agent chat drill --all-modes --provider fake --write-report
+```
+
+## Phase 12: Installation And Native Platforms
+
+**Purpose:** Make ProseForge Agent installable and native on Windows, macOS, and Linux.
+
+**Outputs**
+
+- First-run onboarding wizard.
+- Installation doctor.
+- Native app directory resolver.
+- Path, encoding, and terminal utilities.
+- Native secret storage adapters.
+- Provider setup wizard.
+- Source, pip, pipx, and standalone packaging checks.
+- Windows native support.
+- macOS native support.
+- Linux native support.
+- Shell completions and launchers.
+- Upgrade, migration, backup, uninstall, local model setup, local API, personas, support bundle, and native QA matrix.
+
+**Core Decisions**
+
+- No install or config document may contain machine-specific absolute paths.
+- `pf-agent init`, `pf-agent doctor`, and `pf-agent chat --message` must work on all three operating systems.
+- Native secret storage is preferred; environment variables remain a visible fallback.
+- Packaging is verified before release, not treated as documentation only.
+
+**Verification**
+
+```powershell
+python -m pytest tests/test_first_run_onboarding.py tests/test_installation_doctor.py tests/test_app_dirs.py -q
+python -m pytest tests/test_windows_native_support.py tests/test_macos_native_support.py tests/test_linux_native_support.py -q
+pf-agent release check --complete-agent --write-report
+```
+
+## Phase 13: Hardening (Cross-Cutting)
+
+**Purpose:** Close coverage gaps that span the earlier phases — spend control, agent safety, streaming UX, continuous cross-platform verification, and concurrency. These are the Hardening Cards (61–65); each is folded into the phase that owns its dependency rather than run as a strict trailing block.
+
+**Outputs**
+
+- Provider usage metering and budget (Task 61) — folds into Phase 3.
+- Agent safety and prompt-injection guard (Task 62) — folds into Phase 11.
+- Streaming responses (Task 63) — folds into Phases 3 and 11.
+- Cross-platform CI pipeline (Task 64) — established after Phase 1, strengthened through Phase 12.
+- Concurrency and locking (Task 65) — folds into Phases 4, 7, and 11.
+
+**Core Decisions**
+
+- Budgets stop spend before a call and preserve the prompt pack for resume.
+- Untrusted content can never raise the permission ceiling.
+- Streaming output must aggregate to the same text as non-streaming.
+- CI runs the suite on Windows, macOS, and Linux on every change.
+- Shared state writes serialize through one cross-platform lock.
+
+**Verification**
+
+```powershell
+python -m pytest tests/test_provider_usage_metering.py tests/test_agent_safety_guard.py tests/test_streaming_responses.py -q
+python -m pytest tests/test_ci_pipeline.py tests/test_concurrency_locking.py -q
 ```

@@ -35,6 +35,15 @@ tasks/         small implementation cards with tests and acceptance criteria
 appendices/    contracts, test matrix, risk register
 ```
 
+## Complete Agent Expansion
+
+This plan now treats ProseForge Agent as a full agent platform:
+
+- Novel-writing workflows remain the primary professional use case.
+- Chat is a first-class surface, including general chat, project chat, workflow chat, operator chat, and creative chat.
+- Installation and native operation on Windows, macOS, and Linux are part of the core product, not later polish.
+- Provider adaptation, memory, retrieval, permissions, and reports are shared by chat and writing workflows.
+
 ## Execution Rule
 
 Do not execute more than one task card without running its verification command and updating the task status. The project is large enough that partial, unverified progress will become confusing quickly.
@@ -71,6 +80,36 @@ Do not execute more than one task card without running its verification command 
 28. Provider capability probing.
 29. Provider fallback router.
 30. Provider docs refresh and certification.
+31. Agent runtime kernel.
+32. Intent router and conversation modes.
+33. Tool registry and permission policy.
+34. Chat session store.
+35. Chat CLI REPL.
+36. Chat prompt protocol.
+37. Chat retrieval and citations.
+38. Chat memory and user preferences.
+39. Chat-to-workflow handoff.
+40. Agent event bus and background jobs.
+41. First-run onboarding wizard.
+42. Installation doctor.
+43. Cross-platform app directories.
+44. Cross-platform path, encoding, and terminal support.
+45. Native secret storage.
+46. Provider setup wizard.
+47. pip, pipx, and source installation.
+48. Standalone binary packaging.
+49. Windows native support.
+50. macOS native support.
+51. Linux native support.
+52. Shell completions and launchers.
+53. Upgrade, migration, and backup.
+54. Uninstall and data retention.
+55. Offline local model setup.
+56. Local agent service API.
+57. Agent profiles and personas.
+58. Operator diagnostics and support bundle.
+59. Cross-platform native QA matrix.
+60. Complete agent release gate.
 
 ## Definition Of Done
 
@@ -78,11 +117,14 @@ The project is usable when this command sequence works on a demo project:
 
 ```powershell
 pf-agent init --config configs/agent.example.yaml
+pf-agent doctor --config configs/agent.example.yaml
+pf-agent chat --message "hello" --provider fake --no-project
 pf-agent status
 pf-agent phase-plan --project-title "Demo Novel" --start-date 2026-06-26 --write
 pf-agent daily-workbook --date 2026-06-26 --write
 pf-agent chapter run --slug demo_novel --title "Demo Novel" --vol-no 1 --chapter-no 1 --provider-role drafter
 pf-agent export --slug demo_novel --format txt
+pf-agent release check --complete-agent --write-report
 ```
 
 The release candidate must also pass:

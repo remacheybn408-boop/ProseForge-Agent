@@ -14,6 +14,8 @@ This calendar turns the large architecture plan into daily work. Each day has a 
 6. [Phase 05, Days 51-64: Chapter Production Workflow](phase-05-days-51-64.md)
 7. [Phase 06, Days 65-75: CLI, Reports, Extensions, And Operator UX](phase-06-days-65-75.md)
 8. [Phase 07, Days 76-90: End-To-End Hardening And Release](phase-07-days-76-90.md)
+9. [Phase 08, Days 91-105: Agent Runtime And Chat](phase-08-days-91-105-agent-runtime-chat.md)
+10. [Phase 09, Days 106-120: Installation And Native Platforms](phase-09-days-106-120-install-native-platforms.md)
 
 ## Phase Goals
 
@@ -27,6 +29,8 @@ This calendar turns the large architecture plan into daily work. Each day has a 
 | 05 | 2026-08-15 to 2026-08-28 | The agent can run chapter drafting, review, rewrite, accept, and export workflows. |
 | 06 | 2026-08-29 to 2026-09-08 | The operator experience, reports, extension points, and documentation are usable. |
 | 07 | 2026-09-09 to 2026-09-23 | The product survives full demo, failure drills, provider fallback drills, and release checks. |
+| 08 | 2026-09-24 to 2026-10-08 | The Agent Kernel and chat system work across general, project, workflow, operator, and creative modes. |
+| 09 | 2026-10-09 to 2026-10-23 | Installation, native OS support, local service, personas, diagnostics, and complete release gates are verified. |
 
 ## Daily Workbook Contract
 

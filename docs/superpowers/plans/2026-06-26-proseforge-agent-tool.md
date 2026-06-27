@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` or `superpowers:executing-plans` to implement these plans task by task. Each task card is intentionally small enough to execute, test, and review independently.
 
-**Goal:** Build a portable `ProseForge Agent` workspace into a professional novel-writing agent tool that orchestrates the existing ProseForge engine, deep memory, automatic retrieval, multi-model providers, daily workbooks, revision loops, and export workflows.
+**Goal:** Build a portable `ProseForge Agent` workspace into a complete agent platform: it can chat, install cleanly on Windows/macOS/Linux, orchestrate the existing ProseForge engine, maintain deep memory, retrieve context automatically, route across many model providers, generate daily workbooks, revise chapters, and export workflows.
 
-**Architecture:** The old single heavy plan has been split into smaller files. Start with the index, then read only the architecture or task card needed for the current work. `$PROSEFORGE_ROOT` remains the writing engine of record; the current Agent checkout becomes the workflow, memory, model, schedule, and orchestration layer.
+**Architecture:** The old single heavy plan has been split into smaller files. Start with the index, then read only the architecture or task card needed for the current work. `$PROSEFORGE_ROOT` remains the writing engine of record; the current Agent checkout becomes the agent runtime, chat, workflow, memory, model, install, native-platform, schedule, and orchestration layer.
 
 **Tech Stack:** Python 3.10+, SQLite FTS5, YAML/JSON, pytest, argparse, existing ProseForge wrappers, OpenAI-compatible model APIs, native Anthropic/Gemini-style adapters, optional local LLM endpoints, and Markdown/JSON artifacts.
 
@@ -33,6 +33,8 @@ Then execute one task card at a time. Do not try to implement the whole project 
 - [05 Model Provider Adapters](proseforge-agent-tool/architecture/05-model-provider-adapters.md)
 - [06 Workflow Engine](proseforge-agent-tool/architecture/06-workflow-engine.md)
 - [07 Extension Foundation](proseforge-agent-tool/architecture/07-extension-foundation.md)
+- [08 Agent Runtime And Chat](proseforge-agent-tool/architecture/08-agent-runtime-and-chat.md)
+- [09 Installation And Native Platforms](proseforge-agent-tool/architecture/09-installation-and-native-platforms.md)
 
 **Phases And Daily Work**
 
@@ -59,7 +61,7 @@ Then execute one task card at a time. Do not try to implement the whole project 
 **Task Cards**
 
 - [00 Task Index](proseforge-agent-tool/tasks/00-task-index.md)
-- Task cards live in `docs/superpowers/plans/proseforge-agent-tool/tasks/`; provider-specific cards continue after Task 17.
+- Task cards live in `docs/superpowers/plans/proseforge-agent-tool/tasks/`; platform-level agent, chat, install, and native OS cards continue after Task 30.
 
 **Appendices**
 

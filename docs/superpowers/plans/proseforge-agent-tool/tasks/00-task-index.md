@@ -21,7 +21,7 @@ paths:
 
 ## Required Task Card Shape
 
-Every task card must contain these sections: Goal, Architecture Notes, Files, Interfaces / Contracts, TDD Steps, Verification, Acceptance, Commit Boundary. The TDD section must name the exact test, command, expected failure, implementation target, expected pass, integration check, and commit boundary.
+Every task card must contain these sections: Goal, Architecture Notes, Files, Interfaces / Contracts, TDD Steps, Verification, Acceptance, Commit Boundary. Platform-level cards also include Agent Product Requirement, Data Flow, Cross-Platform Notes, and Failure Modes To Prove. The TDD section must name the exact test, command, expected failure, implementation target, expected pass, integration check, and commit boundary.
 
 ## Task Order
 
@@ -55,6 +55,47 @@ Every task card must contain these sections: Goal, Architecture Notes, Files, In
 28. [Provider Capability Probing](28-provider-capability-probing.md)
 29. [Provider Fallback Router](29-provider-fallback-router.md)
 30. [Provider Docs Refresh And Certification](30-provider-docs-refresh-and-certification.md)
+
+31. [Agent Runtime Kernel](31-agent-runtime-kernel.md)
+32. [Intent Router And Conversation Modes](32-intent-router-and-conversation-modes.md)
+33. [Tool Registry And Permission Policy](33-tool-registry-and-permission-policy.md)
+34. [Chat Session Store](34-chat-session-store.md)
+35. [Chat CLI REPL](35-chat-cli-repl.md)
+36. [Chat Prompt Protocol](36-chat-prompt-protocol.md)
+37. [Chat Retrieval And Citations](37-chat-retrieval-and-citations.md)
+38. [Chat Memory And User Preferences](38-chat-memory-and-user-preferences.md)
+39. [Chat-To-Workflow Handoff](39-chat-to-workflow-handoff.md)
+40. [Agent Event Bus And Background Jobs](40-agent-event-bus-and-background-jobs.md)
+41. [First-Run Onboarding Wizard](41-first-run-onboarding-wizard.md)
+42. [Installation Doctor](42-installation-doctor.md)
+43. [Cross-Platform App Directories](43-cross-platform-app-directories.md)
+44. [Cross-Platform Path Encoding And Terminal](44-cross-platform-path-encoding-terminal.md)
+45. [Native Secret Storage](45-native-secret-storage.md)
+46. [Provider Setup Wizard](46-provider-setup-wizard.md)
+47. [pip, pipx, And Source Installation](47-pip-pipx-source-installation.md)
+48. [Standalone Binary Packaging](48-standalone-binary-packaging.md)
+49. [Windows Native Support](49-windows-native-support.md)
+50. [macOS Native Support](50-macos-native-support.md)
+51. [Linux Native Support](51-linux-native-support.md)
+52. [Shell Completions And Launchers](52-shell-completions-and-launchers.md)
+53. [Upgrade, Migration, And Backup](53-upgrade-migration-and-backup.md)
+54. [Uninstall And Data Retention](54-uninstall-and-data-retention.md)
+55. [Offline Local Model Setup](55-offline-local-model-setup.md)
+56. [Local Agent Service API](56-local-agent-service-api.md)
+57. [Agent Profiles And Personas](57-agent-profiles-and-personas.md)
+58. [Operator Diagnostics And Support Bundle](58-operator-diagnostics-and-support-bundle.md)
+59. [Cross-Platform Native QA Matrix](59-cross-platform-native-qa-matrix.md)
+60. [Complete Agent Release Gate](60-complete-agent-release-gate.md)
+
+## Hardening Cards (61–65)
+
+These cards close coverage gaps in the 1–60 plan. They are numbered as an appendix to avoid renumbering existing cards; each notes the point in the 1–60 order after which it should logically execute.
+
+61. [Provider Usage Metering And Budget](61-provider-usage-metering-and-budget.md) — execute after Tasks 04–06 (provider layer).
+62. [Agent Safety And Prompt-Injection Guard](62-agent-safety-and-prompt-injection-guard.md) — execute after Task 33 (permissions) and Task 09 (retrieval).
+63. [Streaming Responses](63-streaming-responses.md) — execute after Tasks 04–06 and Task 35 (chat REPL).
+64. [Cross-Platform CI Pipeline](64-cross-platform-ci-pipeline.md) — execute after Task 01; strengthen as Tasks 49–51, 59 land.
+65. [Concurrency And Locking](65-concurrency-and-locking.md) — execute after Task 07 (memory), Task 12 (workflow state), and Task 40 (jobs).
 
 ## Execution Rule
 
