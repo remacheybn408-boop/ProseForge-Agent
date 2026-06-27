@@ -1,0 +1,33 @@
+# ProseForge Agent — example provider configuration.
+#
+# This file works fully offline: the only configured provider is the
+# deterministic "fake" provider, which needs no network and no API key.
+# Real providers (OpenAI-compatible, native Anthropic/Gemini) are added by
+# later tasks; sample entries are shown commented out below.
+
+default_provider: fake_main
+
+providers:
+  - name: fake_main
+    kind: fake
+    model: fake-novelist
+    options: {}
+
+  # Example real provider (enabled by a later task). Secrets come from the
+  # environment, never inline:
+  # - name: domestic_main
+  #   kind: openai_compatible
+  #   model: model-name
+  #   options:
+  #     base_url: "https://provider.example/v1"
+  #     api_key_env: "DOMESTIC_LLM_API_KEY"
+  #     timeout_seconds: 120
+
+# Each writing role routes to a provider name above. Unmapped roles fall back
+# to default_provider.
+roles:
+  planner: fake_main
+  drafter: fake_main
+  critic: fake_main
+  reviser: fake_main
+  memory: fake_main
