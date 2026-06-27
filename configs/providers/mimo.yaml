@@ -1,0 +1,23 @@
+# Xiaomi MiMo provider profiles (portable).
+#
+# MiMo has no single official cloud endpoint: it runs via self-hosting or an
+# OpenAI-compatible gateway, so `base_url` is a REQUIRED, operator-configured
+# value (no built-in vendor default). The API key (account auth) is the
+# environment-driven value, read at runtime from `api_key_env` and never written
+# here.
+
+providers:
+  mimo_main:
+    family: mimo
+    protocol: mimo_openai
+    model: mimo-7b
+    base_url: "https://api-mimo.xiaomi.com/v1"   # configurable: replace with your self-hosted / gateway route
+    api_key_env: MIMO_API_KEY
+    privacy_class: cloud
+    certification_level: shape_tested
+    capabilities:
+      text: supported
+      streaming: supported
+      json: supported
+      tools: unverified
+      vision: unverified
