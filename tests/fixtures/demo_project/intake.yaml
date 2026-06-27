@@ -1,0 +1,12 @@
+slug: "demo_novel"
+title: "Demo Novel"
+genre: "fantasy"
+target_chapters: 12
+market: "serialized web fiction"
+length: "long"
+cadence: "daily"
+tone: "冷峻"
+audience: "成人向"
+constraints:
+  - "不得提前揭示反派身份"
+  - "保持第三人称限知视角"

@@ -64,6 +64,16 @@ class MemoryStore:
     def initialize(self) -> None:
         apply_schema(self._conn)
 
+    def close(self) -> None:
+        """Close the underlying SQLite connection (releases the file lock)."""
+        self._conn.close()
+
+    def __enter__(self) -> "MemoryStore":
+        return self
+
+    def __exit__(self, *exc) -> None:
+        self.close()
+
     # -- writes ----------------------------------------------------------
 
     def add(self, item: MemoryItem) -> MemoryItem:
