@@ -5,6 +5,7 @@ workflow state into a single, resumable, fully-offline chapter run. It is
 imported by the CLI and higher-level orchestration, never by those subsystems.
 """
 
+from .accept import AcceptanceError, AcceptanceRecord, ChapterAcceptor
 from .context import (
     ChapterContextBuilder,
     ChapterContextPackage,
@@ -16,6 +17,23 @@ from .lifecycle import (
     ChapterLifecycle,
     ChapterProject,
     ChapterRunResult,
+)
+from .review import (
+    REVIEW_CATEGORIES,
+    ChapterReviewer,
+    ReviewedChapter,
+    ReviewFinding,
+    ReviewPromptBuilder,
+    ReviewReport,
+)
+from .rewrite import (
+    RevisedDraft,
+    RevisionValidator,
+    RewriteItem,
+    RewritePlan,
+    RewritePlanner,
+    RewritePromptBuilder,
+    Rewriter,
 )
 
 __all__ = [
@@ -30,4 +48,20 @@ __all__ = [
     "ChapterArtifacts",
     "ChapterRunResult",
     "ChapterLifecycle",
+    "REVIEW_CATEGORIES",
+    "ReviewFinding",
+    "ReviewReport",
+    "ReviewedChapter",
+    "ReviewPromptBuilder",
+    "ChapterReviewer",
+    "RewriteItem",
+    "RewritePlan",
+    "RewritePlanner",
+    "RewritePromptBuilder",
+    "RevisedDraft",
+    "Rewriter",
+    "RevisionValidator",
+    "AcceptanceError",
+    "AcceptanceRecord",
+    "ChapterAcceptor",
 ]
