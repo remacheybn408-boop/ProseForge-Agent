@@ -1,0 +1,24 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "role": "model",
+        "parts": [
+          {"text": "A single quiet line."},
+          {"functionCall": {"name": "noop", "args": {}}}
+        ]
+      },
+      "finishReason": "STOP",
+      "safetyRatings": [
+        {"category": "HARM_CATEGORY_HARASSMENT", "probability": "NEGLIGIBLE"}
+      ]
+    }
+  ],
+  "promptFeedback": {"safetyRatings": []},
+  "usageMetadata": {
+    "promptTokenCount": 5,
+    "candidatesTokenCount": 7,
+    "totalTokenCount": 12
+  },
+  "modelVersion": "gemini-2.0-flash"
+}

@@ -1,0 +1,36 @@
+# Google / Gemini provider profiles (portable).
+#
+# Model ids are concrete; the API key is the environment-driven value, read at
+# runtime from `api_key_env` and never written here. The main profile speaks the
+# native GenerateContent API; the `gemini_openai` profile uses Google's
+# OpenAI-compatible endpoint.
+
+providers:
+  gemini_main:            # native GenerateContent
+    family: gemini
+    protocol: gemini_generate
+    model: gemini-2.0-flash
+    base_url: "https://generativelanguage.googleapis.com/v1beta"
+    api_key_env: GEMINI_API_KEY
+    privacy_class: cloud
+    certification_level: shape_tested
+    capabilities:
+      text: supported
+      streaming: supported
+      json: supported
+      tools: supported
+      vision: supported
+  gemini_openai:          # OpenAI-compatible bridge
+    family: gemini
+    protocol: gemini_openai
+    model: gemini-2.0-flash
+    base_url: "https://generativelanguage.googleapis.com/v1beta/openai"
+    api_key_env: GEMINI_API_KEY
+    privacy_class: cloud
+    certification_level: shape_tested
+    capabilities:
+      text: supported
+      streaming: supported
+      json: supported
+      tools: supported
+      vision: supported

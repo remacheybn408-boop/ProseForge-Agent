@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": 401,
+    "status": "UNAUTHENTICATED",
+    "message": "API key not valid"
+  }
+}
