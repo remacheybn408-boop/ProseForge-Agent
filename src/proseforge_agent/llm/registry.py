@@ -24,6 +24,7 @@ from .providers.deepseek import DEEPSEEK_ALIASES, build_provider as _build_deeps
 from .providers.qwen import QWEN_ALIASES, build_provider as _build_qwen
 from .providers.glm import GLM_ALIASES, build_provider as _build_glm
 from .providers.mimo import MIMO_ALIASES, build_provider as _build_mimo
+from .providers.minimax import MINIMAX_ALIASES, build_provider as _build_minimax
 from .http import HttpTransport
 
 # Profile-driven builders keyed by provider family / protocol alias. Concrete
@@ -44,6 +45,7 @@ PROFILE_BUILDERS: dict[str, Callable[..., LLMProvider]] = {
     "bigmodel_openai": _build_glm,
     **{alias: _build_mimo for alias in MIMO_ALIASES},
     "mimo_openai": _build_mimo,
+    **{alias: _build_minimax for alias in MINIMAX_ALIASES},
 }
 
 

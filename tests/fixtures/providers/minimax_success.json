@@ -1,0 +1,18 @@
+{
+  "id": "chatcmpl_minimax_0001",
+  "object": "chat.completion",
+  "model": "MiniMax-Text-01",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "A single quiet line.",
+        "reasoning_content": "Think: stay terse and calm."
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {"prompt_tokens": 5, "completion_tokens": 7, "total_tokens": 12},
+  "base_resp": {"status_code": 0, "status_msg": "success"}
+}

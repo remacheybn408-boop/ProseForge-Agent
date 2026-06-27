@@ -1,0 +1,22 @@
+# MiniMax provider profiles (portable).
+#
+# Model ids are concrete; the API key is the environment-driven value, read at
+# runtime from `api_key_env` and never written here. MiniMax exposes an
+# OpenAI-compatible Chat Completions surface (Bearer auth) and adds a
+# `reasoning_content` field on thinking models plus multimodal metadata.
+
+providers:
+  minimax_main:
+    family: minimax
+    protocol: minimax_chat
+    model: MiniMax-Text-01
+    base_url: "https://api.minimaxi.com/v1"
+    api_key_env: MINIMAX_API_KEY
+    privacy_class: cloud
+    certification_level: shape_tested
+    capabilities:
+      text: supported
+      streaming: supported
+      json: supported
+      tools: supported
+      vision: unverified
