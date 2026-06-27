@@ -1,0 +1,22 @@
+# Qwen / DashScope (Alibaba Cloud) provider profiles (portable).
+#
+# Model ids are concrete; the API key is the environment-driven value, read at
+# runtime from `api_key_env` and never written here. DashScope exposes an
+# OpenAI-compatible surface (Bearer auth) under its `compatible-mode` base URL.
+# An optional workspace is selected via the DASHSCOPE_WORKSPACE_ID env var.
+
+providers:
+  qwen_main:
+    family: qwen
+    protocol: dashscope_openai
+    model: qwen-plus
+    base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    api_key_env: DASHSCOPE_API_KEY
+    privacy_class: cloud
+    certification_level: shape_tested
+    capabilities:
+      text: supported
+      streaming: supported
+      json: supported
+      tools: supported
+      vision: unverified

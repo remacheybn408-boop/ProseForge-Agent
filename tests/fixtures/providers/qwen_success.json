@@ -1,0 +1,23 @@
+{
+  "id": "chatcmpl_qwen_0001",
+  "object": "chat.completion",
+  "model": "qwen-plus",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "A single quiet line.",
+        "tool_calls": [
+          {
+            "id": "call_0001",
+            "type": "function",
+            "function": {"name": "noop", "arguments": "{}"}
+          }
+        ]
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {"prompt_tokens": 5, "completion_tokens": 7, "total_tokens": 12}
+}
