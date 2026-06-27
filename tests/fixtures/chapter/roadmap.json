@@ -1,0 +1,14 @@
+{
+  "project_slug": "demo",
+  "chapters": [
+    {
+      "chapter_no": 1,
+      "title": "启程",
+      "target_length": 2000,
+      "scene_beats": ["主角接到密信", "雨夜离城"],
+      "constraints": ["不得提前揭示反派身份"],
+      "gates": ["建立主角动机", "埋下密信伏笔"],
+      "previous_summary": ""
+    }
+  ]
+}
