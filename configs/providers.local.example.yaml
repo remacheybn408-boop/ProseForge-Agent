@@ -1,0 +1,41 @@
+# ProseForge Agent — local & gateway provider profiles (example).
+#
+# Local profiles need no API key: they talk to a model server running on your
+# own machine. Gateway profiles (e.g. OpenRouter) read their key from the
+# environment via api_key_env — never inline a secret here.
+#
+# Capability fields are intentionally omitted; they default to "unknown" until
+# a provider is certified.
+
+providers:
+  ollama_main:
+    family: ollama
+    protocol: local_openai_compatible
+    base_url: http://localhost:11434/v1
+    model: llama-local
+
+  lmstudio_main:
+    family: lmstudio
+    protocol: local_openai_compatible
+    base_url: http://localhost:1234/v1
+    model: lmstudio-local
+
+  vllm_main:
+    family: vllm
+    protocol: local_openai_compatible
+    base_url: http://localhost:8000/v1
+    model: vllm-local
+
+  llamacpp_main:
+    family: llamacpp
+    protocol: local_openai_compatible
+    base_url: http://localhost:8080/v1
+    model: llamacpp-local
+
+  openrouter_gateway:
+    family: openrouter
+    protocol: openai_compatible
+    base_url: https://openrouter.ai/api/v1
+    model: openrouter-model
+    api_key_env: OPENROUTER_API_KEY
+    privacy_class: foreign
