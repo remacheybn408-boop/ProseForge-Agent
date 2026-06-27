@@ -364,3 +364,34 @@ pf-agent release check --complete-agent --write-report
 python -m pytest tests/test_provider_usage_metering.py tests/test_agent_safety_guard.py tests/test_streaming_responses.py -q
 python -m pytest tests/test_ci_pipeline.py tests/test_concurrency_locking.py -q
 ```
+
+## Phase 14: Autonomous Agent Runtime
+
+**Purpose:** Give the agent Claude-Code-class runtime maturity — a bounded multi-step autonomous loop, task decomposition, self-verification, a general tool framework with a sandbox, sub-agent delegation, interruptibility, and a task-success eval harness. Novel writing becomes the first vertical capability on this runtime (see `architecture/11-autonomous-agent-runtime.md`).
+
+**Outputs**
+
+- Autonomous agent loop with budgets and context compaction (Task 68).
+- Task planner and TODO tracking (Task 69).
+- Self-verification and reflection/retry; ProseForge gates as domain verifiers (Task 70).
+- General tool framework: filesystem and web tools (Task 71).
+- Tool execution sandbox and approval policy (Task 72).
+- Sub-agent delegation (Task 73).
+- Interruptibility and steering (Task 74).
+- Agent eval and task-success harness (Task 75).
+
+**Core Decisions**
+
+- The loop reuses the per-turn kernel (Task 31) unmodified.
+- Every run is bounded by iteration and cost budgets, a no-progress detector, and interruptibility.
+- Write/execute tools are gated by permission, safety, sandbox, and approval.
+- Task-success rate is an enforced release gate.
+
+**Verification**
+
+```powershell
+python -m pytest tests/test_agent_loop.py tests/test_task_planner.py tests/test_self_verification.py -q
+python -m pytest tests/test_general_tools.py tests/test_tool_sandbox.py tests/test_sub_agent.py tests/test_control_interrupt.py -q
+python -m pytest tests/eval -q
+pf-agent run --goal "draft a one-line opening" --provider fake --max-iterations 5
+```

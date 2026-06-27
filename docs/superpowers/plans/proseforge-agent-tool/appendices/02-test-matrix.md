@@ -69,6 +69,14 @@ The test matrix verifies ProseForge Agent as a complete agent product: novel wor
 | Capabilities | `tests/test_capabilities.py` | flag disable, auto-disable on self-check failure, safe-mode boot |
 | Boundary contracts | `tests/contracts/test_boundary_contracts.py` | each cross-subsystem interface shape holds with canonical fakes |
 | Golden regression | `tests/golden/test_golden_outputs.py` | deterministic outputs match stored snapshots |
+| Autonomous loop | `tests/test_agent_loop.py` | multi-step run, iteration/cost budget, no-progress stop, context compaction |
+| Task planner | `tests/test_task_planner.py` | decomposition, status transitions, blocked tasks, mid-run revision |
+| Self-verification | `tests/test_self_verification.py` | criteria check, bounded reflection retry, pluggable domain verifiers |
+| General tools | `tests/test_general_tools.py` | fs confined to workspace, web needs permission, structured tool results |
+| Tool sandbox | `tests/test_tool_sandbox.py` | permission+approval gate, workspace confinement, timeout, safety block |
+| Sub-agent | `tests/test_sub_agent.py` | scoped/clamped permissions, isolated failure, aggregation, parallel |
+| Interruptibility | `tests/test_control_interrupt.py` | safe-point interrupt, resumable checkpoint, steer merge |
+| Agent eval | `tests/eval/test_agent_eval.py` | task-success rate over golden suite, threshold gate, determinism |
 
 ## Cross-Platform Native Matrix
 
@@ -142,3 +150,5 @@ python -m pytest -q
 - Cards use the canonical fakes in `src/proseforge_agent/testing/fakes.py`; do not redefine drifting per-card fakes.
 - Every cross-subsystem interface has a contract test in `tests/contracts/`; changing an interface updates its contract test in the same commit.
 - Deterministic outputs have golden snapshots in `tests/golden/`; the contract and golden tiers are required gates in CI and the release gate.
+- Every autonomous run is bounded by an iteration budget and a cost budget and is interruptible; tests must prove the loop cannot run unbounded.
+- Write/execute tools run only under sufficient permission plus approval and inside the workspace sandbox; tests must prove refusal without them.

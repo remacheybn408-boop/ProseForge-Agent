@@ -99,7 +99,20 @@ These cards close coverage gaps in the 1–60 plan. They are numbered as an appe
 66. [Capability Flags And Safe-Mode Boot](66-capability-flags-and-safe-mode.md) — execute after Task 42 (doctor) and Task 40 (events).
 67. [Cross-Module Contract And Golden Regression Tests](67-contract-and-golden-tests.md) — establish canonical fakes after Task 04; add boundary/golden cases as subsystems land; consumed by Tasks 64 and 60.
 
-The maintainability contract these cards enforce is documented in [Modularity, Fault Isolation, And Recovery](../architecture/10-modularity-and-recovery.md).
+## Autonomous Agent Runtime Cards (68–75)
+
+These give the agent Claude-Code-class runtime maturity with novel writing as the first vertical capability. See [Autonomous Agent Runtime](../architecture/11-autonomous-agent-runtime.md).
+
+68. [Autonomous Agent Loop](68-autonomous-agent-loop.md) — execute after Task 31 (kernel).
+69. [Task Planner And TODO Tracking](69-task-planner-and-todo.md) — execute after Task 31; consumed by Task 68.
+70. [Self-Verification And Reflection](70-self-verification-and-reflection.md) — execute after Tasks 31 and 69; ProseForge gates register as domain verifiers.
+71. [General Tool Framework And Filesystem/Web Tools](71-general-tool-framework.md) — execute after Task 33; reuses Task 02 path containment and Task 62 safety.
+72. [Tool Execution Sandbox And Approval Policy](72-tool-execution-sandbox.md) — execute after Tasks 33, 62, and 71.
+73. [Sub-Agent Delegation](73-sub-agent-delegation.md) — execute after Tasks 68, 69, and 33.
+74. [Interruptibility And Steering](74-interruptibility-and-steering.md) — execute after Tasks 68 and 69.
+75. [Agent Eval And Task-Success Harness](75-agent-eval-harness.md) — execute after Tasks 68 and 70; consumed by Tasks 64 and 60.
+
+The maintainability contract these cards enforce is documented in [Modularity, Fault Isolation, And Recovery](../architecture/10-modularity-and-recovery.md). The autonomous runtime design is in [Autonomous Agent Runtime](../architecture/11-autonomous-agent-runtime.md).
 
 ## Execution Rule
 

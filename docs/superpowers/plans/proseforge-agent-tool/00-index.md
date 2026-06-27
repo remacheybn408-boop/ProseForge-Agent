@@ -123,7 +123,20 @@ These close coverage gaps in the 1–60 plan and are folded into the phase that 
 66. Capability flags and safe-mode boot.
 67. Cross-module contract and golden regression tests.
 
-The maintainer contract for fault isolation, three-tier rollback, the debugging runbook, and the internal interface compatibility policy lives in `architecture/10-modularity-and-recovery.md`.
+### Autonomous Agent Runtime (68–75)
+
+These give the agent Claude-Code-class runtime maturity, with novel writing as the first vertical capability (see `architecture/11-autonomous-agent-runtime.md`):
+
+68. Autonomous agent loop (multi-step, budgeted, context compaction).
+69. Task planner and TODO tracking.
+70. Self-verification and reflection/retry.
+71. General tool framework (filesystem and web tools).
+72. Tool execution sandbox and approval policy.
+73. Sub-agent delegation.
+74. Interruptibility and steering.
+75. Agent eval and task-success harness.
+
+The maintainer contract for fault isolation, three-tier rollback, the debugging runbook, and the internal interface compatibility policy lives in `architecture/10-modularity-and-recovery.md`. The autonomous runtime design lives in `architecture/11-autonomous-agent-runtime.md`.
 
 ## Definition Of Done
 

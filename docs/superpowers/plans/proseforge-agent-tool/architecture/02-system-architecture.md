@@ -53,8 +53,15 @@ src/proseforge_agent/
 |- capabilities.py           capability flags + safe-mode boot (Task 66)
 |- agent/
 |  |- kernel.py              per-turn agent loop
+|  |- loop.py                multi-step autonomous loop + context compaction (Task 68)
+|  |- planner.py             goal decomposition + TODO tracking (Task 69)
+|  |- reflection.py          self-verification + reflection/retry (Task 70)
 |  |- intent_router.py       chat and command intent classification
-|  |- tools.py               internal tool registry
+|  |- tools.py               internal + general tool registry (fs/web, Task 71)
+|  |- sandbox.py             tool execution sandbox + approval (Task 72)
+|  |- subagent.py            scoped sub-agent delegation (Task 73)
+|  |- control.py             interrupt + steering tokens (Task 74)
+|  |- eval.py                task-success eval harness (Task 75)
 |  |- permissions.py         read/write/system permission policy
 |  |- safety.py              prompt-injection guard (Task 62)
 |  |- profiles.py            agent profiles and personas (Task 57)

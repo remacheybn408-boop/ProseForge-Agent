@@ -47,6 +47,10 @@
 | One subsystem corrupts another's data | Data loss spreads | Blast-Radius Contract (`architecture/10`); writes isolated behind stores; shared lock (Task 65); migration backup (Task 53) |
 | Fault is hard to diagnose | Slow repair | Debugging runbook (`architecture/10`): trace id (Task 40) → event log → support bundle (Task 58) → isolate with canonical fakes (Task 67) |
 | Drifting per-card test fakes | Inconsistent test coverage | One authoritative fakes module (Task 67) reused across cards |
+| Autonomous loop runs away | Wasted cost, stuck process | Iteration + cost budget (Tasks 68/61), no-progress detector, interruptibility (Task 74), capability disable (Task 66) |
+| Tool execution harms the system | Data loss or unsafe commands | Workspace confinement + sandbox + approval (Tasks 71/72), permission ceiling (Task 33), injection guard (Task 62) |
+| Sub-agent escalates permissions | Privilege escape | Ceiling clamped to parent grant; isolated context (Task 73) |
+| Agent quality regresses silently | Lower task success over time | Task-success eval harness as a release gate (Tasks 75/60/64) |
 
 ## Risk Review Cadence
 
