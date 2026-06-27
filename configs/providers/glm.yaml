@@ -1,0 +1,36 @@
+# Zhipu GLM (BigModel) provider profiles (portable).
+#
+# Model ids are concrete; the API key is the environment-driven value, read at
+# runtime from `api_key_env` and never written here. BigModel exposes an
+# OpenAI-compatible surface (Bearer auth). The coding plan is a separate route
+# under a distinct base URL.
+
+providers:
+  glm_main:               # BigModel main route
+    family: glm
+    protocol: bigmodel_openai
+    model: glm-4.6
+    base_url: "https://open.bigmodel.cn/api/paas/v4"
+    api_key_env: ZHIPU_API_KEY
+    privacy_class: cloud
+    certification_level: shape_tested
+    capabilities:
+      text: supported
+      streaming: supported
+      json: supported
+      tools: supported
+      vision: unverified
+  glm_coding:             # separate coding plan route
+    family: glm
+    protocol: glm_coding_plan
+    model: glm-4.6
+    base_url: "https://open.bigmodel.cn/api/coding/paas/v4"
+    api_key_env: ZHIPU_API_KEY
+    privacy_class: cloud
+    certification_level: shape_tested
+    capabilities:
+      text: supported
+      streaming: supported
+      json: supported
+      tools: supported
+      vision: unverified

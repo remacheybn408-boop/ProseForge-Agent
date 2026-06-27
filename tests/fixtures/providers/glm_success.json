@@ -1,0 +1,14 @@
+{
+  "id": "chatcmpl_glm_0001",
+  "request_id": "req_glm_0001",
+  "object": "chat.completion",
+  "model": "glm-4.6",
+  "choices": [
+    {
+      "index": 0,
+      "message": {"role": "assistant", "content": "A single quiet line."},
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {"prompt_tokens": 5, "completion_tokens": 7, "total_tokens": 12}
+}
