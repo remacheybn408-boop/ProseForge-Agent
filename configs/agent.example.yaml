@@ -1,0 +1,21 @@
+# ProseForge Agent — example configuration (portable).
+#
+# This file must never contain a machine-specific absolute path. Paths come
+# from environment variables, with sensible defaults where useful. Relative
+# paths resolve from the directory that contains this config file.
+#
+# ${VAR}            -> required environment variable
+# ${VAR:-default}   -> environment variable, falling back to "default"
+
+paths:
+  # Root of your existing ProseForge engine checkout.
+  proseforge_root: "${PROSEFORGE_ROOT}"
+  # Agent-owned workspace. Defaults to a local ".pf-agent" folder.
+  workspace_root: "${PROSEFORGE_AGENT_WORKSPACE:-.pf-agent}"
+
+project:
+  slug: "demo_novel"
+  title: "Demo Novel"
+
+# Provider profiles are loaded from a separate file (added by a later task).
+providers_config_path: "configs/providers.example.yaml"
