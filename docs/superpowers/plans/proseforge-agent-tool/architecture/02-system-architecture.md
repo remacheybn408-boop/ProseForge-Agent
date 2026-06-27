@@ -50,6 +50,7 @@ src/proseforge_agent/
 |- errors.py                 typed exceptions
 |- cli.py                    command entry point
 |- concurrency.py            shared file lock + SQLite retry (Task 65)
+|- capabilities.py           capability flags + safe-mode boot (Task 66)
 |- agent/
 |  |- kernel.py              per-turn agent loop
 |  |- intent_router.py       chat and command intent classification
@@ -122,10 +123,16 @@ src/proseforge_agent/
 |  `- api.py                 optional local-only HTTP surface over the kernel (Task 56)
 |- release/
 |  `- complete_agent_gate.py release gate aggregator (Task 60)
-`- extension/
-   |- contracts.py           provider, step, retriever contracts
-   `- registry.py            extension registry
+|- extension/
+|  |- contracts.py           provider, step, retriever contracts
+|  `- registry.py            extension registry
+`- testing/
+   `- fakes.py               canonical fakes + contract harness (Task 67)
 ```
+
+For the cross-cutting maintainability contract — blast-radius rules, module
+ownership map, three-tier rollback, the debugging runbook, and the internal
+interface compatibility policy — see `10-modularity-and-recovery.md`.
 
 ## Workspace Layout
 

@@ -111,6 +111,20 @@ Do not execute more than one task card without running its verification command 
 59. Cross-platform native QA matrix.
 60. Complete agent release gate.
 
+## Cross-Cutting Hardening Cards (61–67)
+
+These close coverage gaps in the 1–60 plan and are folded into the phase that owns each dependency (see `phases/00-phase-roadmap.md` Phase 13 and `tasks/00-task-index.md`):
+
+61. Provider usage metering and budget.
+62. Agent safety and prompt-injection guard.
+63. Streaming responses.
+64. Cross-platform CI pipeline.
+65. Concurrency and locking.
+66. Capability flags and safe-mode boot.
+67. Cross-module contract and golden regression tests.
+
+The maintainer contract for fault isolation, three-tier rollback, the debugging runbook, and the internal interface compatibility policy lives in `architecture/10-modularity-and-recovery.md`.
+
 ## Definition Of Done
 
 The project is usable when this command sequence works on a demo project:

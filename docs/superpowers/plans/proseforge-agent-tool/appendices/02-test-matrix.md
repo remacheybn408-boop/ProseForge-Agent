@@ -66,6 +66,9 @@ The test matrix verifies ProseForge Agent as a complete agent product: novel wor
 | Streaming | `tests/test_streaming_responses.py` | aggregated stream equals non-streaming; single-chunk fallback |
 | CI pipeline | `tests/test_ci_pipeline.py` | three-OS matrix, pytest step, QA-matrix parity |
 | Concurrency | `tests/test_concurrency_locking.py` | serialized writers, clean lock timeout, SQLite busy retry |
+| Capabilities | `tests/test_capabilities.py` | flag disable, auto-disable on self-check failure, safe-mode boot |
+| Boundary contracts | `tests/contracts/test_boundary_contracts.py` | each cross-subsystem interface shape holds with canonical fakes |
+| Golden regression | `tests/golden/test_golden_outputs.py` | deterministic outputs match stored snapshots |
 
 ## Cross-Platform Native Matrix
 
@@ -136,3 +139,6 @@ python -m pytest -q
 - Native OS tests must simulate all three operating systems in unit tests and record manual evidence before release.
 - No test fixture may contain machine-specific absolute paths.
 - Secret-like strings must be redacted from logs, reports, support bundles, and assertion output.
+- Cards use the canonical fakes in `src/proseforge_agent/testing/fakes.py`; do not redefine drifting per-card fakes.
+- Every cross-subsystem interface has a contract test in `tests/contracts/`; changing an interface updates its contract test in the same commit.
+- Deterministic outputs have golden snapshots in `tests/golden/`; the contract and golden tiers are required gates in CI and the release gate.

@@ -96,6 +96,10 @@ These cards close coverage gaps in the 1–60 plan. They are numbered as an appe
 63. [Streaming Responses](63-streaming-responses.md) — execute after Tasks 04–06 and Task 35 (chat REPL).
 64. [Cross-Platform CI Pipeline](64-cross-platform-ci-pipeline.md) — execute after Task 01; strengthen as Tasks 49–51, 59 land.
 65. [Concurrency And Locking](65-concurrency-and-locking.md) — execute after Task 07 (memory), Task 12 (workflow state), and Task 40 (jobs).
+66. [Capability Flags And Safe-Mode Boot](66-capability-flags-and-safe-mode.md) — execute after Task 42 (doctor) and Task 40 (events).
+67. [Cross-Module Contract And Golden Regression Tests](67-contract-and-golden-tests.md) — establish canonical fakes after Task 04; add boundary/golden cases as subsystems land; consumed by Tasks 64 and 60.
+
+The maintainability contract these cards enforce is documented in [Modularity, Fault Isolation, And Recovery](../architecture/10-modularity-and-recovery.md).
 
 ## Execution Rule
 

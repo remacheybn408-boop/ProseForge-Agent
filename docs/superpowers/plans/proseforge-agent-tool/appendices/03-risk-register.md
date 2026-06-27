@@ -36,6 +36,18 @@
 | Generated local files committed | Repository bloat | Ignore workspace outputs later |
 | Docs drift from commands | User confusion | CLI tests and docs audit before release |
 
+## Maintainability And Late-Stage Risks
+
+| Risk | Impact | Mitigation |
+| --- | --- | --- |
+| Bugs pile up in late subsystems | A broken module blocks the whole product | Capability flags + safe-mode boot (Task 66): disable the module, ship degraded |
+| A subsystem cannot be fixed in time | Release stalls | Three-tier rollback (`architecture/10`): revert the card commit, restore migration backup, or disable the capability |
+| Cross-module change breaks a distant module | Late, hard-to-locate integration bugs | Contract tests per boundary + golden snapshots (Task 67); CI runs them every change (Task 64) |
+| Internal interface drifts | Silent breakage across subsystems | Interface compatibility policy (`architecture/10`): contract test updated in the same commit, one-version shim before removal |
+| One subsystem corrupts another's data | Data loss spreads | Blast-Radius Contract (`architecture/10`); writes isolated behind stores; shared lock (Task 65); migration backup (Task 53) |
+| Fault is hard to diagnose | Slow repair | Debugging runbook (`architecture/10`): trace id (Task 40) → event log → support bundle (Task 58) → isolate with canonical fakes (Task 67) |
+| Drifting per-card test fakes | Inconsistent test coverage | One authoritative fakes module (Task 67) reused across cards |
+
 ## Risk Review Cadence
 
 Review this file:
@@ -44,3 +56,5 @@ Review this file:
 - After Task 07.
 - After Task 13.
 - Before Task 17 release hardening.
+- After Task 40 (runtime now has chat, background jobs, and concurrency — re-check fault isolation and blast radius).
+- Before Task 60 (release gate — re-check maintainability: capabilities, rollback paths, contract/golden coverage).
