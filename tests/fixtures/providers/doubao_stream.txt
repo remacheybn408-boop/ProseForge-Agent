@@ -1,0 +1,7 @@
+data: {"choices":[{"index":0,"delta":{"role":"assistant","content":"Hello"}}]}
+
+data: {"choices":[{"index":0,"delta":{"content":" from"}}]}
+
+data: {"choices":[{"index":0,"delta":{"content":" Doubao"}}]}
+
+data: [DONE]

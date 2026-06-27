@@ -1,0 +1,37 @@
+# Volcengine Doubao (Ark) provider profiles (portable).
+#
+# Model ids are concrete; the API key is the environment-driven value, read at
+# runtime from `api_key_env` and never written here. Ark exposes an
+# OpenAI-compatible surface (Bearer auth). The request `model` field accepts
+# either a model name or an inference endpoint id (`ep-...`); the region is
+# carried by the base URL host.
+
+providers:
+  doubao_main:            # model-name routing
+    family: doubao
+    protocol: ark_openai
+    model: doubao-pro-32k
+    base_url: "https://ark.cn-beijing.volces.com/api/v3"
+    api_key_env: ARK_API_KEY
+    privacy_class: cloud
+    certification_level: shape_tested
+    capabilities:
+      text: supported
+      streaming: supported
+      json: supported
+      tools: supported
+      vision: unverified
+  doubao_endpoint:        # endpoint-id routing
+    family: doubao
+    protocol: ark_openai
+    model: ep-20250101000000-abcde
+    base_url: "https://ark.cn-beijing.volces.com/api/v3"
+    api_key_env: ARK_API_KEY
+    privacy_class: cloud
+    certification_level: shape_tested
+    capabilities:
+      text: supported
+      streaming: supported
+      json: supported
+      tools: supported
+      vision: unverified
