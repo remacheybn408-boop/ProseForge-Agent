@@ -137,6 +137,16 @@ class MemoryStore:
             )
         return self.get(new_id)
 
+    def mark_superseded(self, item_id: int) -> None:
+        """Mark a single item superseded. Used by many-to-one compaction."""
+        if self.get(item_id) is None:
+            raise MemoryError(f"cannot supersede unknown memory item {item_id}")
+        with self._conn:
+            self._conn.execute(
+                "UPDATE memory_items SET status = 'superseded', updated_at = ? WHERE id = ?",
+                (_now(), item_id),
+            )
+
     # -- reads -----------------------------------------------------------
 
     def get(self, item_id: int) -> MemoryItem | None:
