@@ -1,0 +1,4 @@
+data: {"id":"chatcmpl-openai-stream","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"role":"assistant","content":"Hello"}}]}
+data: {"id":"chatcmpl-openai-stream","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":" from"}}]}
+data: {"id":"chatcmpl-openai-stream","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":" OpenAI"}}]}
+data: [DONE]

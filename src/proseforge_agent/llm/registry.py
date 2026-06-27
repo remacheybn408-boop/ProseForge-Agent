@@ -15,6 +15,28 @@ import yaml
 from ..errors import ConfigurationError
 from .base import LLMProvider, ProviderSpec
 from .fake import FakeProvider
+from .profiles import ProviderProfile
+from .providers.openai import OPENAI_ALIASES, build_provider as _build_openai
+from .http import HttpTransport
+
+# Profile-driven builders keyed by provider family / protocol alias. Concrete
+# vendor profiles (OpenAI, ...) register here; the fake/kind path is separate.
+PROFILE_BUILDERS: dict[str, Callable[..., LLMProvider]] = {
+    alias: _build_openai for alias in OPENAI_ALIASES
+}
+
+
+def build_provider_from_profile(
+    profile: ProviderProfile, *, http: HttpTransport | None = None
+) -> LLMProvider:
+    """Resolve a :class:`ProviderProfile` to a concrete provider via its family/protocol."""
+    for key in (profile.family, profile.protocol):
+        builder = PROFILE_BUILDERS.get(key)
+        if builder is not None:
+            return builder(profile, http=http)
+    raise ConfigurationError(
+        f"no provider builder for family {profile.family!r} / protocol {profile.protocol!r}"
+    )
 
 
 def _build_fake(spec: ProviderSpec) -> LLMProvider:
@@ -97,4 +119,4 @@ class ProviderRegistry:
         return self._instances[name]
 
 
-__all__ = ["ProviderRegistry"]
+__all__ = ["ProviderRegistry", "build_provider_from_profile", "PROFILE_BUILDERS"]

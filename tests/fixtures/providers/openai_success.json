@@ -1,0 +1,28 @@
+{
+  "id": "chatcmpl-openai-0001",
+  "object": "chat.completion",
+  "created": 1735689600,
+  "model": "gpt-4o-mini",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "A single quiet line.",
+        "tool_calls": [
+          {
+            "id": "call_abc123",
+            "type": "function",
+            "function": { "name": "lookup", "arguments": "{\"q\":\"canon\"}" }
+          }
+        ]
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 11,
+    "completion_tokens": 5,
+    "total_tokens": 16
+  }
+}

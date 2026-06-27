@@ -1,0 +1,36 @@
+# OpenAI / ChatGPT provider profiles (portable).
+#
+# Model ids are concrete; the API key and (optionally) the base URL are the
+# environment-driven values. The key is read at runtime from `api_key_env` and
+# is never written here.
+
+providers:
+  openai_main:           # Chat Completions — broadest compatibility (default)
+    family: openai
+    protocol: openai_chat
+    model: gpt-4o-mini
+    base_url: "https://api.openai.com/v1"
+    api_key_env: OPENAI_API_KEY
+    privacy_class: cloud
+    certification_level: shape_tested
+    capabilities:
+      text: supported
+      streaming: supported
+      json: supported
+      tools: supported
+      vision: unverified
+
+  openai_responses:      # Responses API
+    family: openai
+    protocol: openai_responses
+    model: gpt-4o-mini
+    base_url: "https://api.openai.com/v1"
+    api_key_env: OPENAI_API_KEY
+    privacy_class: cloud
+    certification_level: shape_tested
+    capabilities:
+      text: supported
+      streaming: supported
+      json: supported
+      tools: supported
+      vision: unverified
