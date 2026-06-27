@@ -1,0 +1,12 @@
+slug: demo
+title: Demo Novel
+genre: fantasy
+target_chapters: 36
+market: web-serial
+length: long
+cadence: daily
+tone: heroic
+audience: young-adult
+constraints:
+  - no graphic violence
+  - keep chapters under 3000 words
