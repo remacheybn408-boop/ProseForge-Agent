@@ -24,9 +24,14 @@ class ProviderError(ProseForgeAgentError):
     """Raised when an LLM provider call fails."""
 
 
+class MemoryError(ProseForgeAgentError):
+    """Raised when a memory store operation fails validation or persistence."""
+
+
 __all__ = [
     "ProseForgeAgentError",
     "ConfigurationError",
     "EngineAdapterError",
     "ProviderError",
+    "MemoryError",
 ]
