@@ -1,0 +1,25 @@
+# Python build / install artifacts
+*.egg-info/
+build/
+dist/
+__pycache__/
+*.py[cod]
+
+# Test / tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Editable-install backdoor (setuptools)
+*.pth
+
+# Agent workspace runtime data
+.pf-agent/
+workspace/
+
+# Environments
+.venv/
+venv/
+
+# Local-only Claude Code settings (personal, not shared)
+.claude/settings.local.json
