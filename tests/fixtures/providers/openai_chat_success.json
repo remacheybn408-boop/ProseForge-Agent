@@ -1,0 +1,21 @@
+{
+  "id": "chatcmpl-test-0001",
+  "object": "chat.completion",
+  "created": 1700000000,
+  "model": "model-a",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Hello from the model."
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 9,
+    "completion_tokens": 5,
+    "total_tokens": 14
+  }
+}
