@@ -59,6 +59,21 @@ def test_report_json_format_is_stable(capsys):
     assert out_a == out_b
 
 
+def test_provider_routes_writes_report(tmp_path):
+    code = main(
+        [
+            "provider",
+            "routes",
+            "--all-policies",
+            "--write-report",
+            "--out",
+            str(tmp_path),
+        ]
+    )
+    assert code == 0
+    assert list(tmp_path.glob("provider-routes*"))
+
+
 def test_unknown_command_errors_nonzero(capsys):
     code = main(["bogus"])
     assert code != 0

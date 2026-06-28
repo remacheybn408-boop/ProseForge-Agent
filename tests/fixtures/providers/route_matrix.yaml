@@ -1,0 +1,78 @@
+providers:
+  - name: cloud_writer
+    family: openai
+    model: gpt-example
+    locality: foreign
+    privacy: remote
+    cost: high
+    quality: high
+    reliability: 0.95
+    certified: true
+    api_key_env: OPENAI_API_KEY
+    capabilities:
+      text: pass
+      json_mode: pass
+      tool_calling: pass
+      long_context: pass
+  - name: fake_local
+    family: fake
+    model: fake-novelist
+    locality: local
+    privacy: local
+    cost: low
+    quality: medium
+    reliability: 0.90
+    certified: true
+    capabilities:
+      text: pass
+      json_mode: pass
+      tool_calling: pass
+      long_context: pass
+  - name: domestic_writer
+    family: qwen
+    model: qwen-example
+    locality: domestic
+    privacy: remote
+    cost: medium
+    quality: high
+    reliability: 0.92
+    certified: true
+    capabilities:
+      text: pass
+      json_mode: pass
+      long_context: pass
+  - name: uncertified_local
+    family: local
+    model: local-uncertified
+    locality: local
+    privacy: local
+    cost: low
+    quality: low
+    reliability: 0.50
+    certified: false
+    capabilities:
+      text: pass
+roles:
+  memory:
+    required_capabilities:
+      - text
+    candidates:
+      - cloud_writer
+      - fake_local
+      - uncertified_local
+  drafter:
+    required_capabilities:
+      - text
+      - json_mode
+    candidates:
+      - cloud_writer
+      - domestic_writer
+      - fake_local
+  researcher:
+    required_capabilities:
+      - text
+      - tool_calling
+    candidates:
+      - cloud_writer
+      - domestic_writer
+      - fake_local

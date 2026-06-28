@@ -22,6 +22,7 @@ from .capabilities import (
 from .fake import FakeProvider
 from .probes import CapabilityProber
 from .registry import ProviderRegistry
+from .router import ProviderRouter, RouteDecision, RouteProvider, RouteSkip
 
 __all__ = [
     "STANDARD_ROLES",
@@ -37,4 +38,8 @@ __all__ = [
     "CapabilityProber",
     "CapabilityProbeResult",
     "capability_matrix",
+    "ProviderRouter",
+    "RouteDecision",
+    "RouteProvider",
+    "RouteSkip",
 ]
