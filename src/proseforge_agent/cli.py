@@ -128,6 +128,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "bind address, provider, check flag",
         "artifacts": "local API readiness report",
     },
+    "support": {
+        "help": "Create redacted operator support bundles",
+        "inputs": "bundle subcommand, redaction flag",
+        "artifacts": "support bundle diagnostics",
+    },
 }
 
 
@@ -248,6 +253,8 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--bind", default="127.0.0.1", help="service bind address")
             group.add_argument("--allow-remote", action="store_true", help="allow non-loopback bind")
             group.add_argument("--permission-level", default="read_only", help="service permission ceiling")
+        if name == "support":
+            group.add_argument("--redact", action="store_true", help="redact paths and secrets")
         if name == "provider":
             group.add_argument(
                 "--provider",
@@ -1028,6 +1035,26 @@ def _handle_service(args: argparse.Namespace) -> int:
     return _emit(report, args.format)
 
 
+def _handle_support(args: argparse.Namespace) -> int:
+    from .install.support_bundle import SupportBundleBuilder
+
+    bundle = SupportBundleBuilder(Path(".pf-agent")).build(redact=bool(args.redact))
+    report = Report(
+        title="Support Bundle",
+        status="ok",
+        next_action="Attach the redacted bundle when reporting operator diagnostics",
+        sections=[
+            ReportSection("Files", [f"{name}" for name in bundle.files]),
+            ReportSection(
+                "Summary",
+                [f"{key}={value}" for key, value in bundle.summary.items()],
+            ),
+        ],
+        data=bundle.to_dict(),
+    )
+    return _emit(report, args.format)
+
+
 def _planned_report(group: str, next_action: str) -> Report:
     spec = COMMAND_GROUPS[group]
     return Report(
@@ -1080,6 +1107,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_uninstall(args)
     if args.command == "service":
         return _handle_service(args)
+    if args.command == "support":
+        return _handle_support(args)
     return _handle_planned(args.command)(args)
 
 

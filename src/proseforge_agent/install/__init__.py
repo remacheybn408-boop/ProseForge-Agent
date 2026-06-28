@@ -13,6 +13,7 @@ from .macos import MacOSChecks
 from .linux import LinuxChecks
 from .local_models import LocalModelCandidate, LocalModelDetector
 from .shell import CompletionScript, InstallPlan, ShellCompletionRenderer, ShellInstaller
+from .support_bundle import SupportBundle, SupportBundleBuilder
 from .migrations import MigrationResult, MigrationRunner
 from .uninstall import UninstallPlan, UninstallPlanner, UninstallResult
 
@@ -42,6 +43,8 @@ __all__ = [
     "SecretStore",
     "ShellCompletionRenderer",
     "ShellInstaller",
+    "SupportBundle",
+    "SupportBundleBuilder",
     "ShellCommandRenderer",
     "TerminalCaps",
     "UninstallPlan",

@@ -1,0 +1,15 @@
+{
+  "provider": {
+    "name": "fake",
+    "api_key": "sk-secret",
+    "config_path": "C:/Users/bijin/.pf-agent/config.yaml"
+  },
+  "events": [
+    {
+      "event_type": "provider.status",
+      "payload": {
+        "token": "secret-token"
+      }
+    }
+  ]
+}
