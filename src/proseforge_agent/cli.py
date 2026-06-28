@@ -98,6 +98,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "job name, provider, dry-run flag",
         "artifacts": "event bus records, job report",
     },
+    "init": {
+        "help": "Initialize a ProseForge Agent workspace",
+        "inputs": "portable/native mode, ProseForge root",
+        "artifacts": "agent config, workspace, provider stub, doctor report",
+    },
 }
 
 
@@ -194,6 +199,11 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "jobs":
             group.add_argument("job_name", nargs="?", help="allow-listed background job")
             group.add_argument("--provider", default="fake", help="provider for the job")
+        if name == "init":
+            group.add_argument("--portable", action="store_true", help="initialize portable .pf-agent workspace")
+            group.add_argument("--native", action="store_true", help="initialize native app directories")
+            group.add_argument("--proseforge-root", default="${PROSEFORGE_ROOT}", help="ProseForge engine root")
+            group.add_argument("--non-interactive", action="store_true", help="run without prompts")
         if name == "provider":
             group.add_argument(
                 "--provider",
@@ -693,6 +703,45 @@ def _handle_jobs(args: argparse.Namespace) -> int:
     return _emit(report, args.format)
 
 
+def _handle_init(args: argparse.Namespace) -> int:
+    from .install.first_run import FirstRunWizard
+
+    result = FirstRunWizard(Path(".pf-agent")).run(
+        {
+            "portable": args.portable or not args.native,
+            "native": args.native,
+            "proseforge_root": args.proseforge_root,
+            "non_interactive": args.non_interactive,
+        }
+    )
+    report = Report(
+        title="First Run",
+        status="ok",
+        next_action="Run `pf-agent doctor` to verify the installation",
+        sections=[
+            ReportSection(
+                "Artifacts",
+                [
+                    f"config={result.config_path}",
+                    f"workspace={result.workspace_path}",
+                    f"providers={result.provider_stub_path}",
+                    f"doctor_report={result.doctor_report_path}",
+                    f"status={result.status}",
+                ],
+            )
+        ],
+        data={
+            "config_path": str(result.config_path),
+            "workspace_path": str(result.workspace_path),
+            "provider_stub_path": str(result.provider_stub_path),
+            "doctor_report_path": str(result.doctor_report_path),
+            "mode": result.mode,
+            "status": result.status,
+        },
+    )
+    return _emit(report, args.format)
+
+
 def _planned_report(group: str, next_action: str) -> Report:
     spec = COMMAND_GROUPS[group]
     return Report(
@@ -733,6 +782,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_tools(args)
     if args.command == "jobs":
         return _handle_jobs(args)
+    if args.command == "init":
+        return _handle_init(args)
     return _handle_planned(args.command)(args)
 
 

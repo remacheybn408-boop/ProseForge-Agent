@@ -1,0 +1,4 @@
+proseforge_root: ${PROSEFORGE_ROOT}
+workspace: ${PROSEFORGE_AGENT_WORKSPACE:-.pf-agent}/workspace
+providers: ${PROSEFORGE_AGENT_WORKSPACE:-.pf-agent}/providers.local.yaml
+mode: portable
