@@ -171,6 +171,11 @@ def build_parser() -> argparse.ArgumentParser:
                 help="extract preference candidates without accepting memory",
             )
             group.add_argument(
+                "--propose-handoff",
+                action="store_true",
+                help="create a workflow handoff package without starting it",
+            )
+            group.add_argument(
                 "--permission-level",
                 default="read_only",
                 help="maximum permission level for this turn",
@@ -528,6 +533,23 @@ def _handle_chat(args: argparse.Namespace) -> int:
             .render_markdown()
         )
         return 0
+    if getattr(args, "propose_handoff", False):
+        from .chat.handoff import ChatWorkflowHandoff, render_handoff
+
+        text = args.message or args.text or ""
+        package = ChatWorkflowHandoff().create(
+            text,
+            project_slug=project_slug,
+            mode=args.mode,
+        )
+        report = Report(
+            title="Handoff Package",
+            status="ok",
+            next_action="Confirm write-level packages before starting a workflow",
+            sections=[ReportSection("Package", render_handoff(package))],
+            data=package.to_dict(),
+        )
+        return _emit(report, args.format)
     if getattr(args, "show_memory_candidates", False):
         from .chat.memory import ChatMemoryExtractor, render_memory_candidates
 
