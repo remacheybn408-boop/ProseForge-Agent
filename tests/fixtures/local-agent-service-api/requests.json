@@ -1,0 +1,7 @@
+{
+  "chat": {
+    "message": "hello",
+    "provider": "fake",
+    "mode": "general_chat"
+  }
+}

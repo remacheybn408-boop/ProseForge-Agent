@@ -123,6 +123,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "plan flag, remove user data flag",
         "artifacts": "uninstall plan",
     },
+    "service": {
+        "help": "Check the local agent service facade",
+        "inputs": "bind address, provider, check flag",
+        "artifacts": "local API readiness report",
+    },
 }
 
 
@@ -235,6 +240,12 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "uninstall":
             group.add_argument("--plan", action="store_true", help="show uninstall plan without deleting")
             group.add_argument("--remove-user-data", action="store_true", help="include user data in plan")
+        if name == "service":
+            group.add_argument("--provider", default="fake", help="service provider")
+            group.add_argument("--check", action="store_true", help="validate service configuration only")
+            group.add_argument("--bind", default="127.0.0.1", help="service bind address")
+            group.add_argument("--allow-remote", action="store_true", help="allow non-loopback bind")
+            group.add_argument("--permission-level", default="read_only", help="service permission ceiling")
         if name == "provider":
             group.add_argument(
                 "--provider",
@@ -941,6 +952,52 @@ def _handle_uninstall(args: argparse.Namespace) -> int:
     return _emit(report, args.format)
 
 
+def _handle_service(args: argparse.Namespace) -> int:
+    from .agent import AgentKernel
+    from .chat import ChatSessionStore
+    from .llm import FakeProvider
+    from .service import LocalAgentService
+
+    provider = FakeProvider(name=args.provider or "fake", model=args.provider or "fake")
+    store = ChatSessionStore(Path(".pf-agent"))
+    kernel = AgentKernel(provider=provider, session_store=store)
+    service = LocalAgentService(
+        kernel=kernel,
+        session_store=store,
+        bind=args.bind,
+        allow_remote=args.allow_remote,
+        permission_level=args.permission_level,
+        provider_name=args.provider or "fake",
+    )
+    health = service.health()
+    provider_status = service.provider_status()
+    report = Report(
+        title="Local Agent Service",
+        status="ok",
+        next_action="Wrap this facade in an approved transport only after release gating",
+        sections=[
+            ReportSection(
+                "Health",
+                [
+                    f"bind={health['bind']}",
+                    f"permission={health['permission_level']}",
+                    f"web_server={health['web_server']}",
+                    f"check_only={bool(args.check)}",
+                ],
+            ),
+            ReportSection(
+                "Providers",
+                [
+                    f"{item['name']} -> {item['status']}"
+                    for item in provider_status["providers"]
+                ],
+            ),
+        ],
+        data={"health": health, "provider_status": provider_status},
+    )
+    return _emit(report, args.format)
+
+
 def _planned_report(group: str, next_action: str) -> Report:
     spec = COMMAND_GROUPS[group]
     return Report(
@@ -991,6 +1048,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_upgrade(args)
     if args.command == "uninstall":
         return _handle_uninstall(args)
+    if args.command == "service":
+        return _handle_service(args)
     return _handle_planned(args.command)(args)
 
 
