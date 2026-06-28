@@ -61,6 +61,10 @@ class InstallationDoctor:
         self.config = dict(config or {})
 
     def run(self, section: str | None = None) -> DoctorReport:
+        if section == "windows":
+            from .windows import WindowsChecks
+
+            return DoctorReport(checks=WindowsChecks(self.env).run())
         checks = [
             self._os_check(),
             self._python_check(),

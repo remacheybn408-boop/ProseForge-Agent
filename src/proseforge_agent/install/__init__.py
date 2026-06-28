@@ -8,6 +8,7 @@ from .platform_io import ShellCommandRenderer, TerminalCaps, read_text_utf8, wri
 from .package_checks import PackageCheck, PackageChecker, PackageReport
 from .provider_setup import ProviderSetupResult, ProviderSetupWizard
 from .secrets import SecretLookup, SecretStore
+from .windows import WindowsChecks
 
 __all__ = [
     "AppDirs",
@@ -27,6 +28,7 @@ __all__ = [
     "SecretStore",
     "ShellCommandRenderer",
     "TerminalCaps",
+    "WindowsChecks",
     "read_text_utf8",
     "write_text_utf8",
 ]
