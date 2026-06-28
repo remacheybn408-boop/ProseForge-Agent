@@ -108,6 +108,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "optional diagnostic section",
         "artifacts": "doctor report",
     },
+    "completions": {
+        "help": "Show shell completions and launcher install plans",
+        "inputs": "shell name",
+        "artifacts": "completion script",
+    },
 }
 
 
@@ -211,6 +216,8 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--non-interactive", action="store_true", help="run without prompts")
         if name == "doctor":
             group.add_argument("--section", default=None, help="diagnostic section to run")
+        if name == "completions":
+            group.add_argument("--shell", default="powershell", help="shell to render")
         if name == "provider":
             group.add_argument(
                 "--provider",
@@ -804,6 +811,32 @@ def _handle_doctor(args: argparse.Namespace) -> int:
     return _emit(report, args.format)
 
 
+def _handle_completions(args: argparse.Namespace) -> int:
+    from .install.shell import ShellCompletionRenderer
+
+    script = ShellCompletionRenderer().render(args.shell)
+    if args.subcommand != "show":
+        report = _planned_report("completions", "Use `pf-agent completions show --shell <shell>`")
+        return _emit(report, args.format)
+    report = Report(
+        title="Shell Completion",
+        status="ok",
+        next_action="Install only after granting system_write permission",
+        sections=[
+            ReportSection(
+                "Script",
+                [
+                    f"shell={script.shell}",
+                    f"target={script.install_target}",
+                    script.script_text.strip(),
+                ],
+            )
+        ],
+        data=script.__dict__,
+    )
+    return _emit(report, args.format)
+
+
 def _planned_report(group: str, next_action: str) -> Report:
     spec = COMMAND_GROUPS[group]
     return Report(
@@ -848,6 +881,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_init(args)
     if args.command == "doctor":
         return _handle_doctor(args)
+    if args.command == "completions":
+        return _handle_completions(args)
     return _handle_planned(args.command)(args)
 
 

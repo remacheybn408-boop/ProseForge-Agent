@@ -11,15 +11,18 @@ from .secrets import SecretLookup, SecretStore
 from .windows import WindowsChecks
 from .macos import MacOSChecks
 from .linux import LinuxChecks
+from .shell import CompletionScript, InstallPlan, ShellCompletionRenderer, ShellInstaller
 
 __all__ = [
     "AppDirs",
     "BinaryManifest",
+    "CompletionScript",
     "DoctorCheck",
     "DoctorReport",
     "FirstRunResult",
     "FirstRunWizard",
     "InstallationDoctor",
+    "InstallPlan",
     "LinuxChecks",
     "MacOSChecks",
     "ManifestReport",
@@ -30,6 +33,8 @@ __all__ = [
     "ProviderSetupWizard",
     "SecretLookup",
     "SecretStore",
+    "ShellCompletionRenderer",
+    "ShellInstaller",
     "ShellCommandRenderer",
     "TerminalCaps",
     "WindowsChecks",

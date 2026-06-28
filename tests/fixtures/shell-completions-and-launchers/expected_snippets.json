@@ -1,0 +1,6 @@
+{
+  "powershell": "Register-ArgumentCompleter -Native -CommandName pf-agent",
+  "bash": "complete -W \"init doctor provider chat\" pf-agent",
+  "zsh": "#compdef pf-agent",
+  "fish": "complete -c pf-agent"
+}
