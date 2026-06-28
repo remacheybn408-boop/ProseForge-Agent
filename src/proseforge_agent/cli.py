@@ -93,6 +93,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "tool registry",
         "artifacts": "tool registry report",
     },
+    "jobs": {
+        "help": "Run allow-listed background agent jobs",
+        "inputs": "job name, provider, dry-run flag",
+        "artifacts": "event bus records, job report",
+    },
 }
 
 
@@ -186,6 +191,9 @@ def build_parser() -> argparse.ArgumentParser:
                 action="store_true",
                 help="include permission levels in the tool list",
             )
+        if name == "jobs":
+            group.add_argument("job_name", nargs="?", help="allow-listed background job")
+            group.add_argument("--provider", default="fake", help="provider for the job")
         if name == "provider":
             group.add_argument(
                 "--provider",
@@ -657,6 +665,34 @@ def _handle_tools(args: argparse.Namespace) -> int:
     return _emit(report, args.format)
 
 
+def _handle_jobs(args: argparse.Namespace) -> int:
+    if args.subcommand != "run" or not args.job_name:
+        report = _planned_report("jobs", "Use `pf-agent jobs run <job-name> --dry-run`")
+        return _emit(report, args.format)
+    from .agent import BackgroundJobRunner, EventBus
+
+    runner = BackgroundJobRunner(event_bus=EventBus(Path(".pf-agent") / "events.jsonl"))
+    result = runner.run(args.job_name, provider=args.provider, dry_run=args.dry_run)
+    report = Report(
+        title="Background Job",
+        status=result.status,
+        next_action="Inspect the event bus before scheduling recurring jobs",
+        sections=[
+            ReportSection(
+                "Result",
+                [
+                    f"job={result.job_name}",
+                    f"status={result.status}",
+                    f"allowed={str(result.allowed).lower()}",
+                    f"dry_run={str(result.dry_run).lower()}",
+                ],
+            )
+        ],
+        data=result.to_dict(),
+    )
+    return _emit(report, args.format)
+
+
 def _planned_report(group: str, next_action: str) -> Report:
     spec = COMMAND_GROUPS[group]
     return Report(
@@ -695,6 +731,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_chat(args)
     if args.command == "tools":
         return _handle_tools(args)
+    if args.command == "jobs":
+        return _handle_jobs(args)
     return _handle_planned(args.command)(args)
 
 
