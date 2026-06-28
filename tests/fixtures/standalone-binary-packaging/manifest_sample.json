@@ -1,0 +1,6 @@
+{
+  "artifact_name": "pf-agent-linux-x64",
+  "entry_point": "proseforge_agent.cli:main",
+  "bundled_files": ["LICENSE", "pyproject.toml"],
+  "smoke_command": ["pf-agent", "--version"]
+}
