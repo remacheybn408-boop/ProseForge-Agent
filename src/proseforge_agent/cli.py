@@ -156,6 +156,11 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--project", default=None, help="project slug")
             group.add_argument("--mode", default="general_chat", help="conversation mode")
             group.add_argument(
+                "--show-prompt",
+                action="store_true",
+                help="print the structured prompt pack without running the turn",
+            )
+            group.add_argument(
                 "--permission-level",
                 default="read_only",
                 help="maximum permission level for this turn",
@@ -503,6 +508,16 @@ def _handle_chat(args: argparse.Namespace) -> int:
     project_slug = None if args.no_project else args.project
     provider = FakeProvider(name=args.provider or "fake", model=args.provider or "fake")
     session_store = ChatSessionStore(Path(".pf-agent"))
+    if getattr(args, "show_prompt", False):
+        from .chat import ChatPromptBuilder
+
+        text = args.message or args.text or ""
+        print(
+            ChatPromptBuilder()
+            .build(text=text, mode=args.mode, project_slug=project_slug)
+            .render_markdown()
+        )
+        return 0
     if not args.message:
         from .chat.repl import ChatRepl
 
