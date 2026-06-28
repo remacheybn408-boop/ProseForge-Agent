@@ -65,6 +65,10 @@ class InstallationDoctor:
             from .windows import WindowsChecks
 
             return DoctorReport(checks=WindowsChecks(self.env).run())
+        if section == "macos":
+            from .macos import MacOSChecks
+
+            return DoctorReport(checks=MacOSChecks(self.env).run())
         checks = [
             self._os_check(),
             self._python_check(),

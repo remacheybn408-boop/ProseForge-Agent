@@ -9,6 +9,7 @@ from .package_checks import PackageCheck, PackageChecker, PackageReport
 from .provider_setup import ProviderSetupResult, ProviderSetupWizard
 from .secrets import SecretLookup, SecretStore
 from .windows import WindowsChecks
+from .macos import MacOSChecks
 
 __all__ = [
     "AppDirs",
@@ -18,6 +19,7 @@ __all__ = [
     "FirstRunResult",
     "FirstRunWizard",
     "InstallationDoctor",
+    "MacOSChecks",
     "ManifestReport",
     "PackageCheck",
     "PackageChecker",
