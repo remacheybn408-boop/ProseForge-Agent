@@ -1,0 +1,10 @@
+cases:
+  - mode: operator_chat
+    text: "provider key 读不到"
+    expected: diagnose_installation
+  - mode: project_chat
+    text: "今天应该写什么？"
+    expected: retrieve_context
+  - mode: general_chat
+    text: "hello there"
+    expected: answer_directly

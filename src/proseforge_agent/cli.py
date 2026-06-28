@@ -445,15 +445,38 @@ def _handle_provider(args: argparse.Namespace) -> int:
 
 
 def _handle_chat(args: argparse.Namespace) -> int:
+    if args.subcommand == "classify":
+        from .agent import IntentRouter
+
+        text = args.text or args.message or ""
+        decision = IntentRouter().classify(text, mode=args.mode, project_slug=args.project)
+        report = Report(
+            title="Chat Intent",
+            status="ok",
+            next_action="Pass this intent to the Agent Kernel",
+            sections=[
+                ReportSection(
+                    "Intent",
+                    [
+                        f"name: {decision.name}",
+                        f"confidence: {decision.confidence:.2f}",
+                        f"permission: {decision.required_permission}",
+                        f"reason: {decision.reason}",
+                    ],
+                )
+            ],
+            data=decision.__dict__,
+        )
+        return _emit(report, args.format)
     if not args.message:
         report = _planned_report("chat", "Pass --message for one-shot chat")
         return _emit(report, args.format)
-    from .agent import AgentKernel, AgentTurnRequest
+    from .agent import AgentKernel, AgentTurnRequest, IntentRouter
     from .llm import FakeProvider
 
     project_slug = None if args.no_project else args.project
     provider = FakeProvider(name=args.provider or "fake", model=args.provider or "fake")
-    kernel = AgentKernel(provider=provider)
+    kernel = AgentKernel(provider=provider, intent_router=IntentRouter())
     result = kernel.run_turn(
         AgentTurnRequest(
             session_id="cli",
