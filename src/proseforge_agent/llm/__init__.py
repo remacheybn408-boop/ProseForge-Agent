@@ -15,7 +15,12 @@ from .base import (
     StreamChunk,
     Usage,
 )
+from .capabilities import (
+    CapabilityProbeResult,
+    capability_matrix,
+)
 from .fake import FakeProvider
+from .probes import CapabilityProber
 from .registry import ProviderRegistry
 
 __all__ = [
@@ -29,4 +34,7 @@ __all__ = [
     "Usage",
     "FakeProvider",
     "ProviderRegistry",
+    "CapabilityProber",
+    "CapabilityProbeResult",
+    "capability_matrix",
 ]

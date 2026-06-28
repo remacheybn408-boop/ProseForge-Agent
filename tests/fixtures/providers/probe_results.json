@@ -1,0 +1,36 @@
+{
+  "fake": {
+    "text": {
+      "status": "pass",
+      "evidence": {"sample": "[fake:fake-novelist] role=drafter :: Write one sentence."}
+    },
+    "streaming": {
+      "status": "pass",
+      "evidence": {"chunks": 5}
+    },
+    "json_mode": {
+      "status": "pass",
+      "evidence": {"parsed": false, "note": "deterministic echo, not real JSON"}
+    },
+    "long_context": {
+      "status": "pass",
+      "evidence": {"prompt_tokens": 128}
+    },
+    "tool_calling": {
+      "status": "unsupported",
+      "evidence": {"note": "fake provider has no tool-calling backend"}
+    },
+    "reasoning_controls": {
+      "status": "unsupported",
+      "evidence": {"note": "no reasoning controls offline"}
+    },
+    "embeddings": {
+      "status": "unsupported",
+      "evidence": {"note": "no embeddings endpoint offline"}
+    },
+    "safety_behavior": {
+      "status": "unsupported",
+      "evidence": {"note": "no safety classifier offline"}
+    }
+  }
+}

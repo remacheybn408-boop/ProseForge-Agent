@@ -17,6 +17,9 @@ __pycache__/
 .pf-agent/
 workspace/
 
+# Generated report artifacts (CLI --write / --write-report output)
+reports/
+
 # Environments
 .venv/
 venv/

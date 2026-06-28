@@ -136,6 +136,17 @@ def build_parser() -> argparse.ArgumentParser:
             help="group subcommand (e.g. 'command-reference', 'list')",
         )
         group.add_argument("--providers", default=None, help="providers config (YAML)")
+        if name == "provider":
+            group.add_argument(
+                "--provider",
+                default=None,
+                help="provider name to probe (default: fake)",
+            )
+            group.add_argument(
+                "--write-report",
+                action="store_true",
+                help="write the probe report to the output directory",
+            )
 
     return parser
 
@@ -162,7 +173,45 @@ def _handle_report(args: argparse.Namespace) -> int:
     return _emit(report, args.format)
 
 
+def _handle_provider_probe(args: argparse.Namespace) -> int:
+    from .llm import CapabilityProber, FakeProvider
+    from .llm.capabilities import capability_matrix
+
+    name = getattr(args, "provider", None) or "fake"
+    provider = FakeProvider(name=name, model=name)
+    results = CapabilityProber(provider).run()
+    matrix = capability_matrix(results)
+    sections = [
+        ReportSection(
+            heading="Capabilities",
+            lines=[
+                f"{r.capability} -> {r.status} ({r.latency_ms:.1f} ms)"
+                for r in results
+            ],
+        )
+    ]
+    report = Report(
+        title=f"Provider Capability Probe: {name}",
+        status="ok",
+        next_action="Feed the capability matrix into the fallback router",
+        sections=sections,
+        data={"provider": name, "matrix": matrix},
+    )
+
+    if getattr(args, "write_report", False) and not args.dry_run:
+        out_dir = Path(args.out) if args.out else Path("reports")
+        out_dir.mkdir(parents=True, exist_ok=True)
+        suffix = "json" if args.format == "json" else "md"
+        path = out_dir / f"provider-probe-{name}.{suffix}"
+        path.write_text(ReportRenderer().render(report, args.format), encoding="utf-8")
+        print(f"wrote {path}")
+        return 0
+    return _emit(report, args.format)
+
+
 def _handle_provider(args: argparse.Namespace) -> int:
+    if args.subcommand == "probe":
+        return _handle_provider_probe(args)
     if not args.providers:
         report = _planned_report("provider", "Pass --providers <config.yaml> to list providers")
         return _emit(report, args.format)
