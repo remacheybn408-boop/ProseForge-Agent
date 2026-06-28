@@ -26,3 +26,5 @@ venv/
 
 # Local-only Claude Code settings (personal, not shared)
 .claude/settings.local.json
+config/
+uv.lock

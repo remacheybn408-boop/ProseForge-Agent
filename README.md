@@ -3,25 +3,38 @@
 An agentic orchestration layer for long-form novel production. It wraps the
 existing **ProseForge engine** (the canonical writing engine) with planning,
 retrieval, drafting, review, revision, deep memory, multi-provider model
-routing, daily workbooks, reports, extensions, and release checks.
+routing, daily workbooks, reports, extensions, agent runtime, chat, and
+release checks.
 
 ProseForge Agent does **not** reimplement the writing engine. The engine at
 `$PROSEFORGE_ROOT` remains the source of truth for project slots, pipeline
 actions, guards, reports, and exports. This package owns orchestration:
-model calls, provider routing, schedules, evidence packs, agent memory, and
-workflow state.
+model calls, provider routing, schedules, evidence packs, agent memory,
+workflow state, conversational agent loop, and background event processing.
 
 ## Status
 
-Active implementation. The package now includes the CLI shell, configuration
-loading, workspace helpers, ProseForge engine adapter, provider registry and
-profiles, retrieval evidence packs, memory ingestion and compaction, phase
-planning, daily workbook generation, chapter lifecycle workflows, reports,
-extension hooks, an end-to-end demo, and release checks.
+**366 tests passing.** The implementation covers task cards 1–40 of the
+project plan — the full core, provider, agent runtime, and chat stack.
 
-Several CLI command groups are present as operator-facing entry points. Some
-groups still return planned reports until their deeper integrations are wired.
-Provider inspection and command-reference reporting are implemented.
+**Core layer** — config, workspace, ProseForge engine adapter, provider
+registry (10 provider profiles), retrieval evidence packs, memory schema
+and store with ingestion and compaction, phase planning, daily workbook
+generation, chapter lifecycle (draft → review → rewrite → accept),
+workflow state with recovery, CLI with report rendering, extension hooks,
+end-to-end demo, and release checks.
+
+**Agent Runtime** — per-turn AgentKernel with dependency-injected provider,
+tools, session store, retrieval, and intent router; conversation modes and
+permission policy; tool registry with capability-based access control.
+
+**Chat** — session store with transcript persistence, interactive CLI REPL,
+prompt protocol, retrieval with cited evidence packs, memory-backed user
+preferences, chat-to-workflow handoff, and agent event bus for background
+jobs with progress tracking.
+
+**Release gate** — automated checks for provider certification, memory audit
+enforcement, docs and examples presence, and offline fake-provider demo.
 
 ## Requirements
 
@@ -47,6 +60,8 @@ src/proseforge_agent/       importable package (src-layout)
   workflow/                 workflow state and recovery
   reports/                  Markdown, JSON, and terminal report rendering
   extensions/               extension registry and hook base classes
+  agent/                    kernel, intent router, modes, tools, permissions, events
+  chat/                     session store, repl, prompts, retrieval, memory, handoff
 configs/                    agent and provider example configs
 docs/                       operator, developer, and implementation docs
 samples/                    sample extensions
@@ -85,6 +100,18 @@ Inspect provider routing with the offline fake-provider example:
 
 ```powershell
 python -m proseforge_agent.cli provider --providers configs/providers.example.yaml
+```
+
+Launch the interactive chat REPL:
+
+```powershell
+python -m proseforge_agent.chat.repl
+```
+
+Run the end-to-end offline demo:
+
+```powershell
+python -m proseforge_agent.demo
 ```
 
 ## Provider Profiles
