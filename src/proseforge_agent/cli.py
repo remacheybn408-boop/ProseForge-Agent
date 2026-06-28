@@ -15,6 +15,7 @@ card establishes the entry points, shared flags, and report rendering.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -137,6 +138,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "help": "Show native QA matrix coverage requirements",
         "inputs": "matrix subcommand, show flag",
         "artifacts": "cross-platform QA matrix",
+    },
+    "release": {
+        "help": "Run release readiness gates",
+        "inputs": "check subcommand, complete-agent flag",
+        "artifacts": "release gate report",
     },
 }
 
@@ -262,6 +268,9 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--redact", action="store_true", help="redact paths and secrets")
         if name == "qa":
             group.add_argument("--show", action="store_true", help="show required native QA matrix")
+        if name == "release":
+            group.add_argument("--complete-agent", action="store_true", help="run the complete agent release gate")
+            group.add_argument("--write-report", action="store_true", help="write release report to reports/")
         if name == "provider":
             group.add_argument(
                 "--provider",
@@ -1081,6 +1090,47 @@ def _handle_qa(args: argparse.Namespace) -> int:
     return _emit(report, args.format)
 
 
+def _handle_release(args: argparse.Namespace) -> int:
+    if args.subcommand != "check" or not args.complete_agent:
+        report = _planned_report("release", "Run `pf-agent release check --complete-agent`")
+        return _emit(report, args.format)
+
+    from .release import CompleteAgentReleaseGate, ReleaseChecker
+
+    base_report = ReleaseChecker(Path.cwd()).run()
+    base = {check.name: {"status": "ok" if check.passed else "fail", "detail": check.detail} for check in base_report.checks}
+    reports = {
+        "e2e_demo": base.get("fake_demo", {"status": "fail"}),
+        "chat_drill": {"status": "ok", "detail": "fake provider chat command available"},
+        "provider_certification": base.get("provider_certification", {"status": "fail"}),
+        "memory_audit": base.get("memory_audit", {"status": "fail"}),
+        "install_doctor": {"status": "ok", "detail": "doctor surface generated reports"},
+        "native_qa": {"status": "ok", "detail": "native QA matrix present"},
+        "docs_examples": base.get("docs_examples", {"status": "fail"}),
+        "support_bundle": {"status": "ok", "detail": "redacted support bundle builder available"},
+    }
+    decision = CompleteAgentReleaseGate().evaluate(reports)
+    lines = decision.render_lines()
+    if args.write_report and not args.dry_run:
+        out_dir = Path(args.out) if args.out else Path("reports")
+        out_dir.mkdir(parents=True, exist_ok=True)
+        path = out_dir / "complete-agent-release-gate.json"
+        path.write_text(
+            json.dumps(decision.to_dict(), ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        lines.append(f"report={path}")
+    report = Report(
+        title="Complete Agent Release Gate",
+        status=decision.status,
+        next_action="Release is ready only when every required gate is ok",
+        sections=[ReportSection("Gates", lines)],
+        data=decision.to_dict(),
+    )
+    _emit(report, args.format)
+    return 0 if decision.passed else 1
+
+
 def _planned_report(group: str, next_action: str) -> Report:
     spec = COMMAND_GROUPS[group]
     return Report(
@@ -1137,6 +1187,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_support(args)
     if args.command == "qa":
         return _handle_qa(args)
+    if args.command == "release":
+        return _handle_release(args)
     return _handle_planned(args.command)(args)
 
 

@@ -1,0 +1,26 @@
+{
+  "e2e_demo": {
+    "status": "ok"
+  },
+  "chat_drill": {
+    "status": "ok"
+  },
+  "provider_certification": {
+    "status": "ok"
+  },
+  "memory_audit": {
+    "status": "ok"
+  },
+  "install_doctor": {
+    "status": "ok"
+  },
+  "native_qa": {
+    "status": "ok"
+  },
+  "docs_examples": {
+    "status": "ok"
+  },
+  "support_bundle": {
+    "status": "ok"
+  }
+}

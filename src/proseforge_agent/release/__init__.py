@@ -12,8 +12,9 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .errors import MemoryError, ProseForgeAgentError
-from .memory.store import MemoryItem, MemoryStore
+from ..errors import MemoryError, ProseForgeAgentError
+from ..memory.store import MemoryItem, MemoryStore
+from .complete_agent_gate import CompleteAgentReleaseGate, ReleaseDecision
 
 
 class ReleaseError(ProseForgeAgentError):
@@ -37,7 +38,7 @@ class ReleaseReport:
     checks: list[CheckResult] = field(default_factory=list)
 
     def render(self) -> str:
-        lines = [f"# Release Check — {'PASS' if self.passed else 'FAIL'}", ""]
+        lines = [f"# Release Check - {'PASS' if self.passed else 'FAIL'}", ""]
         for check in self.checks:
             mark = "ok" if check.passed else "FAIL"
             lines.append(f"- [{mark}] {check.name}: {check.detail}")
@@ -62,8 +63,8 @@ class ReleaseChecker:
     # -- individual checks ----------------------------------------------
 
     def check_provider_certification(self) -> CheckResult:
-        from .llm.base import Message, ProviderRequest
-        from .llm.registry import ProviderRegistry
+        from ..llm.base import Message, ProviderRequest
+        from ..llm.registry import ProviderRegistry
 
         registry = ProviderRegistry.from_dict(
             {
@@ -128,7 +129,7 @@ class ReleaseChecker:
         )
 
     def check_fake_demo(self) -> CheckResult:
-        from .demo import DemoRunner
+        from ..demo import DemoRunner
 
         with tempfile.TemporaryDirectory() as tmp:
             try:
@@ -140,4 +141,11 @@ class ReleaseChecker:
         return CheckResult(name="fake_demo", passed=ok, detail=detail)
 
 
-__all__ = ["ReleaseError", "CheckResult", "ReleaseReport", "ReleaseChecker"]
+__all__ = [
+    "CompleteAgentReleaseGate",
+    "ReleaseDecision",
+    "ReleaseError",
+    "CheckResult",
+    "ReleaseReport",
+    "ReleaseChecker",
+]
