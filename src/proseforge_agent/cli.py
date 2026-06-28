@@ -161,6 +161,11 @@ def build_parser() -> argparse.ArgumentParser:
                 help="print the structured prompt pack without running the turn",
             )
             group.add_argument(
+                "--show-citations",
+                action="store_true",
+                help="print retrieval citations without inventing missing context",
+            )
+            group.add_argument(
                 "--permission-level",
                 default="read_only",
                 help="maximum permission level for this turn",
@@ -518,6 +523,23 @@ def _handle_chat(args: argparse.Namespace) -> int:
             .render_markdown()
         )
         return 0
+    if getattr(args, "show_citations", False):
+        from .chat.retrieval import ChatRetrievalResponder, render_citations
+
+        text = args.message or args.text or ""
+        answer = ChatRetrievalResponder(evidence=[]).answer(text, project_slug=project_slug)
+        rendered = render_citations(answer)
+        report = Report(
+            title="Chat Citations",
+            status="ok" if not answer.degraded else "degraded",
+            next_action="Add project evidence before relying on this answer",
+            sections=[
+                ReportSection("Answer", answer.text.splitlines()),
+                ReportSection("Citations", rendered.splitlines()),
+            ],
+            data=answer.to_dict(),
+        )
+        return _emit(report, args.format)
     if not args.message:
         from .chat.repl import ChatRepl
 

@@ -1,0 +1,18 @@
+{
+  "evidence": [
+    {
+      "id": "ev-1",
+      "source": "memory:chapter-002",
+      "text": "昨天完成到第二章结尾，主角发现旧照片。",
+      "kind": "canon",
+      "score": 0.92
+    },
+    {
+      "id": "ev-2",
+      "source": "memory:outline",
+      "text": "下一场应推进到码头调查线索。",
+      "kind": "active_arc",
+      "score": 0.81
+    }
+  ]
+}
