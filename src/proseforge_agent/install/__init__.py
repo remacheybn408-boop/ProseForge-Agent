@@ -4,6 +4,7 @@ from .first_run import FirstRunResult, FirstRunWizard
 from .app_dirs import AppDirs
 from .doctor import DoctorCheck, DoctorReport, InstallationDoctor
 from .platform_io import ShellCommandRenderer, TerminalCaps, read_text_utf8, write_text_utf8
+from .secrets import SecretLookup, SecretStore
 
 __all__ = [
     "AppDirs",
@@ -12,6 +13,8 @@ __all__ = [
     "FirstRunResult",
     "FirstRunWizard",
     "InstallationDoctor",
+    "SecretLookup",
+    "SecretStore",
     "ShellCommandRenderer",
     "TerminalCaps",
     "read_text_utf8",

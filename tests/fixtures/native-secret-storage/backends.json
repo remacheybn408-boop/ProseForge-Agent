@@ -1,0 +1,6 @@
+{
+  "windows": "credential_manager",
+  "macos": "keychain",
+  "linux": "secret_service",
+  "fallback": "env_fallback"
+}

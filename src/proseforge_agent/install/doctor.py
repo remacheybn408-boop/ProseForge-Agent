@@ -11,6 +11,7 @@ from typing import Any
 
 from .app_dirs import AppDirs
 from .platform_io import TerminalCaps
+from .secrets import SecretStore
 
 
 @dataclass(frozen=True)
@@ -144,11 +145,12 @@ class InstallationDoctor:
     def _secret_backend_check(self) -> DoctorCheck:
         backend = self.env.get("SECRET_BACKEND", "env")
         native = backend in {"credential_manager", "keychain", "secret_service"}
+        store = SecretStore(backend if native else "env_fallback", protected=native)
         return DoctorCheck(
             "secret_backend",
             "secrets",
-            "ok" if native else "warn",
-            f"backend={backend}",
+            "ok" if store.protected else "warn",
+            f"backend={store.backend}",
             None if native else "Use native secret storage when available",
         )
 
