@@ -1,0 +1,2 @@
+{"role":"user","content":"今天写什么？","created_at":"2026-06-28T00:00:00+00:00","evidence_refs":[],"tool_calls":[],"provider_metadata":{}}
+{"role":"assistant","content":"继续第二章。","created_at":"2026-06-28T00:00:01+00:00","evidence_refs":["ev-1"],"tool_calls":[{"name":"memory.search","status":"ok"}],"provider_metadata":{"provider":"fake"}}

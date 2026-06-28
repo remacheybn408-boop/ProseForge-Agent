@@ -456,6 +456,24 @@ def _handle_provider(args: argparse.Namespace) -> int:
 
 
 def _handle_chat(args: argparse.Namespace) -> int:
+    if args.subcommand == "sessions":
+        from .chat import ChatSessionStore
+
+        store = ChatSessionStore(Path(".pf-agent"))
+        sessions = store.list(project_slug=args.project)
+        lines = [
+            f"{session.id} -> {session.mode}"
+            + (f" ({session.project_slug})" if session.project_slug else "")
+            for session in sessions
+        ]
+        report = Report(
+            title="Chat Sessions",
+            status="ok",
+            next_action="Use a session id to resume a durable chat transcript",
+            sections=[ReportSection("Sessions", lines)],
+            data={"sessions": [session.__dict__ for session in sessions]},
+        )
+        return _emit(report, args.format)
     if args.subcommand == "classify":
         from .agent import IntentRouter
 
