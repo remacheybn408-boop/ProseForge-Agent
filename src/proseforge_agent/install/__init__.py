@@ -12,6 +12,7 @@ from .windows import WindowsChecks
 from .macos import MacOSChecks
 from .linux import LinuxChecks
 from .shell import CompletionScript, InstallPlan, ShellCompletionRenderer, ShellInstaller
+from .migrations import MigrationResult, MigrationRunner
 
 __all__ = [
     "AppDirs",
@@ -26,6 +27,8 @@ __all__ = [
     "LinuxChecks",
     "MacOSChecks",
     "ManifestReport",
+    "MigrationResult",
+    "MigrationRunner",
     "PackageCheck",
     "PackageChecker",
     "PackageReport",

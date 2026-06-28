@@ -113,6 +113,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "shell name",
         "artifacts": "completion script",
     },
+    "upgrade": {
+        "help": "Check or run safe workspace upgrades",
+        "inputs": "version range, check flag",
+        "artifacts": "backup and migration report",
+    },
 }
 
 
@@ -218,6 +223,10 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--section", default=None, help="diagnostic section to run")
         if name == "completions":
             group.add_argument("--shell", default="powershell", help="shell to render")
+        if name == "upgrade":
+            group.add_argument("--check", action="store_true", help="check upgrade readiness without migration")
+            group.add_argument("--from-version", default="1", help="current workspace schema version")
+            group.add_argument("--to-version", default="2", help="target workspace schema version")
         if name == "provider":
             group.add_argument(
                 "--provider",
@@ -837,6 +846,38 @@ def _handle_completions(args: argparse.Namespace) -> int:
     return _emit(report, args.format)
 
 
+def _handle_upgrade(args: argparse.Namespace) -> int:
+    if args.check:
+        report = Report(
+            title="Upgrade",
+            status="ok",
+            next_action="Run without --check only after reviewing backup location",
+            sections=[
+                ReportSection(
+                    "Plan",
+                    [
+                        f"from={args.from_version}",
+                        f"to={args.to_version}",
+                        "backup=required-before-migration",
+                    ],
+                )
+            ],
+            data={"from_version": args.from_version, "to_version": args.to_version, "check": True},
+        )
+        return _emit(report, args.format)
+    from .install.migrations import MigrationRunner
+
+    result = MigrationRunner(Path(".pf-agent")).run(args.from_version, args.to_version)
+    report = Report(
+        title="Upgrade",
+        status=result.status,
+        next_action="Inspect rollback steps if status is rolled_back",
+        sections=[ReportSection("Result", [f"backup={result.backup_path}", f"status={result.status}"])],
+        data=result.__dict__ | {"backup_path": str(result.backup_path)},
+    )
+    return _emit(report, args.format)
+
+
 def _planned_report(group: str, next_action: str) -> Report:
     spec = COMMAND_GROUPS[group]
     return Report(
@@ -883,6 +924,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_doctor(args)
     if args.command == "completions":
         return _handle_completions(args)
+    if args.command == "upgrade":
+        return _handle_upgrade(args)
     return _handle_planned(args.command)(args)
 
 
