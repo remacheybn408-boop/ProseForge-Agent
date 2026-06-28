@@ -88,6 +88,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "message, mode, provider",
         "artifacts": "agent turn report",
     },
+    "tools": {
+        "help": "List internal tools and permission levels",
+        "inputs": "tool registry",
+        "artifacts": "tool registry report",
+    },
 }
 
 
@@ -154,6 +159,12 @@ def build_parser() -> argparse.ArgumentParser:
                 "--permission-level",
                 default="read_only",
                 help="maximum permission level for this turn",
+            )
+        if name == "tools":
+            group.add_argument(
+                "--include-permissions",
+                action="store_true",
+                help="include permission levels in the tool list",
             )
         if name == "provider":
             group.add_argument(
@@ -503,6 +514,36 @@ def _handle_chat(args: argparse.Namespace) -> int:
     return _emit(report, args.format)
 
 
+def _handle_tools(args: argparse.Namespace) -> int:
+    from .agent import default_tool_registry
+
+    registry = default_tool_registry()
+    lines = []
+    for tool in registry.list():
+        if args.include_permissions:
+            lines.append(f"{tool.name} -> {tool.permission} ({tool.description})")
+        else:
+            lines.append(f"{tool.name} ({tool.description})")
+    report = Report(
+        title="Agent Tools",
+        status="ok",
+        next_action="Authorize tool calls through PermissionPolicy",
+        sections=[ReportSection("Tools", lines)],
+        data={
+            "tools": [
+                {
+                    "name": tool.name,
+                    "permission": tool.permission,
+                    "description": tool.description,
+                    "enabled": tool.enabled,
+                }
+                for tool in registry.list()
+            ]
+        },
+    )
+    return _emit(report, args.format)
+
+
 def _planned_report(group: str, next_action: str) -> Report:
     spec = COMMAND_GROUPS[group]
     return Report(
@@ -539,6 +580,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_provider(args)
     if args.command == "chat":
         return _handle_chat(args)
+    if args.command == "tools":
+        return _handle_tools(args)
     return _handle_planned(args.command)(args)
 
 

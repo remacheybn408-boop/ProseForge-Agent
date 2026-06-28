@@ -1,0 +1,10 @@
+tools:
+  - name: memory.search
+    permission: read_only
+    description: Search memory records
+  - name: chapter.run
+    permission: draft_write
+    description: Draft chapter artifacts
+  - name: chapter.accept
+    permission: project_write
+    description: Accept chapter output
