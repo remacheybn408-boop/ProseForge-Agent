@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from .app_dirs import AppDirs
+from .platform_io import TerminalCaps
 
 
 @dataclass(frozen=True)
@@ -152,12 +153,13 @@ class InstallationDoctor:
         )
 
     def _encoding_check(self) -> DoctorCheck:
-        utf8 = self.env.get("PYTHONUTF8") == "1" or sys.getdefaultencoding().lower() == "utf-8"
+        caps = TerminalCaps.detect(self.env)
+        utf8 = caps.supports_utf8 or self.env.get("PYTHONUTF8") == "1" or sys.getdefaultencoding().lower() == "utf-8"
         return DoctorCheck(
             "encoding",
             "encoding",
             "ok" if utf8 else "warn",
-            "UTF-8 enabled" if utf8 else "terminal may not support UTF-8",
+            "UTF-8 enabled" if utf8 else "terminal may not support UTF-8; ASCII fallback active",
             None if utf8 else "Enable UTF-8 mode for your shell",
         )
 
