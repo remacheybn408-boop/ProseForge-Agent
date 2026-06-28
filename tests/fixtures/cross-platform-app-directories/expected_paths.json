@@ -1,0 +1,8 @@
+{
+  "portable": {
+    "config_dir": ".pf-agent/config",
+    "data_dir": ".pf-agent/data",
+    "cache_dir": ".pf-agent/cache",
+    "log_dir": ".pf-agent/logs"
+  }
+}

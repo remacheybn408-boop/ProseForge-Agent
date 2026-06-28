@@ -9,6 +9,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from .app_dirs import AppDirs
+
 
 @dataclass(frozen=True)
 class DoctorCheck:
@@ -66,6 +68,7 @@ class InstallationDoctor:
             self._provider_key_check(),
             self._secret_backend_check(),
             self._encoding_check(),
+            self._paths_check(),
         ]
         if section:
             checks = [check for check in checks if check.section == section]
@@ -157,6 +160,15 @@ class InstallationDoctor:
             "UTF-8 enabled" if utf8 else "terminal may not support UTF-8",
             None if utf8 else "Enable UTF-8 mode for your shell",
         )
+
+    def _paths_check(self) -> DoctorCheck:
+        current = (self.env.get("PF_TEST_PLATFORM") or platform.system() or "linux").lower()
+        normalized = "windows" if current.startswith("win") else "macos" if current == "darwin" else current
+        try:
+            dirs = AppDirs.for_platform(normalized, self.env, portable=self.env.get("PF_PORTABLE") == "1")
+        except Exception as exc:  # noqa: BLE001 - doctor reports recovery instead of raising
+            return DoctorCheck("app_dirs", "paths", "fail", str(exc), "Set HOME or platform app-dir variables")
+        return DoctorCheck("app_dirs", "paths", "ok", f"config={dirs.config_dir}")
 
 
 def _redact(text: str) -> str:
