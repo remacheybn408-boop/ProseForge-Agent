@@ -118,6 +118,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "version range, check flag",
         "artifacts": "backup and migration report",
     },
+    "uninstall": {
+        "help": "Plan uninstall and data retention actions",
+        "inputs": "plan flag, remove user data flag",
+        "artifacts": "uninstall plan",
+    },
 }
 
 
@@ -227,6 +232,9 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--check", action="store_true", help="check upgrade readiness without migration")
             group.add_argument("--from-version", default="1", help="current workspace schema version")
             group.add_argument("--to-version", default="2", help="target workspace schema version")
+        if name == "uninstall":
+            group.add_argument("--plan", action="store_true", help="show uninstall plan without deleting")
+            group.add_argument("--remove-user-data", action="store_true", help="include user data in plan")
         if name == "provider":
             group.add_argument(
                 "--provider",
@@ -878,6 +886,29 @@ def _handle_upgrade(args: argparse.Namespace) -> int:
     return _emit(report, args.format)
 
 
+def _handle_uninstall(args: argparse.Namespace) -> int:
+    from .install.app_dirs import AppDirs
+    from .install.uninstall import UninstallPlanner
+
+    plan = UninstallPlanner(AppDirs.for_platform(sys.platform, dict(), portable=True)).plan(
+        remove_user_data=args.remove_user_data
+    )
+    report = Report(
+        title="Uninstall Plan",
+        status="ok",
+        next_action="Use explicit confirmation before removing user data",
+        sections=[
+            ReportSection(
+                "Actions",
+                [f"{category}: {', '.join(paths) or '(none)'}" for category, paths in plan.actions.items()],
+            ),
+            ReportSection("Retained", plan.retained_paths),
+        ],
+        data=plan.to_dict(),
+    )
+    return _emit(report, args.format)
+
+
 def _planned_report(group: str, next_action: str) -> Report:
     spec = COMMAND_GROUPS[group]
     return Report(
@@ -926,6 +957,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_completions(args)
     if args.command == "upgrade":
         return _handle_upgrade(args)
+    if args.command == "uninstall":
+        return _handle_uninstall(args)
     return _handle_planned(args.command)(args)
 
 

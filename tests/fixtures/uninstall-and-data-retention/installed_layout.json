@@ -1,0 +1,6 @@
+{
+  "binaries": ["pf-agent"],
+  "shell_integration": ["profile.d/proseforge-agent.ps1"],
+  "cache_logs": [".pf-agent/cache", ".pf-agent/logs"],
+  "user_data": [".pf-agent/data", ".pf-agent/workspace"]
+}

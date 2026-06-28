@@ -13,6 +13,7 @@ from .macos import MacOSChecks
 from .linux import LinuxChecks
 from .shell import CompletionScript, InstallPlan, ShellCompletionRenderer, ShellInstaller
 from .migrations import MigrationResult, MigrationRunner
+from .uninstall import UninstallPlan, UninstallPlanner, UninstallResult
 
 __all__ = [
     "AppDirs",
@@ -40,6 +41,9 @@ __all__ = [
     "ShellInstaller",
     "ShellCommandRenderer",
     "TerminalCaps",
+    "UninstallPlan",
+    "UninstallPlanner",
+    "UninstallResult",
     "WindowsChecks",
     "read_text_utf8",
     "write_text_utf8",
