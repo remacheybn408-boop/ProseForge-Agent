@@ -284,6 +284,12 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--model", default=None, help="provider model for setup")
             group.add_argument("--api-key", default=None, help="provider API key for setup")
             group.add_argument("--verify", action="store_true", help="verify provider after setup")
+            group.add_argument(
+                "--endpoint",
+                action="append",
+                default=None,
+                help="local OpenAI-compatible endpoint to inspect",
+            )
 
     return parser
 
@@ -501,6 +507,32 @@ def _handle_provider_certify(args: argparse.Namespace) -> int:
 
 
 def _handle_provider(args: argparse.Namespace) -> int:
+    if args.subcommand == "discover-local":
+        from .install.local_models import LocalModelDetector
+
+        class StaticLocalHttp:
+            def get_json(self, url: str) -> object:
+                return {"models": []}
+
+        detector = LocalModelDetector(StaticLocalHttp())
+        candidates = detector.detect(endpoints=args.endpoint)
+        lines = [
+            f"{candidate.endpoint} -> {', '.join(candidate.models)}"
+            for candidate in candidates
+        ]
+        if not lines:
+            lines = detector.notes or ["no local models discovered"]
+        report = Report(
+            title="Local Models",
+            status="ok",
+            next_action="Use provider setup with a local endpoint before routing chat to it",
+            sections=[ReportSection("Candidates", lines)],
+            data={
+                "candidates": [candidate.__dict__ for candidate in candidates],
+                "notes": detector.notes,
+            },
+        )
+        return _emit(report, args.format)
     if args.subcommand == "setup":
         from .install.provider_setup import ProviderSetupWizard
         from .install.secrets import SecretStore

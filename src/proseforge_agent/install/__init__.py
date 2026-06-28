@@ -11,6 +11,7 @@ from .secrets import SecretLookup, SecretStore
 from .windows import WindowsChecks
 from .macos import MacOSChecks
 from .linux import LinuxChecks
+from .local_models import LocalModelCandidate, LocalModelDetector
 from .shell import CompletionScript, InstallPlan, ShellCompletionRenderer, ShellInstaller
 from .migrations import MigrationResult, MigrationRunner
 from .uninstall import UninstallPlan, UninstallPlanner, UninstallResult
@@ -26,6 +27,8 @@ __all__ = [
     "InstallationDoctor",
     "InstallPlan",
     "LinuxChecks",
+    "LocalModelCandidate",
+    "LocalModelDetector",
     "MacOSChecks",
     "ManifestReport",
     "MigrationResult",
