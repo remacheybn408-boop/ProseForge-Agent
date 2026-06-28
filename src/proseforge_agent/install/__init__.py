@@ -6,6 +6,7 @@ from .binary_packaging import BinaryManifest, ManifestReport
 from .doctor import DoctorCheck, DoctorReport, InstallationDoctor
 from .platform_io import ShellCommandRenderer, TerminalCaps, read_text_utf8, write_text_utf8
 from .package_checks import PackageCheck, PackageChecker, PackageReport
+from .qa_matrix import CoverageReport, NativeQAMatrix, QACheck
 from .provider_setup import ProviderSetupResult, ProviderSetupWizard
 from .secrets import SecretLookup, SecretStore
 from .windows import WindowsChecks
@@ -21,6 +22,7 @@ __all__ = [
     "AppDirs",
     "BinaryManifest",
     "CompletionScript",
+    "CoverageReport",
     "DoctorCheck",
     "DoctorReport",
     "FirstRunResult",
@@ -37,8 +39,10 @@ __all__ = [
     "PackageCheck",
     "PackageChecker",
     "PackageReport",
+    "NativeQAMatrix",
     "ProviderSetupResult",
     "ProviderSetupWizard",
+    "QACheck",
     "SecretLookup",
     "SecretStore",
     "ShellCompletionRenderer",

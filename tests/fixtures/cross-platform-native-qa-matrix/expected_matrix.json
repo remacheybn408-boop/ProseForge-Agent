@@ -1,0 +1,19 @@
+{
+  "platforms": {
+    "windows": [
+      {
+        "name": "install"
+      }
+    ],
+    "macos": [
+      {
+        "name": "install"
+      }
+    ],
+    "linux": [
+      {
+        "name": "install"
+      }
+    ]
+  }
+}

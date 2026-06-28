@@ -133,6 +133,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "bundle subcommand, redaction flag",
         "artifacts": "support bundle diagnostics",
     },
+    "qa": {
+        "help": "Show native QA matrix coverage requirements",
+        "inputs": "matrix subcommand, show flag",
+        "artifacts": "cross-platform QA matrix",
+    },
 }
 
 
@@ -255,6 +260,8 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--permission-level", default="read_only", help="service permission ceiling")
         if name == "support":
             group.add_argument("--redact", action="store_true", help="redact paths and secrets")
+        if name == "qa":
+            group.add_argument("--show", action="store_true", help="show required native QA matrix")
         if name == "provider":
             group.add_argument(
                 "--provider",
@@ -1055,6 +1062,25 @@ def _handle_support(args: argparse.Namespace) -> int:
     return _emit(report, args.format)
 
 
+def _handle_qa(args: argparse.Namespace) -> int:
+    from .install.qa_matrix import NativeQAMatrix
+
+    matrix = NativeQAMatrix()
+    payload = matrix.to_dict()
+    lines = []
+    for platform, checks in payload["platforms"].items():
+        for check in checks:
+            lines.append(f"{platform}.{check['name']} -> {check['command']}")
+    report = Report(
+        title="Native QA Matrix",
+        status="ok",
+        next_action="Use this matrix as the native release coverage checklist",
+        sections=[ReportSection("Required Checks", lines)],
+        data=payload,
+    )
+    return _emit(report, args.format)
+
+
 def _planned_report(group: str, next_action: str) -> Report:
     spec = COMMAND_GROUPS[group]
     return Report(
@@ -1109,6 +1135,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_service(args)
     if args.command == "support":
         return _handle_support(args)
+    if args.command == "qa":
+        return _handle_qa(args)
     return _handle_planned(args.command)(args)
 
 
