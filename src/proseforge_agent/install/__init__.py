@@ -10,6 +10,7 @@ from .provider_setup import ProviderSetupResult, ProviderSetupWizard
 from .secrets import SecretLookup, SecretStore
 from .windows import WindowsChecks
 from .macos import MacOSChecks
+from .linux import LinuxChecks
 
 __all__ = [
     "AppDirs",
@@ -19,6 +20,7 @@ __all__ = [
     "FirstRunResult",
     "FirstRunWizard",
     "InstallationDoctor",
+    "LinuxChecks",
     "MacOSChecks",
     "ManifestReport",
     "PackageCheck",

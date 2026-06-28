@@ -69,6 +69,10 @@ class InstallationDoctor:
             from .macos import MacOSChecks
 
             return DoctorReport(checks=MacOSChecks(self.env).run())
+        if section == "linux":
+            from .linux import LinuxChecks
+
+            return DoctorReport(checks=LinuxChecks(self.env).run())
         checks = [
             self._os_check(),
             self._python_check(),

@@ -1,0 +1,6 @@
+{
+  "xdg": {
+    "HOME": "/home/alice",
+    "XDG_CONFIG_HOME": "/cfg"
+  }
+}
