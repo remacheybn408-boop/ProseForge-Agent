@@ -166,6 +166,11 @@ def build_parser() -> argparse.ArgumentParser:
                 help="print retrieval citations without inventing missing context",
             )
             group.add_argument(
+                "--show-memory-candidates",
+                action="store_true",
+                help="extract preference candidates without accepting memory",
+            )
+            group.add_argument(
                 "--permission-level",
                 default="read_only",
                 help="maximum permission level for this turn",
@@ -523,6 +528,23 @@ def _handle_chat(args: argparse.Namespace) -> int:
             .render_markdown()
         )
         return 0
+    if getattr(args, "show_memory_candidates", False):
+        from .chat.memory import ChatMemoryExtractor, render_memory_candidates
+
+        text = args.message or args.text or ""
+        candidates = ChatMemoryExtractor().write_candidates(
+            Path(".pf-agent"),
+            text,
+            project_slug=project_slug,
+        )
+        report = Report(
+            title="Memory Candidates",
+            status="ok",
+            next_action="Review candidates before promoting them to durable memory",
+            sections=[ReportSection("Queues", render_memory_candidates(candidates))],
+            data={"candidates": [candidate.to_dict() for candidate in candidates]},
+        )
+        return _emit(report, args.format)
     if getattr(args, "show_citations", False):
         from .chat.retrieval import ChatRetrievalResponder, render_citations
 
