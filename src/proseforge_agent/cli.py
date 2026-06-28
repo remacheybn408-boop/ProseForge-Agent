@@ -497,15 +497,29 @@ def _handle_chat(args: argparse.Namespace) -> int:
             data=decision.__dict__,
         )
         return _emit(report, args.format)
-    if not args.message:
-        report = _planned_report("chat", "Pass --message for one-shot chat")
-        return _emit(report, args.format)
-    from .agent import AgentKernel, AgentTurnRequest, IntentRouter
+    from .chat import ChatSessionStore
     from .llm import FakeProvider
 
     project_slug = None if args.no_project else args.project
     provider = FakeProvider(name=args.provider or "fake", model=args.provider or "fake")
-    kernel = AgentKernel(provider=provider, intent_router=IntentRouter())
+    session_store = ChatSessionStore(Path(".pf-agent"))
+    if not args.message:
+        from .chat.repl import ChatRepl
+
+        return ChatRepl(
+            provider=provider,
+            session_store=session_store,
+            mode=args.mode,
+            project_slug=project_slug,
+            permission_level=args.permission_level,
+        ).run()
+    from .agent import AgentKernel, AgentTurnRequest, IntentRouter
+
+    kernel = AgentKernel(
+        provider=provider,
+        intent_router=IntentRouter(),
+        session_store=session_store,
+    )
     result = kernel.run_turn(
         AgentTurnRequest(
             session_id="cli",
@@ -518,7 +532,7 @@ def _handle_chat(args: argparse.Namespace) -> int:
     report = Report(
         title="Agent Chat",
         status="ok",
-        next_action="Use chat sessions in Task 34 for durable transcripts",
+        next_action="Use chat sessions to resume durable transcripts",
         sections=[ReportSection("Response", result.text.splitlines())],
         data={
             "trace_id": result.trace_id,

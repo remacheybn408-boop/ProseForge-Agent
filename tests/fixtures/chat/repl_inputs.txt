@@ -1,0 +1,6 @@
+/help
+/mode project_chat
+/project demo
+今天写什么？
+/sessions
+/exit
