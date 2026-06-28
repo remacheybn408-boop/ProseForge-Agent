@@ -1,0 +1,11 @@
+{
+  "OS": "Windows",
+  "PYTHON_VERSION": "3.11.0",
+  "PACKAGE_INSTALLED": "0",
+  "CONFIG_EXISTS": "0",
+  "WORKSPACE_WRITABLE": "1",
+  "PROSEFORGE_ROOT": "",
+  "OPENAI_API_KEY": "sk-secret",
+  "SECRET_BACKEND": "env",
+  "PYTHONUTF8": "1"
+}

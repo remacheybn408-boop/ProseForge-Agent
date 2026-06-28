@@ -103,6 +103,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "portable/native mode, ProseForge root",
         "artifacts": "agent config, workspace, provider stub, doctor report",
     },
+    "doctor": {
+        "help": "Run read-only installation diagnostics",
+        "inputs": "optional diagnostic section",
+        "artifacts": "doctor report",
+    },
 }
 
 
@@ -204,6 +209,8 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--native", action="store_true", help="initialize native app directories")
             group.add_argument("--proseforge-root", default="${PROSEFORGE_ROOT}", help="ProseForge engine root")
             group.add_argument("--non-interactive", action="store_true", help="run without prompts")
+        if name == "doctor":
+            group.add_argument("--section", default=None, help="diagnostic section to run")
         if name == "provider":
             group.add_argument(
                 "--provider",
@@ -742,6 +749,29 @@ def _handle_init(args: argparse.Namespace) -> int:
     return _emit(report, args.format)
 
 
+def _handle_doctor(args: argparse.Namespace) -> int:
+    from .install.doctor import InstallationDoctor
+
+    doctor_report = InstallationDoctor().run(section=args.section)
+    report = Report(
+        title="Installation Doctor",
+        status=doctor_report.status,
+        next_action="Follow recovery commands for any failing checks",
+        sections=[
+            ReportSection(
+                "Checks",
+                [
+                    f"{check.section}.{check.name} -> {check.status}: {check.detail}"
+                    + (f" | recovery: {check.recovery}" if check.recovery else "")
+                    for check in doctor_report.checks
+                ],
+            )
+        ],
+        data=doctor_report.to_dict(),
+    )
+    return _emit(report, args.format)
+
+
 def _planned_report(group: str, next_action: str) -> Report:
     spec = COMMAND_GROUPS[group]
     return Report(
@@ -784,6 +814,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_jobs(args)
     if args.command == "init":
         return _handle_init(args)
+    if args.command == "doctor":
+        return _handle_doctor(args)
     return _handle_planned(args.command)(args)
 
 
