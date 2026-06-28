@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from .app_dirs import AppDirs
+from .package_checks import PackageChecker
 from .platform_io import TerminalCaps
 from .secrets import SecretStore
 
@@ -93,12 +94,17 @@ class InstallationDoctor:
 
     def _package_check(self) -> DoctorCheck:
         installed = self.env.get("PACKAGE_INSTALLED", "1") != "0"
+        package_report = PackageChecker().verify() if Path("pyproject.toml").exists() else None
+        console_ok = True
+        if package_report is not None:
+            console_ok = next((check.status == "ok" for check in package_report.checks if check.name == "console_script"), False)
+        ok = installed and console_ok
         return DoctorCheck(
             "package",
             "packaging",
-            "ok" if installed else "fail",
-            "pf-agent importable" if installed else "package metadata missing",
-            None if installed else "python -m pip install -e .",
+            "ok" if ok else "fail",
+            "pf-agent importable" if ok else "package metadata missing",
+            None if ok else "python -m pip install -e .",
         )
 
     def _config_check(self) -> DoctorCheck:
