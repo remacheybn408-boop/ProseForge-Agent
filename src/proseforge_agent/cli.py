@@ -83,6 +83,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "extension registry",
         "artifacts": "extension report",
     },
+    "chat": {
+        "help": "Run one-shot agent chat and intent classification",
+        "inputs": "message, mode, provider",
+        "artifacts": "agent turn report",
+    },
 }
 
 
@@ -138,6 +143,18 @@ def build_parser() -> argparse.ArgumentParser:
             help="group subcommand (e.g. 'command-reference', 'list')",
         )
         group.add_argument("--providers", default=None, help="providers config (YAML)")
+        if name == "chat":
+            group.add_argument("--message", default=None, help="one-shot chat message")
+            group.add_argument("--text", default=None, help="text to classify")
+            group.add_argument("--provider", default="fake", help="chat provider")
+            group.add_argument("--no-project", action="store_true", help="do not bind a project")
+            group.add_argument("--project", default=None, help="project slug")
+            group.add_argument("--mode", default="general_chat", help="conversation mode")
+            group.add_argument(
+                "--permission-level",
+                default="read_only",
+                help="maximum permission level for this turn",
+            )
         if name == "provider":
             group.add_argument(
                 "--provider",
@@ -427,6 +444,42 @@ def _handle_provider(args: argparse.Namespace) -> int:
     return _emit(report, args.format)
 
 
+def _handle_chat(args: argparse.Namespace) -> int:
+    if not args.message:
+        report = _planned_report("chat", "Pass --message for one-shot chat")
+        return _emit(report, args.format)
+    from .agent import AgentKernel, AgentTurnRequest
+    from .llm import FakeProvider
+
+    project_slug = None if args.no_project else args.project
+    provider = FakeProvider(name=args.provider or "fake", model=args.provider or "fake")
+    kernel = AgentKernel(provider=provider)
+    result = kernel.run_turn(
+        AgentTurnRequest(
+            session_id="cli",
+            text=args.message,
+            mode=args.mode,
+            project_slug=project_slug,
+            permission_level=args.permission_level,
+        )
+    )
+    report = Report(
+        title="Agent Chat",
+        status="ok",
+        next_action="Use chat sessions in Task 34 for durable transcripts",
+        sections=[ReportSection("Response", result.text.splitlines())],
+        data={
+            "trace_id": result.trace_id,
+            "intent": result.intent.__dict__,
+            "tool_calls": [call.__dict__ for call in result.tool_calls],
+            "evidence_refs": result.evidence_refs,
+            "memory_candidate_ids": result.memory_candidate_ids,
+            "events": result.events,
+        },
+    )
+    return _emit(report, args.format)
+
+
 def _planned_report(group: str, next_action: str) -> Report:
     spec = COMMAND_GROUPS[group]
     return Report(
@@ -461,6 +514,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_report(args)
     if args.command == "provider":
         return _handle_provider(args)
+    if args.command == "chat":
+        return _handle_chat(args)
     return _handle_planned(args.command)(args)
 
 

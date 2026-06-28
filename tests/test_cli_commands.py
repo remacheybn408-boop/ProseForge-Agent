@@ -74,6 +74,13 @@ def test_provider_routes_writes_report(tmp_path):
     assert list(tmp_path.glob("provider-routes*"))
 
 
+def test_chat_one_shot_without_project(capsys):
+    code = main(["chat", "--message", "hello", "--provider", "fake", "--no-project"])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "Trace:" in out
+
+
 def test_unknown_command_errors_nonzero(capsys):
     code = main(["bogus"])
     assert code != 0
