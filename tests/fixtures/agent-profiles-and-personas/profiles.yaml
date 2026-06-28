@@ -1,0 +1,12 @@
+profiles:
+  copychief:
+    mode: creative_chat
+    tone: crisp editorial
+    provider_roles:
+      draft: fake
+      review: fake
+    memory_scope: project
+    permission_ceiling: project_write
+    prompt_pack:
+      persona: copychief
+      style: concise

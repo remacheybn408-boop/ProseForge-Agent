@@ -5,6 +5,7 @@ from .kernel import AgentKernel
 from .intent_router import IntentDecision, IntentRouter
 from .types import AgentIntent, AgentTurnRequest, AgentTurnResult, ToolCallResult
 from .permissions import PERMISSION_LEVELS, PermissionDecision, PermissionPolicy
+from .profiles import AgentProfile, AgentProfileRegistry
 from .tools import AgentTool, ToolRegistry, default_tool_registry
 
 __all__ = [
@@ -21,6 +22,8 @@ __all__ = [
     "PERMISSION_LEVELS",
     "PermissionDecision",
     "PermissionPolicy",
+    "AgentProfile",
+    "AgentProfileRegistry",
     "AgentTool",
     "ToolRegistry",
     "JobResult",

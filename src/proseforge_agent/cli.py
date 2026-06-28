@@ -215,6 +215,8 @@ def build_parser() -> argparse.ArgumentParser:
                 default="read_only",
                 help="maximum permission level for this turn",
             )
+            group.add_argument("--profile", default=None, help="agent persona profile")
+            group.add_argument("--profiles-file", default=None, help="YAML file with agent profiles")
         if name == "tools":
             group.add_argument(
                 "--include-permissions",
@@ -647,13 +649,27 @@ def _handle_chat(args: argparse.Namespace) -> int:
     project_slug = None if args.no_project else args.project
     provider = FakeProvider(name=args.provider or "fake", model=args.provider or "fake")
     session_store = ChatSessionStore(Path(".pf-agent"))
+    mode = args.mode
+    permission_level = args.permission_level
+    profile = None
+    if getattr(args, "profile", None):
+        from .agent import AgentProfileRegistry
+
+        registry = (
+            AgentProfileRegistry.from_yaml(args.profiles_file)
+            if args.profiles_file
+            else AgentProfileRegistry.builtins()
+        )
+        profile = registry.resolve(args.profile, session_permission_max=args.permission_level)
+        mode = profile.mode
+        permission_level = profile.permission_ceiling
     if getattr(args, "show_prompt", False):
         from .chat import ChatPromptBuilder
 
         text = args.message or args.text or ""
         print(
             ChatPromptBuilder()
-            .build(text=text, mode=args.mode, project_slug=project_slug)
+            .build(text=text, mode=mode, project_slug=project_slug)
             .render_markdown()
         )
         return 0
@@ -664,7 +680,7 @@ def _handle_chat(args: argparse.Namespace) -> int:
         package = ChatWorkflowHandoff().create(
             text,
             project_slug=project_slug,
-            mode=args.mode,
+            mode=mode,
         )
         report = Report(
             title="Handoff Package",
@@ -714,9 +730,9 @@ def _handle_chat(args: argparse.Namespace) -> int:
         return ChatRepl(
             provider=provider,
             session_store=session_store,
-            mode=args.mode,
+            mode=mode,
             project_slug=project_slug,
-            permission_level=args.permission_level,
+            permission_level=permission_level,
         ).run()
     from .agent import AgentKernel, AgentTurnRequest, IntentRouter
 
@@ -729,18 +745,32 @@ def _handle_chat(args: argparse.Namespace) -> int:
         AgentTurnRequest(
             session_id="cli",
             text=args.message,
-            mode=args.mode,
+            mode=mode,
             project_slug=project_slug,
-            permission_level=args.permission_level,
+            permission_level=permission_level,
         )
     )
+    sections = []
+    if profile is not None:
+        sections.append(
+            ReportSection(
+                "Profile",
+                [
+                    f"profile: {profile.name}",
+                    f"mode: {profile.mode}",
+                    f"permission_ceiling: {profile.permission_ceiling}",
+                ],
+            )
+        )
+    sections.append(ReportSection("Response", result.text.splitlines()))
     report = Report(
         title="Agent Chat",
         status="ok",
         next_action="Use chat sessions to resume durable transcripts",
-        sections=[ReportSection("Response", result.text.splitlines())],
+        sections=sections,
         data={
             "trace_id": result.trace_id,
+            "profile": profile.__dict__ if profile is not None else None,
             "intent": result.intent.__dict__,
             "tool_calls": [call.__dict__ for call in result.tool_calls],
             "evidence_refs": result.evidence_refs,
