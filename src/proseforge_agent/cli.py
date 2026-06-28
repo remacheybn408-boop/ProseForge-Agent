@@ -155,6 +155,26 @@ def build_parser() -> argparse.ArgumentParser:
                 help="render route decisions for all non-manual policies",
             )
             group.add_argument(
+                "--all",
+                action="store_true",
+                help="operate on all configured provider profiles",
+            )
+            group.add_argument(
+                "--shape-only",
+                action="store_true",
+                help="run offline shape certification only",
+            )
+            group.add_argument(
+                "--real-if-key-present",
+                action="store_true",
+                help="run real smoke only when the provider key is present",
+            )
+            group.add_argument(
+                "--records-dir",
+                default=None,
+                help="directory for provider certification records",
+            )
+            group.add_argument(
                 "--route-matrix",
                 default=None,
                 help="provider route matrix YAML",
@@ -271,11 +291,122 @@ def _handle_provider_routes(args: argparse.Namespace) -> int:
     return _emit(report, args.format)
 
 
+def _provider_profile_paths() -> list[Path]:
+    return sorted((Path(__file__).resolve().parents[2] / "configs" / "providers").glob("*.yaml"))
+
+
+def _certifier_for_family(family: str):
+    from .llm.providers import (
+        anthropic,
+        deepseek,
+        doubao,
+        gemini,
+        glm,
+        grok,
+        mimo,
+        minimax,
+        openai,
+        qwen,
+    )
+
+    modules = {
+        "anthropic": anthropic,
+        "deepseek": deepseek,
+        "doubao": doubao,
+        "gemini": gemini,
+        "glm": glm,
+        "xai": grok,
+        "mimo": mimo,
+        "minimax": minimax,
+        "openai": openai,
+        "qwen": qwen,
+    }
+    return modules.get(family)
+
+
+def _handle_provider_certify(args: argparse.Namespace) -> int:
+    from .llm.certification import CertificationStore, PASSED, SKIPPED, UNVERIFIED
+    from .llm.docs_refresh import docs_refresh_report, source_urls_for_family
+    from .llm.profiles import load_provider_profiles
+
+    records_dir = Path(args.records_dir) if args.records_dir else Path("reports") / "provider-certification-records"
+    store = CertificationStore(records_dir)
+    written = []
+    families: set[str] = set()
+    for path in _provider_profile_paths():
+        profiles = load_provider_profiles(path)
+        for profile in profiles.values():
+            if not args.all and args.provider and profile.name != args.provider:
+                continue
+            if not args.all and not args.provider:
+                continue
+            certifier = _certifier_for_family(profile.family)
+            if certifier is None:
+                continue
+            shape = certifier.shape_certification(profile)
+            smoke = {"skipped": True, "reason": "shape-only"}
+            if not args.shape_only and args.real_if_key_present:
+                smoke = certifier.real_smoke(profile)
+            source_urls = source_urls_for_family(profile.family)
+            record = store.write(
+                provider=profile.name,
+                family=profile.family,
+                protocol=profile.protocol,
+                model=profile.model,
+                source_urls=source_urls,
+                checked_date=shape["checked_date"],
+                shape_status=PASSED if shape.get("level") == "shape_tested" else UNVERIFIED,
+                smoke_status=SKIPPED if smoke.get("skipped") else PASSED,
+                workflow_status=UNVERIFIED,
+                capability_status=shape.get("capabilities") or {},
+                limitations=[
+                    f"{key}={value}"
+                    for key, value in (shape.get("capabilities") or {}).items()
+                    if value not in {"supported", "pass", PASSED}
+                ],
+            )
+            written.append(record)
+            families.add(profile.family)
+
+    docs_report = docs_refresh_report(sorted(families))
+    report = Report(
+        title="Provider Certification",
+        status="ok",
+        next_action="Use ProviderReleaseCheck before release sign-off",
+        sections=[
+            ReportSection(
+                "Records",
+                [
+                    f"{record.provider} -> shape={record.shape_status}, smoke={record.smoke_status}"
+                    for record in written
+                ],
+            ),
+            *docs_report.sections,
+        ],
+        data={
+            "records_dir": str(records_dir),
+            "records": [record.__dict__ for record in written],
+            "docs": docs_report.data,
+        },
+    )
+    if getattr(args, "write_report", False) and not args.dry_run:
+        out_dir = Path(args.out) if args.out else Path("reports")
+        out_dir.mkdir(parents=True, exist_ok=True)
+        suffix = "json" if args.format == "json" else "md"
+        path = out_dir / f"provider-certification.{suffix}"
+        path.write_text(ReportRenderer().render(report, args.format), encoding="utf-8")
+        print(f"wrote {path}")
+        return 0
+    return _emit(report, args.format)
+
+
 def _handle_provider(args: argparse.Namespace) -> int:
     if args.subcommand == "probe":
         return _handle_provider_probe(args)
     if args.subcommand == "routes":
         return _handle_provider_routes(args)
+    if args.subcommand == "certify":
+        return _handle_provider_certify(args)
     if not args.providers:
         report = _planned_report("provider", "Pass --providers <config.yaml> to list providers")
         return _emit(report, args.format)

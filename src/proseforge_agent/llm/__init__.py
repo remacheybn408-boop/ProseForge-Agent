@@ -19,6 +19,12 @@ from .capabilities import (
     CapabilityProbeResult,
     capability_matrix,
 )
+from .certification import (
+    CertificationStore,
+    ProviderCertificationRecord,
+    ProviderReleaseCheck,
+    ProviderReleaseCheckResult,
+)
 from .fake import FakeProvider
 from .probes import CapabilityProber
 from .registry import ProviderRegistry
@@ -38,6 +44,10 @@ __all__ = [
     "CapabilityProber",
     "CapabilityProbeResult",
     "capability_matrix",
+    "CertificationStore",
+    "ProviderCertificationRecord",
+    "ProviderReleaseCheck",
+    "ProviderReleaseCheckResult",
     "ProviderRouter",
     "RouteDecision",
     "RouteProvider",
