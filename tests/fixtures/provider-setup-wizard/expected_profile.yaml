@@ -1,0 +1,4 @@
+name: deepseek
+model: deepseek-chat
+protocol: openai_compatible
+secret_ref: secret://deepseek/api_key

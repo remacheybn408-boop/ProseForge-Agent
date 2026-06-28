@@ -257,6 +257,9 @@ def build_parser() -> argparse.ArgumentParser:
                 default="drafter",
                 help="role to route (default: drafter)",
             )
+            group.add_argument("--model", default=None, help="provider model for setup")
+            group.add_argument("--api-key", default=None, help="provider API key for setup")
+            group.add_argument("--verify", action="store_true", help="verify provider after setup")
 
     return parser
 
@@ -474,6 +477,35 @@ def _handle_provider_certify(args: argparse.Namespace) -> int:
 
 
 def _handle_provider(args: argparse.Namespace) -> int:
+    if args.subcommand == "setup":
+        from .install.provider_setup import ProviderSetupWizard
+        from .install.secrets import SecretStore
+
+        result = ProviderSetupWizard(Path(".pf-agent"), SecretStore.for_platform(sys.platform, False)).configure(
+            provider=args.provider or "",
+            api_key=args.api_key,
+            model=args.model or args.provider or "",
+            verify=args.verify,
+        )
+        report = Report(
+            title="Provider Setup",
+            status="ok",
+            next_action="Run `pf-agent provider certify --all --shape-only` before release",
+            sections=[
+                ReportSection(
+                    "Profile",
+                    [
+                        f"provider={result.provider}",
+                        f"model={result.model}",
+                        f"profile={result.profile_path}",
+                        f"secret_ref={result.secret_ref}",
+                        f"verified={result.verified}",
+                    ],
+                )
+            ],
+            data=result.__dict__ | {"profile_path": str(result.profile_path)},
+        )
+        return _emit(report, args.format)
     if args.subcommand == "probe":
         return _handle_provider_probe(args)
     if args.subcommand == "routes":

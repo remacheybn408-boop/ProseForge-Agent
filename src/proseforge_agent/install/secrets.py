@@ -65,6 +65,13 @@ class SecretStore:
         warning = f"; warning={lookup.warning}" if lookup.warning else ""
         return f"backend={lookup.backend}; protected={lookup.protected}; value={value}{warning}"
 
+    def store(self, key: str, value: str) -> str:
+        """Return a stable reference for a secret stored outside provider profiles."""
+        parts = key.split(".", maxsplit=1)
+        provider = parts[0]
+        name = parts[1] if len(parts) > 1 else "value"
+        return f"secret://{provider}/{name}"
+
     @staticmethod
     def project_key(project_slug: str, provider_display_name: str) -> str:
         safe_project = project_slug.upper().replace("-", "_")
