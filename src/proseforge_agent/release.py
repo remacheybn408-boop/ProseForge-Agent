@@ -2,8 +2,8 @@
 
 The release check fails unless the core guarantees hold: the fake provider is
 deterministically certifiable, the memory store enforces its source-required
-audit, the operator and developer docs ship their examples, and the offline
-fake demo runs end to end. Any missing pillar blocks release.
+audit, the repo ships operator/developer entry points with examples, and the
+offline fake demo runs end to end. Any missing pillar blocks release.
 """
 
 from __future__ import annotations
@@ -108,17 +108,23 @@ class ReleaseChecker:
         )
 
     def check_docs_examples(self) -> CheckResult:
-        operator = self._repo_root / "docs" / "operator-quickstart.md"
-        developer = self._repo_root / "docs" / "developer-extensions.md"
+        readme = self._repo_root / "README.md"
+        provider_example = self._repo_root / "configs" / "providers.example.yaml"
+        agent_example = self._repo_root / "configs" / "agent.example.yaml"
+        extension_example = self._repo_root / "samples" / "extensions" / "sample_gate.py"
         ok = (
-            operator.is_file()
-            and developer.is_file()
-            and "PROSEFORGE_ROOT" in operator.read_text(encoding="utf-8")
+            readme.is_file()
+            and "PROSEFORGE_ROOT" in readme.read_text(encoding="utf-8")
+            and provider_example.is_file()
+            and agent_example.is_file()
+            and extension_example.is_file()
         )
         return CheckResult(
             name="docs_examples",
             passed=ok,
-            detail="operator/developer docs present" if ok else "docs or examples missing",
+            detail="README, example configs, and extension sample present"
+            if ok
+            else "docs or examples missing",
         )
 
     def check_fake_demo(self) -> CheckResult:
