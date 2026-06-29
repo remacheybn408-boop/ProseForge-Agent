@@ -7,6 +7,7 @@ from .types import AgentIntent, AgentTurnRequest, AgentTurnResult, ToolCallResul
 from .permissions import PERMISSION_LEVELS, PermissionDecision, PermissionPolicy
 from .profiles import AgentProfile, AgentProfileRegistry
 from .sandbox import Approval, ExecRequest, ExecResult, Sandbox
+from .subagent import Scope, SubAgentResult, SubAgentRunner
 from .tools import (
     AgentTool,
     ToolContext,
@@ -36,6 +37,9 @@ __all__ = [
     "ExecRequest",
     "ExecResult",
     "Sandbox",
+    "Scope",
+    "SubAgentResult",
+    "SubAgentRunner",
     "AgentTool",
     "ToolContext",
     "ToolRegistry",

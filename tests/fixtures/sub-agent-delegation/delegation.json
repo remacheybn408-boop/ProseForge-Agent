@@ -1,0 +1,8 @@
+{
+  "task": "research the setting",
+  "scope": {
+    "permission_ceiling": "draft_write",
+    "allowed_tools": ["memory.search", "web.search"],
+    "budget": {"max_iterations": 3}
+  }
+}
