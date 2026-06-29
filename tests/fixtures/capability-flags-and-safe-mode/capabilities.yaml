@@ -1,0 +1,9 @@
+capabilities:
+  chat: true
+  service: false
+  local_models: true
+  planning: true
+  providers: true
+  memory: true
+  retrieval: true
+  workflow: true

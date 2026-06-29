@@ -149,6 +149,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "check subcommand, complete-agent flag",
         "artifacts": "release gate report",
     },
+    "status": {
+        "help": "Show resolved capability flags and safe-mode status",
+        "inputs": "capabilities flag, config",
+        "artifacts": "capability map report",
+    },
 }
 
 
@@ -307,6 +312,18 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "release":
             group.add_argument("--complete-agent", action="store_true", help="run the complete agent release gate")
             group.add_argument("--write-report", action="store_true", help="write release report to reports/")
+        if name == "status":
+            group.add_argument(
+                "--capabilities",
+                action="store_true",
+                help="list each capability as enabled/degraded/disabled with a reason",
+            )
+            group.add_argument(
+                "--disable",
+                action="append",
+                default=None,
+                help="disable a capability for this run (repeatable)",
+            )
         if name == "provider":
             group.add_argument(
                 "--provider",
@@ -1187,6 +1204,57 @@ def _handle_usage(args: argparse.Namespace) -> int:
     return _emit(report, args.format)
 
 
+def _capability_self_checks() -> dict:
+    """Import-based self-checks: a capability whose module fails to import is
+    auto-disabled, demonstrating safe-mode boot without crashing the CLI."""
+    import importlib
+
+    modules = {
+        "chat": "proseforge_agent.chat",
+        "service": "proseforge_agent.service",
+        "local_models": "proseforge_agent.install.local_models",
+        "planning": "proseforge_agent.workflow",
+        "providers": "proseforge_agent.llm",
+        "memory": "proseforge_agent.memory",
+        "retrieval": "proseforge_agent.retrieval",
+        "workflow": "proseforge_agent.workflow",
+    }
+
+    def _checker(module_name: str):
+        def check():
+            importlib.import_module(module_name)
+
+        return check
+
+    return {name: _checker(module) for name, module in modules.items()}
+
+
+def _handle_status(args: argparse.Namespace) -> int:
+    from .capabilities import CapabilityRegistry
+
+    overrides = {name: False for name in (args.disable or [])}
+    cap_map = CapabilityRegistry(
+        config={},
+        checks=_capability_self_checks(),
+        cli_overrides=overrides,
+    ).boot()
+    payload = cap_map.to_dict()
+    lines = [
+        f"{state['name']}: {state['status']}"
+        + (f" ({state['reason']})" if state["reason"] else "")
+        for state in payload.values()
+    ]
+    disabled = cap_map.disabled()
+    report = Report(
+        title="Agent Capabilities",
+        status="ok" if not disabled else "degraded",
+        next_action="Disabled capabilities run in safe mode; re-enable in config to restore",
+        sections=[ReportSection("Capabilities", lines)],
+        data=payload,
+    )
+    return _emit(report, args.format)
+
+
 def _handle_qa(args: argparse.Namespace) -> int:
     from .install.qa_matrix import NativeQAMatrix
 
@@ -1357,6 +1425,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_support(args)
     if args.command == "qa":
         return _handle_qa(args)
+    if args.command == "status":
+        return _handle_status(args)
     if args.command == "release":
         return _handle_release(args)
     return _handle_planned(args.command)(args)
