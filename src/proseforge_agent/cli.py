@@ -322,6 +322,7 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--provider", default="fake", help="provider for the run")
             group.add_argument("--allow-exec", action="store_true", help="allow sandboxed command execution")
             group.add_argument("--approve", action="store_true", help="approve sandboxed execution for this run")
+            group.add_argument("--delegate", action="store_true", help="delegate a scoped sub-task during the run")
             group.add_argument(
                 "--show-plan",
                 action="store_true",
@@ -1329,6 +1330,23 @@ def _handle_run(args: argparse.Namespace) -> int:
             approval=Approval(confirmed=bool(getattr(args, "approve", False))),
         )
         sandbox_data = sandbox_result.__dict__
+    delegation_data = None
+    if getattr(args, "delegate", False):
+        from .agent.subagent import Scope, SubAgentRunner
+
+        def _loop_factory(scope: Scope) -> AgentLoop:
+            return AgentLoop(
+                kernel=kernel,
+                budget=scope.budget,
+                planner=_TaskPlanner(),
+                max_reflections=0,
+            )
+
+        delegated = SubAgentRunner(
+            loop_factory=_loop_factory,
+            parent_ceiling="draft_write",
+        ).delegate("research supporting context", Scope(permission_ceiling="system_write", budget=Budget(max_iterations=2)))
+        delegation_data = delegated.__dict__
     sections = [
         ReportSection("Steps", lines or ["(no steps)"]),
         ReportSection(
@@ -1363,12 +1381,23 @@ def _handle_run(args: argparse.Namespace) -> int:
                 ],
             )
         )
+    if delegation_data is not None:
+        sections.append(
+            ReportSection(
+                "Delegation",
+                [
+                    f"status: {delegation_data['status']}",
+                    f"effective_ceiling: {delegation_data['effective_ceiling']}",
+                    delegation_data["output"] or delegation_data["error"] or "(no output)",
+                ],
+            )
+        )
     report = Report(
         title="Autonomous Run",
         status="ok" if result.status in ("completed", "stopped_budget") else "degraded",
         next_action="Increase --max-iterations or refine the goal to reach completion",
         sections=sections,
-        data={**result.to_dict(), "sandbox": sandbox_data},
+        data={**result.to_dict(), "sandbox": sandbox_data, "delegation": delegation_data},
     )
     return _emit(report, args.format)
 
