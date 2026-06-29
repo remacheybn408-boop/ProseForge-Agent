@@ -4,9 +4,30 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from ..errors import ConfigurationError
+
+
+@dataclass(frozen=True)
+class ToolResult:
+    """Structured result returned by agent tools."""
+
+    ok: bool
+    output: Any = ""
+    error: str = ""
+    provenance: str = "internal"
+
+
+@dataclass(frozen=True)
+class ToolContext:
+    """Execution context shared by general tools."""
+
+    workspace_root: Path
+    permission_level: str = "read_only"
+    network_enabled: bool = False
+    http_client: Any | None = None
 
 
 @dataclass(frozen=True)
@@ -17,9 +38,14 @@ class AgentTool:
     permission: str
     input_schema: dict[str, Any]
     output_schema: dict[str, Any]
-    callable: Callable[[dict[str, Any]], dict[str, Any]]
+    callable: Callable[..., Any]
     description: str = ""
     enabled: bool = True
+
+    def invoke(self, payload: dict[str, Any], context: ToolContext | None = None) -> Any:
+        if context is None:
+            return self.callable(payload)
+        return self.callable(payload, context)
 
 
 class ToolRegistry:
@@ -55,14 +81,15 @@ class ToolRegistry:
         name: str,
         payload: dict[str, Any],
         *,
+        context: ToolContext | None = None,
         audit_events: list[dict[str, Any]] | None = None,
-    ) -> dict[str, Any]:
+    ) -> Any:
         tool = self.get(name)
         if tool is None:
             raise ConfigurationError(f"unknown tool {name!r}")
         self._validate_payload(tool, payload)
         try:
-            result = tool.callable(payload)
+            result = tool.invoke(payload, context)
         except Exception as exc:  # noqa: BLE001 - audit before surfacing
             if audit_events is not None:
                 audit_events.append(
@@ -88,6 +115,116 @@ def _ok(name: str) -> Callable[[dict[str, Any]], dict[str, Any]]:
         return {"ok": True, "tool": name, "payload": payload}
 
     return call
+
+
+def _require_context(context: ToolContext | None) -> ToolContext:
+    if context is None:
+        raise ConfigurationError("tool context is required")
+    return context
+
+
+def _resolve_workspace_path(context: ToolContext, raw_path: str) -> Path:
+    root = context.workspace_root.resolve()
+    candidate = (root / raw_path).resolve()
+    if candidate != root and root not in candidate.parents:
+        raise ConfigurationError(f"path escapes workspace: {raw_path}")
+    return candidate
+
+
+def _fs_read(payload: dict[str, Any], context: ToolContext | None = None) -> ToolResult:
+    ctx = _require_context(context)
+    path = _resolve_workspace_path(ctx, str(payload["path"]))
+    return ToolResult(ok=True, output=path.read_text(encoding="utf-8"), provenance="workspace")
+
+
+def _fs_write(payload: dict[str, Any], context: ToolContext | None = None) -> ToolResult:
+    ctx = _require_context(context)
+    path = _resolve_workspace_path(ctx, str(payload["path"]))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(str(payload["text"]), encoding="utf-8")
+    return ToolResult(ok=True, output=str(path.relative_to(ctx.workspace_root.resolve())), provenance="workspace")
+
+
+def _fs_edit(payload: dict[str, Any], context: ToolContext | None = None) -> ToolResult:
+    ctx = _require_context(context)
+    path = _resolve_workspace_path(ctx, str(payload["path"]))
+    text = path.read_text(encoding="utf-8")
+    old = str(payload["old"])
+    if old not in text:
+        return ToolResult(ok=False, error="old text not found", provenance="workspace")
+    path.write_text(text.replace(old, str(payload["new"]), 1), encoding="utf-8")
+    return ToolResult(ok=True, output=str(path.relative_to(ctx.workspace_root.resolve())), provenance="workspace")
+
+
+def _web_fetch(payload: dict[str, Any], context: ToolContext | None = None) -> ToolResult:
+    ctx = _require_context(context)
+    if not ctx.network_enabled:
+        return ToolResult(ok=False, error="network permission required", provenance="untrusted")
+    if ctx.http_client is None:
+        return ToolResult(ok=False, error="http client is required", provenance="untrusted")
+    return ToolResult(ok=True, output=ctx.http_client.get_text(str(payload["url"])), provenance="untrusted")
+
+
+def _web_search(payload: dict[str, Any], context: ToolContext | None = None) -> ToolResult:
+    ctx = _require_context(context)
+    if not ctx.network_enabled:
+        return ToolResult(ok=False, error="network permission required", provenance="untrusted")
+    if ctx.http_client is None:
+        return ToolResult(ok=False, error="http client is required", provenance="untrusted")
+    return ToolResult(ok=True, output=ctx.http_client.search(str(payload["query"])), provenance="untrusted")
+
+
+def register_general_tools(registry: ToolRegistry) -> ToolRegistry:
+    """Register general filesystem and web tools."""
+    for tool in (
+        AgentTool(
+            name="fs.read",
+            permission="read_only",
+            input_schema={"required": ["path"]},
+            output_schema={},
+            callable=_fs_read,
+            description="Read a UTF-8 file inside the workspace",
+        ),
+        AgentTool(
+            name="fs.write",
+            permission="draft_write",
+            input_schema={"required": ["path", "text"]},
+            output_schema={},
+            callable=_fs_write,
+            description="Write a UTF-8 file inside the workspace",
+        ),
+        AgentTool(
+            name="fs.edit",
+            permission="draft_write",
+            input_schema={"required": ["path", "old", "new"]},
+            output_schema={},
+            callable=_fs_edit,
+            description="Replace text in a UTF-8 file inside the workspace",
+        ),
+        AgentTool(
+            name="web.fetch",
+            permission="read_only",
+            input_schema={"required": ["url"]},
+            output_schema={},
+            callable=_web_fetch,
+            description="Fetch web text through the injected HTTP client",
+        ),
+        AgentTool(
+            name="web.search",
+            permission="read_only",
+            input_schema={"required": ["query"]},
+            output_schema={},
+            callable=_web_search,
+            description="Search the web through the injected HTTP client",
+        ),
+    ):
+        registry.register(tool)
+    return registry
+
+
+def general_tool_registry() -> ToolRegistry:
+    """Build a registry containing only general-purpose tools."""
+    return register_general_tools(ToolRegistry())
 
 
 def default_tool_registry() -> ToolRegistry:
@@ -116,7 +253,16 @@ def default_tool_registry() -> ToolRegistry:
                 description=description,
             )
         )
+    register_general_tools(registry)
     return registry
 
 
-__all__ = ["AgentTool", "ToolRegistry", "default_tool_registry"]
+__all__ = [
+    "AgentTool",
+    "ToolContext",
+    "ToolRegistry",
+    "ToolResult",
+    "default_tool_registry",
+    "general_tool_registry",
+    "register_general_tools",
+]

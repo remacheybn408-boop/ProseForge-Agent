@@ -6,7 +6,14 @@ from .intent_router import IntentDecision, IntentRouter
 from .types import AgentIntent, AgentTurnRequest, AgentTurnResult, ToolCallResult
 from .permissions import PERMISSION_LEVELS, PermissionDecision, PermissionPolicy
 from .profiles import AgentProfile, AgentProfileRegistry
-from .tools import AgentTool, ToolRegistry, default_tool_registry
+from .tools import (
+    AgentTool,
+    ToolContext,
+    ToolRegistry,
+    ToolResult,
+    default_tool_registry,
+    general_tool_registry,
+)
 
 __all__ = [
     "BackgroundJobRunner",
@@ -25,7 +32,10 @@ __all__ = [
     "AgentProfile",
     "AgentProfileRegistry",
     "AgentTool",
+    "ToolContext",
     "ToolRegistry",
+    "ToolResult",
     "JobResult",
     "default_tool_registry",
+    "general_tool_registry",
 ]
