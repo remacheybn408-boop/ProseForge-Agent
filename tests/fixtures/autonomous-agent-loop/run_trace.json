@@ -1,0 +1,6 @@
+{
+  "goal": "draft a one-line opening",
+  "scripted_turns": ["还在起草开头……", "完成开头 [[done]]"],
+  "expected_status": "completed",
+  "expected_steps": 2
+}

@@ -325,6 +325,12 @@ def build_parser() -> argparse.ArgumentParser:
                 action="store_true",
                 help="print the decomposed plan with per-task status",
             )
+            group.add_argument(
+                "--max-iterations",
+                type=int,
+                default=5,
+                help="iteration budget for the autonomous loop",
+            )
         if name == "status":
             group.add_argument(
                 "--capabilities",
@@ -1263,11 +1269,38 @@ def _handle_run(args: argparse.Namespace) -> int:
         )
         return _emit(report, args.format)
 
-    # Autonomous loop execution is wired in Task 68.
-    return _emit(
-        _planned_report("run", "Add --show-plan to preview the decomposed plan"),
-        args.format,
+    from .agent import AgentKernel, IntentRouter
+    from .agent.loop import AgentLoop, Budget
+    from .agent.planner import TaskPlanner as _TaskPlanner
+    from .llm import FakeProvider
+
+    provider = FakeProvider(name=args.provider or "fake", model=args.provider or "fake")
+    kernel = AgentKernel(provider=provider, intent_router=IntentRouter())
+    loop = AgentLoop(
+        kernel=kernel,
+        budget=Budget(max_iterations=args.max_iterations),
+        planner=_TaskPlanner(),
     )
+    result = loop.run(goal=goal)
+    lines = [f"[{step.status}] step {step.index}: {step.text}" for step in result.steps]
+    report = Report(
+        title="Autonomous Run",
+        status="ok" if result.status in ("completed", "stopped_budget") else "degraded",
+        next_action="Increase --max-iterations or refine the goal to reach completion",
+        sections=[
+            ReportSection("Steps", lines or ["(no steps)"]),
+            ReportSection(
+                "Outcome",
+                [
+                    f"status: {result.status}",
+                    f"iterations: {len(result.steps)}",
+                    f"compactions: {result.compactions}",
+                ],
+            ),
+        ],
+        data=result.to_dict(),
+    )
+    return _emit(report, args.format)
 
 
 def _handle_status(args: argparse.Namespace) -> int:
