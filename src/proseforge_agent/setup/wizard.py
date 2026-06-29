@@ -8,20 +8,8 @@ from pathlib import Path
 from typing import Any, Literal
 
 from .config_generator import SetupConfigGenerator, load_existing, provider_entry, redact_config_text
-from .modes import SetupMode
+from .modes import PROVIDER_ORDER, SetupMode
 from .recovery import backup_config, ensure_workspace
-
-
-PROVIDER_ORDER: tuple[str, ...] = (
-    "deepseek",
-    "qwen",
-    "glm",
-    "doubao",
-    "openai",
-    "anthropic",
-    "gemini",
-    "fake",
-)
 
 
 @dataclass(frozen=True)
