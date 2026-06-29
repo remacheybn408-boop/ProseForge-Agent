@@ -1,0 +1,25 @@
+{
+  "threshold": 0.8,
+  "tasks": [
+    {
+      "id": "hello-chat",
+      "goal": "answer a friendly hello",
+      "success_criteria": {
+        "status": "completed",
+        "contains": "answer a friendly hello",
+        "min_steps": 1
+      },
+      "max_iterations": 2
+    },
+    {
+      "id": "summarize-plan",
+      "goal": "summarize the next writing step",
+      "success_criteria": {
+        "status": "completed",
+        "contains": "summarize the next writing step",
+        "min_steps": 1
+      },
+      "max_iterations": 2
+    }
+  ]
+}

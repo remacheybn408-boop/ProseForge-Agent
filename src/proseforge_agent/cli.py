@@ -149,6 +149,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "check subcommand, complete-agent flag",
         "artifacts": "release gate report",
     },
+    "eval": {
+        "help": "Run deterministic agent task-success evaluations",
+        "inputs": "golden suite, provider, threshold",
+        "artifacts": "agent eval report",
+    },
     "status": {
         "help": "Show resolved capability flags and safe-mode status",
         "inputs": "capabilities flag, config",
@@ -317,6 +322,11 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "release":
             group.add_argument("--complete-agent", action="store_true", help="run the complete agent release gate")
             group.add_argument("--write-report", action="store_true", help="write release report to reports/")
+        if name == "eval":
+            group.add_argument("--provider", default="fake", help="provider for deterministic eval")
+            group.add_argument("--suite", default=None, help="path to a golden task suite JSON file")
+            group.add_argument("--threshold", type=float, default=None, help="override suite success threshold")
+            group.add_argument("--write-report", action="store_true", help="write eval report to reports/")
         if name == "run":
             group.add_argument("--goal", default=None, help="goal for the autonomous run")
             group.add_argument("--provider", default="fake", help="provider for the run")
@@ -1504,10 +1514,15 @@ def _handle_release(args: argparse.Namespace) -> int:
         report = _planned_report("release", "Run `pf-agent release check --complete-agent`")
         return _emit(report, args.format)
 
+    from .agent.eval import EvalHarness, EvalSuite
     from .release import CompleteAgentReleaseGate, ReleaseChecker
 
     base_report = ReleaseChecker(Path.cwd()).run()
     base = {check.name: {"status": "ok" if check.passed else "fail", "detail": check.detail} for check in base_report.checks}
+    eval_report = EvalHarness(
+        loop_factory=_eval_loop_factory(args.provider if hasattr(args, "provider") else "fake"),
+        suite=EvalSuite.default(),
+    ).run()
     reports = {
         "e2e_demo": base.get("fake_demo", {"status": "fail"}),
         "chat_drill": {"status": "ok", "detail": "fake provider chat command available"},
@@ -1515,6 +1530,7 @@ def _handle_release(args: argparse.Namespace) -> int:
         "memory_audit": base.get("memory_audit", {"status": "fail"}),
         "install_doctor": {"status": "ok", "detail": "doctor surface generated reports"},
         "native_qa": {"status": "ok", "detail": "native QA matrix present"},
+        "agent_eval": eval_report.to_dict(),
         "docs_examples": base.get("docs_examples", {"status": "fail"}),
         "support_bundle": {"status": "ok", "detail": "redacted support bundle builder available"},
     }
@@ -1538,6 +1554,62 @@ def _handle_release(args: argparse.Namespace) -> int:
     )
     _emit(report, args.format)
     return 0 if decision.passed else 1
+
+
+def _eval_loop_factory(provider_name: str):
+    from .agent import AgentKernel, IntentRouter
+    from .agent.loop import AgentLoop, Budget
+    from .llm import FakeProvider
+
+    def factory(task):
+        provider = FakeProvider(name=provider_name or "fake", model=provider_name or "fake")
+        kernel = AgentKernel(provider=provider, intent_router=IntentRouter())
+        return AgentLoop(
+            kernel=kernel,
+            budget=Budget(max_iterations=task.max_iterations),
+            done_marker="Trace:",
+        )
+
+    return factory
+
+
+def _handle_eval(args: argparse.Namespace) -> int:
+    if args.subcommand not in (None, "run"):
+        return _emit(_planned_report("eval", "Run `pf-agent eval run --provider fake`"), args.format)
+
+    from .agent.eval import EvalHarness, EvalSuite
+
+    suite = EvalSuite.load(args.suite) if args.suite else EvalSuite.default()
+    report_data = EvalHarness(
+        loop_factory=_eval_loop_factory(args.provider),
+        suite=suite,
+        threshold=args.threshold,
+    ).run()
+    lines = [
+        f"success_rate: {report_data.success_rate:.3f}",
+        f"threshold: {report_data.threshold:.3f}",
+        f"passed: {str(report_data.passed).lower()}",
+    ]
+    lines.extend(
+        f"{result.task_id}: {'pass' if result.passed else 'fail'} "
+        f"(status={result.status}, steps={result.steps}, used_budget={result.used_budget})"
+        for result in report_data.results
+    )
+    if args.write_report and not args.dry_run:
+        out_dir = Path(args.out) if args.out else Path("reports")
+        out_dir.mkdir(parents=True, exist_ok=True)
+        path = out_dir / "agent-eval-report.json"
+        path.write_text(report_data.to_json(), encoding="utf-8")
+        lines.append(f"report={path}")
+    report = Report(
+        title="Agent Eval Report",
+        status="ok" if report_data.passed else "blocked",
+        next_action="Keep the golden task success rate above the release threshold",
+        sections=[ReportSection("Task Success", lines)],
+        data=report_data.to_dict(),
+    )
+    _emit(report, args.format)
+    return 0 if report_data.passed else 1
 
 
 def _planned_report(group: str, next_action: str) -> Report:
@@ -1602,6 +1674,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_status(args)
     if args.command == "run":
         return _handle_run(args)
+    if args.command == "eval":
+        return _handle_eval(args)
     if args.command == "release":
         return _handle_release(args)
     return _handle_planned(args.command)(args)

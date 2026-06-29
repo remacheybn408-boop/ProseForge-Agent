@@ -13,6 +13,7 @@ REQUIRED_COMPLETE_AGENT_GATES: tuple[str, ...] = (
     "memory_audit",
     "install_doctor",
     "native_qa",
+    "agent_eval",
     "docs_examples",
     "support_bundle",
 )

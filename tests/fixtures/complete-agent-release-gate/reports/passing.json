@@ -17,6 +17,11 @@
   "native_qa": {
     "status": "ok"
   },
+  "agent_eval": {
+    "passed": true,
+    "success_rate": 1.0,
+    "threshold": 0.8
+  },
   "docs_examples": {
     "status": "ok"
   },
