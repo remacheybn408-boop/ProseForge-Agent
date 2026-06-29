@@ -1,0 +1,6 @@
+{
+  "min_length": 200,
+  "must_include": "钩子",
+  "forbid": "TODO",
+  "note": "校验中文输出长度与必含读者钩子；UTF-8 往返样例。"
+}

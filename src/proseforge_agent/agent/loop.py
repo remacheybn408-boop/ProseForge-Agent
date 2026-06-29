@@ -46,7 +46,7 @@ class StepRecord:
 class LoopResult:
     """Outcome of an autonomous run."""
 
-    status: str  # completed | stopped_budget | stopped_no_progress | interrupted
+    status: str  # completed | stopped_budget | stopped_no_progress | stopped_unverified | interrupted
     steps: list[StepRecord] = field(default_factory=list)
     final_text: str = ""
     transcript_ref: str = ""
@@ -74,6 +74,9 @@ class AgentLoop:
         verifier=None,
         control=None,
         *,
+        criteria: dict | None = None,
+        reflector=None,
+        max_reflections: int = 1,
         event_bus=None,
         done_marker: str = DEFAULT_DONE_MARKER,
         no_progress_limit: int = 3,
@@ -82,12 +85,18 @@ class AgentLoop:
         self._kernel = kernel
         self._budget = budget
         self._planner = planner
+        # verifier is a Task-70 Verifier (has .check); criteria are its acceptance
+        # standards. reflector proposes bounded revisions on failure.
         self._verifier = verifier
+        self._criteria = criteria
+        self._max_reflections = max(0, max_reflections)
+        self._reflector = reflector
         self._control = control
         self._event_bus = event_bus
         self._done_marker = done_marker
         self._no_progress_limit = max(1, no_progress_limit)
         self._context_threshold = max(1, context_threshold)
+        self._pending_instruction: str | None = None
 
     def run(self, goal: str, context: dict | None = None) -> LoopResult:
         plan = self._planner.decompose(goal, context) if self._planner is not None else None
@@ -99,6 +108,14 @@ class AgentLoop:
         repeat_count = 0
         final_text = ""
         status = "stopped_budget"  # default if the budget is exhausted
+
+        # A fresh reflector per run so its bounded budget resets.
+        reflector = self._reflector
+        if reflector is None and self._verifier is not None and self._criteria is not None:
+            from .reflection import Reflector
+
+            reflector = Reflector(max_reflections=self._max_reflections)
+        self._pending_instruction = None
 
         for index in range(self._budget.max_iterations):
             if self._control is not None and getattr(self._control, "is_interrupted", lambda: False)():
@@ -114,6 +131,35 @@ class AgentLoop:
             events.append(event)
             self._emit(event)
             final_text = result.text
+
+            # Self-verification + bounded reflection (only when configured).
+            if self._verifier is not None and self._criteria is not None:
+                verdict = self._verifier.check(result.text, self._criteria)
+                verify_event = {
+                    "type": "verify",
+                    "trace_id": trace_id,
+                    "passed": verdict.passed,
+                    "failures": verdict.failures,
+                }
+                events.append(verify_event)
+                self._emit(verify_event)
+                if not verdict.passed:
+                    revision = reflector.revise(result.text, verdict)
+                    if revision.retry:
+                        refl_event = {
+                            "type": "reflection",
+                            "trace_id": trace_id,
+                            "reason": revision.reason,
+                        }
+                        events.append(refl_event)
+                        self._emit(refl_event)
+                        # Retry the same work with the revision instruction; do not
+                        # advance the plan or mark done on an unverified output.
+                        self._pending_instruction = revision.instruction
+                        continue
+                    # Reflection budget exhausted and still failing: stop cleanly.
+                    status = "stopped_unverified"
+                    break
 
             # Mark plan progress so dependents unblock as work completes.
             if plan is not None:
@@ -154,6 +200,17 @@ class AgentLoop:
     # -- helpers --------------------------------------------------------
 
     def _build_request(self, goal: str, plan, index: int) -> AgentTurnRequest:
+        # A pending reflection instruction takes precedence: retry the same work.
+        if self._pending_instruction:
+            text = self._pending_instruction
+            self._pending_instruction = None
+            return AgentTurnRequest(
+                session_id="autonomous",
+                text=text,
+                mode="general_chat",
+                project_slug=None,
+                permission_level="read_only",
+            )
         text = goal
         if plan is not None:
             nxt = plan.next()
@@ -168,8 +225,6 @@ class AgentLoop:
         )
 
     def _is_done(self, result, plan) -> bool:
-        if self._verifier is not None:
-            return bool(self._verifier(result))
         if self._done_marker and self._done_marker in getattr(result, "text", ""):
             return True
         if plan is not None and plan.items and plan.is_complete():
