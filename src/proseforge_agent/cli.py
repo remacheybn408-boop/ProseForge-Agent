@@ -269,6 +269,11 @@ def build_parser() -> argparse.ArgumentParser:
             )
             group.add_argument("--profile", default=None, help="agent persona profile")
             group.add_argument("--profiles-file", default=None, help="YAML file with agent profiles")
+        if name == "project":
+            group.add_argument("--slug", default=None, help="project slug")
+            group.add_argument("--title", default=None, help="project title")
+            group.add_argument("--author", default=None, help="project author")
+            group.add_argument("--language", default="zh-CN", help="project language")
         if name == "usage":
             group.add_argument(
                 "--usage-log",
@@ -463,6 +468,75 @@ def _handle_report(args: argparse.Namespace) -> int:
         print(f"wrote {path}")
         return 0
     return _emit(report, args.format)
+
+
+def _handle_project(args: argparse.Namespace) -> int:
+    if args.subcommand not in {"init", "manifest", "validate"} or not args.slug:
+        return _emit(
+            _planned_report("project", "Run `pf-agent project init --slug <slug>`"),
+            args.format,
+        )
+    from .novel import NovelProjectStore
+
+    store = NovelProjectStore(Path(".pf-agent") / "workspace")
+    if args.subcommand == "init":
+        manifest = store.init_project(
+            slug=args.slug,
+            title=args.title,
+            author=args.author,
+            language=args.language,
+        )
+        report = Report(
+            title="Project Manifest",
+            status="ok",
+            next_action="Use `pf-agent project validate --slug <slug>` before writing",
+            sections=[
+                ReportSection(
+                    "Manifest",
+                    [
+                        f"slug={manifest.project['slug']}",
+                        f"title={manifest.project['title']}",
+                        f"path={manifest.path}",
+                    ],
+                )
+            ],
+            data=manifest.to_dict() | {"path": str(manifest.path)},
+        )
+        return _emit(report, args.format)
+    if args.subcommand == "manifest":
+        manifest = store.load(args.slug)
+        report = Report(
+            title="Project Manifest",
+            status="ok",
+            next_action="Use this manifest as the project source index",
+            sections=[
+                ReportSection(
+                    "Project",
+                    [
+                        f"slug={manifest.project.get('slug')}",
+                        f"title={manifest.project.get('title')}",
+                        f"language={manifest.project.get('language')}",
+                    ],
+                )
+            ],
+            data=manifest.to_dict() | {"path": str(manifest.path)},
+        )
+        return _emit(report, args.format)
+    validation = store.validate(args.slug)
+    report = Report(
+        title="Project Manifest Validation",
+        status="ok" if validation["status"] == "ok" else "blocked",
+        next_action="Fix manifest errors before running project workflows",
+        sections=[
+            ReportSection(
+                "Validation",
+                [f"valid={str(validation['status'] == 'ok').lower()}", *validation["errors"]],
+            )
+        ],
+        data=validation,
+    )
+    _emit(report, args.format)
+    return 0 if validation["status"] == "ok" else 1
 
 
 def _handle_provider_probe(args: argparse.Namespace) -> int:
@@ -1731,6 +1805,8 @@ def _handle_planned(group: str):
 def _dispatch(args: argparse.Namespace) -> int:
     if args.command == "report":
         return _handle_report(args)
+    if args.command == "project":
+        return _handle_project(args)
     if args.command == "provider":
         return _handle_provider(args)
     if args.command == "usage":
