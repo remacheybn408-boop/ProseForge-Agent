@@ -1014,7 +1014,31 @@ def _handle_jobs(args: argparse.Namespace) -> int:
 
 
 def _handle_setup(args: argparse.Namespace) -> int:
-    from .setup import SetupWizard, mode_from_flags, render_setup_lines
+    from .setup import SetupWizard, mode_from_flags, mode_menu_lines, render_setup_lines
+
+    action_requested = any(
+        [
+            args.quick,
+            args.full,
+            args.minimal,
+            args.non_interactive,
+            args.reconfigure,
+            args.add_provider,
+            args.skip_provider_test,
+            args.no_shell,
+            args.repair,
+            args.print_config,
+        ]
+    )
+    if not action_requested:
+        report = Report(
+            title="Setup Mode Selection",
+            status="ok",
+            next_action="Run `pf-agent setup --quick`, `--full`, or `--minimal`",
+            sections=[ReportSection("Modes", mode_menu_lines().splitlines())],
+            data={"modes": ["quick", "full", "minimal"]},
+        )
+        return _emit(report, args.format)
 
     mode = mode_from_flags(
         quick=args.quick,
