@@ -14,8 +14,10 @@ class WindowsChecks:
     """Read-only Windows native support diagnostics."""
 
     def __init__(self, env: dict[str, str] | None = None) -> None:
-        self.env = dict(os.environ)
-        self.env.update(env or {})
+        # Hermetic like InstallationDoctor: when a caller supplies an env it is
+        # authoritative, so machine variables (e.g. WT_SESSION inside Windows
+        # Terminal) can't leak in and flip a check's result.
+        self.env = dict(os.environ if env is None else env)
 
     def run(self) -> list[DoctorCheck]:
         return [
