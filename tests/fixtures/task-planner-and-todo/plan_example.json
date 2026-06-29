@@ -1,0 +1,8 @@
+{
+  "goal": "写一章：审讯堂发现血玉线索",
+  "items": [
+    {"id": "t1-gather", "title": "检索与梳理上下文：审讯堂", "status": "pending", "depends_on": []},
+    {"id": "t2-outline", "title": "草拟结构大纲", "status": "pending", "depends_on": ["t1-gather"]},
+    {"id": "t3-draft", "title": "撰写初稿", "status": "pending", "depends_on": ["t2-outline"]}
+  ]
+}

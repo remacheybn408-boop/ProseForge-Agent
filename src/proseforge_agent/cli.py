@@ -154,6 +154,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "capabilities flag, config",
         "artifacts": "capability map report",
     },
+    "run": {
+        "help": "Run an autonomous, goal-directed agent loop",
+        "inputs": "goal, provider, iteration budget, show-plan flag",
+        "artifacts": "loop run summary, decomposed plan",
+    },
 }
 
 
@@ -312,6 +317,14 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "release":
             group.add_argument("--complete-agent", action="store_true", help="run the complete agent release gate")
             group.add_argument("--write-report", action="store_true", help="write release report to reports/")
+        if name == "run":
+            group.add_argument("--goal", default=None, help="goal for the autonomous run")
+            group.add_argument("--provider", default="fake", help="provider for the run")
+            group.add_argument(
+                "--show-plan",
+                action="store_true",
+                help="print the decomposed plan with per-task status",
+            )
         if name == "status":
             group.add_argument(
                 "--capabilities",
@@ -1229,6 +1242,34 @@ def _capability_self_checks() -> dict:
     return {name: _checker(module) for name, module in modules.items()}
 
 
+def _handle_run(args: argparse.Namespace) -> int:
+    from .agent.planner import TaskPlanner
+
+    goal = args.goal or ""
+    if not goal:
+        return _emit(
+            _planned_report("run", "Run `pf-agent run --goal \"...\" --show-plan`"),
+            args.format,
+        )
+
+    plan = TaskPlanner().decompose(goal)
+    if getattr(args, "show_plan", False):
+        report = Report(
+            title="Run Plan",
+            status="ok",
+            next_action="The autonomous loop works through these tasks in order",
+            sections=[ReportSection("Plan", plan.render_lines())],
+            data={"goal": goal, "plan": plan.to_dict()},
+        )
+        return _emit(report, args.format)
+
+    # Autonomous loop execution is wired in Task 68.
+    return _emit(
+        _planned_report("run", "Add --show-plan to preview the decomposed plan"),
+        args.format,
+    )
+
+
 def _handle_status(args: argparse.Namespace) -> int:
     from .capabilities import CapabilityRegistry
 
@@ -1427,6 +1468,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_qa(args)
     if args.command == "status":
         return _handle_status(args)
+    if args.command == "run":
+        return _handle_run(args)
     if args.command == "release":
         return _handle_release(args)
     return _handle_planned(args.command)(args)
