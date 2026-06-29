@@ -62,6 +62,7 @@ class StreamChunk:
 
     text: str
     done: bool = False
+    index: int = 0
 
 
 @dataclass(frozen=True)

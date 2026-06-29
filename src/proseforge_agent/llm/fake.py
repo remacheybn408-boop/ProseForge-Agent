@@ -56,7 +56,7 @@ class FakeProvider:
         parts = text.split(" ")
         for index, part in enumerate(parts):
             piece = part if index == len(parts) - 1 else part + " "
-            yield StreamChunk(text=piece, done=index == len(parts) - 1)
+            yield StreamChunk(text=piece, done=index == len(parts) - 1, index=index)
 
 
 __all__ = ["FakeProvider"]

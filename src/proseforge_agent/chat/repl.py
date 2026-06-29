@@ -23,6 +23,7 @@ class ChatRepl:
         project_slug: str | None = None,
         permission_level: str = "read_only",
         session_id: str = "cli",
+        stream: bool = False,
     ) -> None:
         self.provider = provider
         self.session_store = session_store
@@ -32,6 +33,7 @@ class ChatRepl:
         self.project_slug = project_slug
         self.permission_level = permission_level
         self.session_id = session_id
+        self.stream = stream
         self.kernel = AgentKernel(
             provider=provider,
             session_store=session_store,
@@ -51,17 +53,28 @@ class ChatRepl:
                 if should_exit:
                     return 0
                 continue
-            result = self.kernel.run_turn(
-                AgentTurnRequest(
-                    session_id=self.session_id,
-                    text=line,
-                    mode=self.mode,
-                    project_slug=self.project_slug,
-                    permission_level=self.permission_level,
-                )
+            request = AgentTurnRequest(
+                session_id=self.session_id,
+                text=line,
+                mode=self.mode,
+                project_slug=self.project_slug,
+                permission_level=self.permission_level,
             )
-            self._write(result.text)
+            if self.stream:
+                self._write_stream(self.kernel.run_turn_stream(request))
+            else:
+                result = self.kernel.run_turn(request)
+                self._write(result.text)
         return 0
+
+    def _write_stream(self, chunks) -> None:
+        """Print stream chunks incrementally, then a terminating newline."""
+        wrote_any = False
+        for chunk in chunks:
+            print(chunk.text, end="", file=self.output_stream, flush=True)
+            wrote_any = True
+        if wrote_any:
+            print("", file=self.output_stream, flush=True)
 
     def _handle_command(self, line: str) -> bool:
         command, _, argument = line.partition(" ")

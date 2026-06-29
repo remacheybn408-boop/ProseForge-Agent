@@ -7,10 +7,12 @@ workflow or tool implementations.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from typing import Any
 from uuid import uuid4
 
-from ..llm import Message, ProviderRequest
+from ..llm import Message, ProviderRequest, StreamChunk
+from ..llm.streaming import iter_stream
 from .types import AgentIntent, AgentTurnRequest, AgentTurnResult, ToolCallResult
 
 
@@ -88,6 +90,85 @@ class AgentKernel:
             events=events,
             trace_id=trace_id,
         )
+
+    def run_turn_stream(self, request: AgentTurnRequest) -> "Iterator[StreamChunk]":
+        """Yield a turn's answer incrementally as :class:`StreamChunk` pieces.
+
+        Classification, retrieval, safety, and memory behave exactly as in
+        :meth:`run_turn`. Tool turns yield their result as one terminal chunk.
+        Provider answers stream chunk-by-chunk; the joined text is saved to the
+        transcript exactly as the non-streaming path would (with the trace line).
+        If the stream is interrupted, the partial response is saved with a marker.
+        """
+        trace_id = f"trace-{uuid4().hex[:12]}"
+        events: list[dict[str, Any]] = [
+            {
+                "type": "turn_started",
+                "trace_id": trace_id,
+                "session_id": request.session_id,
+                "mode": request.mode,
+            }
+        ]
+        self._ensure_session(request)
+        self._append_message(request.session_id, "user", request.text)
+
+        intent = self._classify(request)
+        evidence = self._retrieve_if_needed(request, intent, events, trace_id)
+        evidence_refs = [item["id"] for item in evidence if "id" in item]
+        effective_ceiling = self._assess_safety(request, evidence, events, trace_id)
+        self._save_memory_if_needed(request, intent, events, trace_id, effective_ceiling)
+
+        if intent.target_tool:
+            result = self._run_tool(
+                request=request,
+                intent=intent,
+                events=events,
+                trace_id=trace_id,
+                evidence_refs=evidence_refs,
+                memory_ids=[],
+                permission_level=effective_ceiling,
+            )
+            yield StreamChunk(text=result.text, done=True, index=0)
+            return
+
+        content = request.text
+        if evidence_refs:
+            content = f"{request.text}\nEvidence refs: {', '.join(evidence_refs)}"
+        provider_request = ProviderRequest(
+            role="planner" if intent.name == "retrieve_context" else "drafter",
+            messages=[Message(role="user", content=content)],
+        )
+
+        pieces: list[str] = []
+        index = 0
+        try:
+            for chunk in iter_stream(self._provider, provider_request):
+                pieces.append(chunk.text)
+                index = chunk.index
+                yield chunk
+        except Exception as exc:  # noqa: BLE001 - save partial, never crash the turn
+            marker = f"\n[stream-interrupted: {exc}]"
+            pieces.append(marker)
+            events.append(
+                {"type": "stream_interrupted", "trace_id": trace_id, "error": str(exc)}
+            )
+            saved = "".join(pieces) + f"\nTrace: {trace_id}"
+            self._append_message(request.session_id, "assistant", saved)
+            self._record_events(events)
+            yield StreamChunk(text=marker, done=True, index=index + 1)
+            return
+
+        events.append(
+            {
+                "type": "provider_call",
+                "trace_id": trace_id,
+                "provider": getattr(self._provider, "name", ""),
+                "model": getattr(self._provider, "model", ""),
+            }
+        )
+        saved = "".join(pieces) + f"\nTrace: {trace_id}"
+        self._append_message(request.session_id, "assistant", saved)
+        self._record_events(events)
 
     # -- classification -------------------------------------------------
 

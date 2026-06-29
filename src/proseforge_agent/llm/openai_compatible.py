@@ -144,7 +144,7 @@ class OpenAICompatibleProvider:
                 deltas.append(content)
 
         for index, piece in enumerate(deltas):
-            yield StreamChunk(text=piece, done=index == len(deltas) - 1)
+            yield StreamChunk(text=piece, done=index == len(deltas) - 1, index=index)
 
     # -- errors -----------------------------------------------------------
 

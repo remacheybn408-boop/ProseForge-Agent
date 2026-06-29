@@ -241,6 +241,11 @@ def build_parser() -> argparse.ArgumentParser:
                 action="store_true",
                 help="assess untrusted content with the injection guard and show the safety verdict",
             )
+            group.add_argument(
+                "--stream",
+                action="store_true",
+                help="stream the response incrementally as it is generated",
+            )
             group.add_argument("--profile", default=None, help="agent persona profile")
             group.add_argument("--profiles-file", default=None, help="YAML file with agent profiles")
         if name == "usage":
@@ -777,6 +782,7 @@ def _handle_chat(args: argparse.Namespace) -> int:
             mode=mode,
             project_slug=project_slug,
             permission_level=permission_level,
+            stream=getattr(args, "stream", False),
         ).run()
     from .agent import AgentKernel, AgentTurnRequest, IntentRouter
 
@@ -792,6 +798,18 @@ def _handle_chat(args: argparse.Namespace) -> int:
         session_store=session_store,
         safety=safety_guard,
     )
+    if getattr(args, "stream", False):
+        request = AgentTurnRequest(
+            session_id="cli",
+            text=args.message,
+            mode=mode,
+            project_slug=project_slug,
+            permission_level=permission_level,
+        )
+        for chunk in kernel.run_turn_stream(request):
+            print(chunk.text, end="", flush=True)
+        print("")
+        return 0
     result = kernel.run_turn(
         AgentTurnRequest(
             session_id="cli",
