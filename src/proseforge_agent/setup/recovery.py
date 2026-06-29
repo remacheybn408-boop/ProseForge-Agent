@@ -32,8 +32,12 @@ def backup_config(config_path: str | Path) -> Path | None:
     path = Path(config_path)
     if not path.exists():
         return None
-    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
     backup = path.with_name(f"{path.name}.bak-{stamp}")
+    counter = 1
+    while backup.exists():
+        backup = path.with_name(f"{path.name}.bak-{stamp}-{counter}")
+        counter += 1
     backup.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
     return backup
 
