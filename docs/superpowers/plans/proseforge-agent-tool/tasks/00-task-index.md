@@ -114,6 +114,10 @@ These give the agent Claude-Code-class runtime maturity with novel writing as th
 
 The maintainability contract these cards enforce is documented in [Modularity, Fault Isolation, And Recovery](../architecture/10-modularity-and-recovery.md). The autonomous runtime design is in [Autonomous Agent Runtime](../architecture/11-autonomous-agent-runtime.md).
 
+## Product Onboarding Cards (76)
+
+76. [pf-agent setup Guided Installation Wizard](76-pf-agent-setup-guided-install-wizard.md) — execute after Tasks 41–55 and before relying on product-grade first use.
+
 ## Execution Rule
 
 Execute one card at a time. Run the card's verification commands before starting the next card. If verification fails, stop and fix the current card instead of carrying broken assumptions forward.

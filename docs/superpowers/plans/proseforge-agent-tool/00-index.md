@@ -136,6 +136,10 @@ These give the agent Claude-Code-class runtime maturity, with novel writing as t
 74. Interruptibility and steering.
 75. Agent eval and task-success harness.
 
+### Product Onboarding (76)
+
+76. Task 76: [`pf-agent setup` Guided Installation Wizard](tasks/76-pf-agent-setup-guided-install-wizard.md).
+
 The maintainer contract for fault isolation, three-tier rollback, the debugging runbook, and the internal interface compatibility policy lives in `architecture/10-modularity-and-recovery.md`. The autonomous runtime design lives in `architecture/11-autonomous-agent-runtime.md`.
 
 ## Definition Of Done

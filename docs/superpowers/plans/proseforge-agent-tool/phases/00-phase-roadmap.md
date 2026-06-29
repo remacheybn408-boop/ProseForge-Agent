@@ -395,3 +395,30 @@ python -m pytest tests/test_general_tools.py tests/test_tool_sandbox.py tests/te
 python -m pytest tests/eval -q
 pf-agent run --goal "draft a one-line opening" --provider fake --max-iterations 5
 ```
+
+## Phase 15: Product Onboarding Polish
+
+**Purpose:** Turn the install pieces into one guided first-use path through Task 76.
+
+**Outputs**
+
+- `pf-agent setup` guided installation wizard.
+- Minimal, quick, full, non-interactive, reconfigure, add-provider, repair, and print-config modes.
+- First-run bootstrap guidance for uninitialized chat, daily workbook, chapter, and provider commands.
+
+**Core Decisions**
+
+- Setup assembles existing install modules instead of rewriting them.
+- Fake provider remains the no-key fallback.
+- Provider, shell, keyring, network, and engine failures become warnings unless they make the local filesystem setup impossible.
+- Raw API keys are never written to config or summary output.
+
+**Verification**
+
+```powershell
+python -m pytest tests/setup -q
+pf-agent setup --minimal
+pf-agent doctor
+pf-agent chat --provider fake --message "hello"
+pf-agent setup --print-config
+```
