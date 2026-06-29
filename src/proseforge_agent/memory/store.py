@@ -9,10 +9,12 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import nullcontext
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
+from ..concurrency import FileLock
 from ..errors import MemoryError
 from .schema import apply_schema
 
@@ -59,7 +61,14 @@ class MemoryStore:
         self._conn = sqlite3.connect(str(db_path))
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA foreign_keys = ON")
+        # Wait out transient contention at the SQLite layer; serialize file-level
+        # writers with an advisory lock alongside the db file.
+        self._conn.execute("PRAGMA busy_timeout = 5000")
+        self._lock = None if str(db_path) == ":memory:" else FileLock(str(db_path) + ".lock")
         self.initialize()
+
+    def _write_lock(self):
+        return self._lock if self._lock is not None else nullcontext()
 
     def initialize(self) -> None:
         apply_schema(self._conn)
@@ -79,7 +88,7 @@ class MemoryStore:
     def add(self, item: MemoryItem) -> MemoryItem:
         self._validate(item)
         now = _now()
-        with self._conn:
+        with self._write_lock(), self._conn:
             cursor = self._conn.execute(
                 """
                 INSERT INTO memory_items
@@ -119,7 +128,7 @@ class MemoryStore:
             supersedes=old_id,
         )
         self._validate(new_item)
-        with self._conn:
+        with self._write_lock(), self._conn:
             cursor = self._conn.execute(
                 """
                 INSERT INTO memory_items
@@ -151,7 +160,7 @@ class MemoryStore:
         """Mark a single item superseded. Used by many-to-one compaction."""
         if self.get(item_id) is None:
             raise MemoryError(f"cannot supersede unknown memory item {item_id}")
-        with self._conn:
+        with self._write_lock(), self._conn:
             self._conn.execute(
                 "UPDATE memory_items SET status = 'superseded', updated_at = ? WHERE id = ?",
                 (_now(), item_id),

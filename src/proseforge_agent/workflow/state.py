@@ -16,6 +16,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
+from ..concurrency import FileLock
 from ..errors import ProseForgeAgentError
 
 
@@ -109,6 +110,8 @@ class WorkflowStateStore:
     def __init__(self, runs_dir: str | Path) -> None:
         self._dir = Path(runs_dir)
         self._dir.mkdir(parents=True, exist_ok=True)
+        # Serialize concurrent writers to this runs directory.
+        self._lock = FileLock(self._dir / ".workflow.lock")
 
     # -- paths / io ------------------------------------------------------
 
@@ -122,7 +125,11 @@ class WorkflowStateStore:
 
     def _save(self, run: WorkflowRun) -> WorkflowRun:
         run.updated_at = _now()
-        self._atomic_write(self._run_path(run.id), json.dumps(asdict(run), ensure_ascii=False, indent=2))
+        with self._lock:
+            self._atomic_write(
+                self._run_path(run.id),
+                json.dumps(asdict(run), ensure_ascii=False, indent=2),
+            )
         return run
 
     # -- lifecycle -------------------------------------------------------
