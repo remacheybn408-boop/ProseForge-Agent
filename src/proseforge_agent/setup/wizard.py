@@ -94,7 +94,8 @@ class SetupWizard:
 
         warnings: list[str] = []
         errors: list[str] = []
-        backup_path = backup_config(config_path) if (reconfigure and config_path.exists()) else None
+        needs_backup = bool(config_path.exists() and (reconfigure or add_provider or repair))
+        backup_path = backup_config(config_path) if needs_backup else None
         existing = load_existing(config_path)
         ensure_workspace(workspace_path)
 
