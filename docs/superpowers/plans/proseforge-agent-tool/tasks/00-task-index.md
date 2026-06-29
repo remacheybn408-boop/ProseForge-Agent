@@ -227,6 +227,60 @@ The maintainability contract these cards enforce is documented in [Modularity, F
 149. [Plugin Hooks / 插件生命周期钩子](149-plugin-hooks.md)
 150. [Plugin Test Harness / 插件测试工具](150-plugin-test-harness.md)
 
+## Hermes-Class Non-Desktop Expansion Cards (151-182)
+
+These cards close the gap between the current ProseForge Agent platform plan and Hermes-class non-desktop operation: terminal/TUI maturity, remote messaging, remote execution environments, managed tools, skill learning, hosted jobs, observability, middleware, and trajectory data. They explicitly exclude desktop UI shells and OS GUI automation.
+
+### Terminal Interface Cards (151-154)
+
+151. [Terminal UI Foundation](151-terminal-ui-foundation.md)
+152. [Slash Command Registry](152-slash-command-registry.md)
+153. [Streaming Tool Output](153-streaming-tool-output.md)
+154. [Terminal Session Operations](154-terminal-session-operations.md)
+
+### Messaging Gateway Cards (155-162)
+
+155. [Messaging Gateway Core](155-messaging-gateway-core.md)
+156. [Platform Adapter Contract](156-platform-adapter-contract.md)
+157. [Telegram Gateway Adapter](157-telegram-gateway-adapter.md)
+158. [Discord And Slack Gateway Adapters](158-discord-and-slack-gateway-adapters.md)
+159. [WhatsApp Signal Email Gateway Adapters](159-whatsapp-signal-email-gateway-adapters.md)
+160. [Gateway Relay Auth And Pairing](160-gateway-relay-auth-and-pairing.md)
+161. [Gateway Delivery Reliability](161-gateway-delivery-reliability.md)
+162. [Gateway Media And Voice Ingestion](162-gateway-media-and-voice-ingestion.md)
+
+### Remote Execution Environment Cards (163-168)
+
+163. [Execution Environment Abstraction](163-execution-environment-abstraction.md)
+164. [Local And Docker Execution Backends](164-local-and-docker-execution-backends.md)
+165. [SSH And Singularity Execution Backends](165-ssh-and-singularity-execution-backends.md)
+166. [Modal And Daytona Execution Backends](166-modal-and-daytona-execution-backends.md)
+167. [Remote File Sync And Checkpoints](167-remote-file-sync-and-checkpoints.md)
+168. [Process Registry And Terminal Lifecycle](168-process-registry-and-terminal-lifecycle.md)
+
+### Managed Tool Gateway Cards (169-173)
+
+169. [Managed Tool Gateway Foundation](169-managed-tool-gateway-foundation.md)
+170. [Web Search And URL Safety Tools](170-web-search-and-url-safety-tools.md)
+171. [Cloud Browser Tool Adapter](171-cloud-browser-tool-adapter.md)
+172. [Media Generation And Transcription Tools](172-media-generation-and-transcription-tools.md)
+173. [Tool Result Artifacts And Output Limits](173-tool-result-artifacts-and-output-limits.md)
+
+### Skill Learning Loop Cards (174-179)
+
+174. [Skill Specification And Registry](174-skill-specification-and-registry.md)
+175. [Skill Hub Install And Sync](175-skill-hub-install-and-sync.md)
+176. [Autonomous Skill Creation](176-autonomous-skill-creation.md)
+177. [Skill Self Improvement And Provenance](177-skill-self-improvement-and-provenance.md)
+178. [Skill Usage Analytics And Safety Audit](178-skill-usage-analytics-and-safety-audit.md)
+179. [User Model And Memory Nudges](179-user-model-and-memory-nudges.md)
+
+### Hosted Ops, Observability, And Research Data Cards (180-182)
+
+180. [Hosted Cron And Scale To Zero](180-hosted-cron-and-scale-to-zero.md)
+181. [Observer Hooks And Telemetry Export](181-observer-hooks-and-telemetry-export.md)
+182. [Middleware Hooks And Trajectory Datasets](182-middleware-hooks-and-trajectory-datasets.md)
+
 ## Execution Rule
 
 Execute one card at a time. Run the card's verification commands before starting the next card. If verification fails, stop and fix the current card instead of carrying broken assumptions forward.

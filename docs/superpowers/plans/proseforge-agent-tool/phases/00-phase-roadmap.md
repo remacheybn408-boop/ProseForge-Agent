@@ -489,3 +489,103 @@ python -m pytest -q
 python -m pytest tests/mcp tests/retrieval tests/notifications tests/plugins -q
 python -m pytest -q
 ```
+
+## Phase 20: Terminal And Messaging Surfaces
+
+**Purpose:** Reach Hermes-class non-desktop interaction maturity through terminal UI, shared slash commands, streaming tool output, terminal session operations, and remote messaging gateways.
+
+**Outputs**
+
+- Terminal UI, slash command registry, streaming tool output, and terminal session operations (Tasks 151-154).
+- Messaging gateway core, platform adapter contract, Telegram, Discord, Slack, WhatsApp, Signal, Email, relay auth, delivery reliability, and media/voice ingestion (Tasks 155-162).
+
+**Core Decisions**
+
+- The TUI and gateway are surfaces over the existing kernel, session store, event bus, and permission policy.
+- Platform adapters are optional and fake-testable without real platform credentials.
+- Gateway delivery is not successful until every required chunk or continuation has landed.
+- This phase excludes desktop UI shells and OS GUI automation.
+
+**Verification**
+
+```powershell
+python -m pytest tests/tui tests/gateway -q
+pf-agent tui --provider fake --no-project --check
+pf-agent gateway run --provider fake --check
+python -m pytest -q
+```
+
+## Phase 21: Remote Execution And Managed Tools
+
+**Purpose:** Allow the agent to run tools safely across local, containerized, remote, serverless, and managed-tool environments.
+
+**Outputs**
+
+- Execution environment abstraction and local, Docker, SSH, Singularity, Modal, and Daytona backends (Tasks 163-166).
+- Remote file sync, checkpoints, process registry, and terminal lifecycle control (Tasks 167-168).
+- Managed tool gateway, web search, URL safety, cloud browser, media tools, and artifact/output limit handling (Tasks 169-173).
+
+**Core Decisions**
+
+- Permission policy decides whether an action may run; environments decide where and how it runs.
+- Every remote or destructive operation has a dry-run plan.
+- Large outputs are represented by summaries and artifact refs, not dumped into model context.
+
+**Verification**
+
+```powershell
+python -m pytest tests/environments tests/tools -q
+pf-agent environments list --provider fake
+pf-agent tools gateway check --provider fake
+python -m pytest -q
+```
+
+## Phase 22: Skill Learning Loop And User Model
+
+**Purpose:** Add procedural-memory skills, skill installation, autonomous skill candidates, self-improvement proposals, usage audit, and user-model nudges.
+
+**Outputs**
+
+- Skill specification, registry, hub install/sync, autonomous creation, revision candidates, usage analytics, and safety audit (Tasks 174-178).
+- User model and memory nudges that keep preferences reviewable instead of silently canonical (Task 179).
+
+**Core Decisions**
+
+- Skills are reusable instructions and assets, not arbitrary privileged code.
+- Autonomous skill creation and self-improvement produce candidates, not automatic enabled changes.
+- User preferences remain scoped, reviewable, and contradiction-aware.
+
+**Verification**
+
+```powershell
+python -m pytest tests/skills tests/memory -q
+pf-agent skills list
+pf-agent memory nudges --provider fake
+python -m pytest -q
+```
+
+## Phase 23: Hosted Ops, Observability, Middleware, And Trajectories
+
+**Purpose:** Add unattended hosted jobs, read-only telemetry hooks, opt-in behavior middleware, and research-ready trajectory export.
+
+**Outputs**
+
+- Hosted cron and scale-to-zero lifecycle contracts (Task 180).
+- Observer hooks and telemetry export (Task 181).
+- Middleware hooks and trajectory datasets (Task 182).
+
+**Core Decisions**
+
+- Hosted cron fires are authenticated, scoped, idempotent, and dry-run testable.
+- Observers are read-only and fail-open.
+- Middleware is opt-in, ordered, policy-rechecked, and traceable.
+- Trajectory exports are redacted before leaving the workspace.
+
+**Verification**
+
+```powershell
+python -m pytest tests/cron tests/test_observer_hooks_telemetry_export.py tests/test_middleware_hooks_trajectory_datasets.py -q
+pf-agent cron add "daily report" --schedule "0 9 * * *" --dry-run
+pf-agent telemetry export --format jsonl --redact
+python -m pytest -q
+```

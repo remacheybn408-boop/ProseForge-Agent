@@ -154,6 +154,17 @@ These give the agent Claude-Code-class runtime maturity, with novel writing as t
 - **Notifications And Jobs (139-142)**: [Notification Core / 通知核心](tasks/139-notification-core.md) through [Job Status Center / 后台任务状态中心](tasks/142-job-status-center.md).
 - **Plugin Platform (143-150)**: [Plugin Manifest Spec / 插件 Manifest 规范](tasks/143-plugin-manifest-spec.md) through [Plugin Test Harness / 插件测试工具](tasks/150-plugin-test-harness.md).
 
+### Hermes-Class Non-Desktop Expansion (151-182)
+
+These cards target Hermes-like completeness without desktop UI shells or OS GUI automation:
+
+- **Terminal Interface (151-154)**: [Terminal UI Foundation](tasks/151-terminal-ui-foundation.md) through [Terminal Session Operations](tasks/154-terminal-session-operations.md).
+- **Messaging Gateway (155-162)**: [Messaging Gateway Core](tasks/155-messaging-gateway-core.md) through [Gateway Media And Voice Ingestion](tasks/162-gateway-media-and-voice-ingestion.md).
+- **Remote Execution Environments (163-168)**: [Execution Environment Abstraction](tasks/163-execution-environment-abstraction.md) through [Process Registry And Terminal Lifecycle](tasks/168-process-registry-and-terminal-lifecycle.md).
+- **Managed Tool Gateway (169-173)**: [Managed Tool Gateway Foundation](tasks/169-managed-tool-gateway-foundation.md) through [Tool Result Artifacts And Output Limits](tasks/173-tool-result-artifacts-and-output-limits.md).
+- **Skill Learning Loop (174-179)**: [Skill Specification And Registry](tasks/174-skill-specification-and-registry.md) through [User Model And Memory Nudges](tasks/179-user-model-and-memory-nudges.md).
+- **Hosted Ops, Observability, And Research Data (180-182)**: [Hosted Cron And Scale To Zero](tasks/180-hosted-cron-and-scale-to-zero.md) through [Middleware Hooks And Trajectory Datasets](tasks/182-middleware-hooks-and-trajectory-datasets.md).
+
 The maintainer contract for fault isolation, three-tier rollback, the debugging runbook, and the internal interface compatibility policy lives in `architecture/10-modularity-and-recovery.md`. The autonomous runtime design lives in `architecture/11-autonomous-agent-runtime.md`.
 
 ## Definition Of Done
