@@ -1,6 +1,7 @@
 """Agent runtime interfaces."""
 
 from .events import BackgroundJobRunner, EventBus, EventRecord, JobResult
+from .eval import EvalHarness, EvalReport, EvalSuite, EvalTaskResult, GoldenTask
 from .kernel import AgentKernel
 from .intent_router import IntentDecision, IntentRouter
 from .types import AgentIntent, AgentTurnRequest, AgentTurnResult, ToolCallResult
@@ -20,6 +21,11 @@ from .tools import (
 
 __all__ = [
     "BackgroundJobRunner",
+    "EvalHarness",
+    "EvalReport",
+    "EvalSuite",
+    "EvalTaskResult",
+    "GoldenTask",
     "EventBus",
     "EventRecord",
     "AgentKernel",
