@@ -118,6 +118,115 @@ The maintainability contract these cards enforce is documented in [Modularity, F
 
 76. [pf-agent setup Guided Installation Wizard](76-pf-agent-setup-guided-install-wizard.md) — execute after Tasks 41–55 and before relying on product-grade first use.
 
+## Expansion Task Cards (77-150)
+
+### Setup Completion Cards (77-80)
+
+77. [Setup Modes / 多模式 Setup 流程](77-setup-modes.md)
+78. [Setup Config Generator / 智能配置生成器](78-setup-config-generator.md)
+79. [Setup Recovery / 重新配置与修复](79-setup-recovery.md)
+80. [First Run Bootstrap / 首次运行自动引导](80-first-run-bootstrap.md)
+
+### Novel Project Operations Cards (81-87)
+
+81. [Novel Project Manifest / 小说项目总清单](81-novel-project-manifest.md)
+82. [Artifact Graph / 稿件产物依赖图](82-artifact-graph.md)
+83. [Bulk Import / 批量导入已有稿件](83-bulk-import.md)
+84. [Scene-Level Workflow / 场景级写作流程](84-scene-level-workflow.md)
+85. [Chapter Reorganization / 章节重排](85-chapter-reorganization.md)
+86. [Export / Compilation Pipeline / 小说导出与编译](86-export-and-compilation-pipeline.md)
+87. [Publishing Metadata / 出版元数据](87-publishing-metadata.md)
+
+### Canon And Story Intelligence Cards (88-94)
+
+88. [Canon Bible Manager / 显式设定 Bible](88-canon-bible-manager.md)
+89. [Continuity Conflict Resolver / 设定冲突仲裁](89-continuity-conflict-resolver.md)
+90. [Timeline Engine / 时间线引擎](90-timeline-engine.md)
+91. [Plot Thread Manager / 情节线管理器](91-plot-thread-manager.md)
+92. [Foreshadowing Tracker / 伏笔追踪器](92-foreshadowing-tracker.md)
+93. [Character Arc Tracker / 人物弧光追踪](93-character-arc-tracker.md)
+94. [Relationship Graph / 人物关系图](94-relationship-graph.md)
+
+### Writing Quality And Editorial Systems Cards (95-108)
+
+95. [Writing Domain Tools Registry / 写作领域工具注册](95-writing-domain-tools-registry.md)
+96. [Explicit Writing Rules / 显式写作规则管理](96-explicit-writing-rules.md)
+97. [Tone / Style Profile Compiler / 风格规则编译器](97-tone-and-style-profile-compiler.md)
+98. [Writing Quality Gates / 写作质量门](98-writing-quality-gates.md)
+99. [Literary Regression Suite / 文风回归测试](99-literary-regression-suite.md)
+100. [Rewrite Strategy Library / 改稿策略库](100-rewrite-strategy-library.md)
+101. [Reader Experience Review / 读者体验审稿](101-reader-experience-review.md)
+102. [Manuscript Search / 全书稿件搜索](102-manuscript-search.md)
+103. [Project Health Doctor / 小说项目健康检查](103-project-health-doctor.md)
+104. [Draft Versioning / Diff / Branch / 稿件版本管理](104-draft-versioning-and-diff-and-branch.md)
+105. [Editorial Pipeline / 编辑工序流水线](105-editorial-pipeline.md)
+106. [Human Approval Queue / 人类审批队列](106-human-approval-queue.md)
+107. [Writing Analytics / 写作统计分析](107-writing-analytics.md)
+108. [Backup Verification / 备份验证](108-backup-verification.md)
+
+### Agent Protocol, Prompt, Context, And Audit Cards (109-115)
+
+109. [Structured Function Calling / 结构化工具调用协议](109-structured-function-calling.md)
+110. [Structured Output Repair / 结构化输出修复](110-structured-output-repair.md)
+111. [Context Window Management / 上下文窗口管理](111-context-window-management.md)
+112. [System Prompt Management / 系统提示管理](112-system-prompt-management.md)
+113. [Prompt Template Registry / Prompt 模板注册表](113-prompt-template-registry.md)
+114. [Multimodal / Attachment Ingestion / 多模态与附件输入](114-multimodal-and-attachment-ingestion.md)
+115. [Audit Trail & Debuggability / 审计追踪与调试](115-audit-trail-and-debuggability.md)
+
+### MCP Integration Cards (116-122)
+
+116. [MCP Client Foundation / MCP 客户端基础](116-mcp-client-foundation.md)
+117. [MCP Server Registry / MCP Server 注册表](117-mcp-server-registry.md)
+118. [MCP Security Boundary / MCP 安全边界](118-mcp-security-boundary.md)
+119. [MCP Tool Approval Gate / MCP 工具审批门](119-mcp-tool-approval-gate.md)
+120. [MCP Tool Schema Validation / MCP 工具 Schema 校验](120-mcp-tool-schema-validation.md)
+121. [MCP Credentials Boundary / MCP 凭证隔离](121-mcp-credentials-boundary.md)
+122. [Tool Timeout / Rate Limit / Circuit Breaker](122-tool-timeout-and-rate-limit-and-circuit-breaker.md)
+
+### Resilience And Offline Operation Cards (123-126)
+
+123. [Provider Fallback / Provider 降级](123-provider-fallback.md)
+124. [Graceful Degradation / 功能分级降级](124-graceful-degradation.md)
+125. [Offline Mode / 离线模式](125-offline-mode.md)
+126. [Request Cache / 请求缓存与去重](126-request-cache.md)
+
+### Conversation Lifecycle Cards (127-132)
+
+127. [Conversation Lifecycle / 会话生命周期管理](127-conversation-lifecycle.md)
+128. [Cross-session Search / 跨会话搜索](128-cross-session-search.md)
+129. [Session Export / Import / 会话导入导出](129-session-export-and-import.md)
+130. [Session Branching / 会话分支](130-session-branching.md)
+131. [Session Merge / 会话合并](131-session-merge.md)
+132. [Multi-Context Switch / 多项目上下文切换](132-multi-context-switch.md)
+
+### RAG And Vector Retrieval Cards (133-138)
+
+133. [Embeddings Abstraction / 向量嵌入抽象层](133-embeddings-abstraction.md)
+134. [Vector Store Adapters / 向量库适配器](134-vector-store-adapters.md)
+135. [Hybrid Retrieval / 混合检索](135-hybrid-retrieval.md)
+136. [RAG Ingestion Pipeline / RAG 入库流水线](136-rag-ingestion-pipeline.md)
+137. [Evidence Pack Retrieval / Evidence Pack 检索融合](137-evidence-pack-retrieval.md)
+138. [RAG Evaluation / RAG 检索评估](138-rag-evaluation.md)
+
+### Notifications And Jobs Cards (139-142)
+
+139. [Notification Core / 通知核心](139-notification-core.md)
+140. [Desktop Notifications / 桌面原生通知](140-desktop-notifications.md)
+141. [Webhook Notifications / Webhook 推送](141-webhook-notifications.md)
+142. [Job Status Center / 后台任务状态中心](142-job-status-center.md)
+
+### Plugin Platform Cards (143-150)
+
+143. [Plugin Manifest Spec / 插件 Manifest 规范](143-plugin-manifest-spec.md)
+144. [Plugin Discovery / 插件发现](144-plugin-discovery.md)
+145. [Plugin Install / Update / Remove CLI](145-plugin-install-update-and-remove-cli.md)
+146. [Plugin Permission Model / 插件权限模型](146-plugin-permission-model.md)
+147. [Plugin Sandbox / 插件沙箱](147-plugin-sandbox.md)
+148. [Plugin Dependency Management / 插件依赖管理](148-plugin-dependency-management.md)
+149. [Plugin Hooks / 插件生命周期钩子](149-plugin-hooks.md)
+150. [Plugin Test Harness / 插件测试工具](150-plugin-test-harness.md)
+
 ## Execution Rule
 
 Execute one card at a time. Run the card's verification commands before starting the next card. If verification fails, stop and fix the current card instead of carrying broken assumptions forward.

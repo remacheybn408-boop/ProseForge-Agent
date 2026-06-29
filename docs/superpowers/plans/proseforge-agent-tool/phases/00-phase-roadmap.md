@@ -422,3 +422,70 @@ pf-agent doctor
 pf-agent chat --provider fake --message "hello"
 pf-agent setup --print-config
 ```
+
+## Phase 16: Setup Completion
+
+**Purpose:** Complete the guided setup surface after Task 76 by splitting modes, config generation, recovery, and first-run bootstrap into independently executable cards.
+
+**Outputs**
+
+- Setup modes and non-interactive behavior (Tasks 77-80).
+- Safe config generation, repair, and first-run guidance.
+
+**Verification**
+
+```powershell
+python -m pytest tests/setup -q
+pf-agent setup --minimal
+pf-agent chat --provider fake --message "hello"
+```
+
+## Phase 17: Novel Production Intelligence
+
+**Purpose:** Expand project-level novel operations, canon management, story intelligence, editorial workflow, quality gates, analytics, and backup verification.
+
+**Outputs**
+
+- Novel manifest, artifact graph, bulk import, scene/chapter operations, export, and publishing metadata (Tasks 81-87).
+- Canon bible, continuity, timeline, plot, foreshadowing, character, and relationship systems (Tasks 88-94).
+- Writing tools, rules, style, quality gates, regression, rewrite, review, search, health, versioning, approval, analytics, and backup checks (Tasks 95-108).
+
+**Verification**
+
+```powershell
+python -m pytest tests/novel -q
+python -m pytest -q
+```
+
+## Phase 18: Agent Protocol And Context Systems
+
+**Purpose:** Strengthen structured tool use, output repair, context-window handling, prompts, attachment ingestion, and audit/debuggability.
+
+**Outputs**
+
+- Structured function calling and output repair (Tasks 109-110).
+- Context, system prompt, template, multimodal attachment, and audit systems (Tasks 111-115).
+
+**Verification**
+
+```powershell
+python -m pytest tests/agent tests/chat -q
+python -m pytest -q
+```
+
+## Phase 19: External Integrations And Platform Systems
+
+**Purpose:** Add MCP integration, resilience/offline layers, conversation lifecycle management, vector/RAG retrieval, notifications/jobs, and plugin platform capabilities.
+
+**Outputs**
+
+- MCP client, registry, security, approval, schema, credentials, and timeout controls (Tasks 116-122).
+- Provider fallback, graceful degradation, offline mode, request cache, conversation lifecycle, session search/export/branch/merge, and multi-context switching (Tasks 123-132).
+- Embeddings, vector stores, hybrid retrieval, RAG ingestion/evaluation, notifications, jobs, and plugin platform cards (Tasks 133-150).
+
+**Verification**
+
+```powershell
+python -m pytest tests/mcp tests/retrieval tests/notifications tests/plugins -q
+python -m pytest -q
+```

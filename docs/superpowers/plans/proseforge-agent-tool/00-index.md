@@ -140,6 +140,20 @@ These give the agent Claude-Code-class runtime maturity, with novel writing as t
 
 76. Task 76: [`pf-agent setup` Guided Installation Wizard](tasks/76-pf-agent-setup-guided-install-wizard.md).
 
+### Expansion Task Cards (77-150)
+
+- **Setup Completion (77-80)**: [Setup Modes / 多模式 Setup 流程](tasks/77-setup-modes.md) through [First Run Bootstrap / 首次运行自动引导](tasks/80-first-run-bootstrap.md).
+- **Novel Project Operations (81-87)**: [Novel Project Manifest / 小说项目总清单](tasks/81-novel-project-manifest.md) through [Publishing Metadata / 出版元数据](tasks/87-publishing-metadata.md).
+- **Canon And Story Intelligence (88-94)**: [Canon Bible Manager / 显式设定 Bible](tasks/88-canon-bible-manager.md) through [Relationship Graph / 人物关系图](tasks/94-relationship-graph.md).
+- **Writing Quality And Editorial Systems (95-108)**: [Writing Domain Tools Registry / 写作领域工具注册](tasks/95-writing-domain-tools-registry.md) through [Backup Verification / 备份验证](tasks/108-backup-verification.md).
+- **Agent Protocol, Prompt, Context, And Audit (109-115)**: [Structured Function Calling / 结构化工具调用协议](tasks/109-structured-function-calling.md) through [Audit Trail & Debuggability / 审计追踪与调试](tasks/115-audit-trail-and-debuggability.md).
+- **MCP Integration (116-122)**: [MCP Client Foundation / MCP 客户端基础](tasks/116-mcp-client-foundation.md) through [Tool Timeout / Rate Limit / Circuit Breaker](tasks/122-tool-timeout-and-rate-limit-and-circuit-breaker.md).
+- **Resilience And Offline Operation (123-126)**: [Provider Fallback / Provider 降级](tasks/123-provider-fallback.md) through [Request Cache / 请求缓存与去重](tasks/126-request-cache.md).
+- **Conversation Lifecycle (127-132)**: [Conversation Lifecycle / 会话生命周期管理](tasks/127-conversation-lifecycle.md) through [Multi-Context Switch / 多项目上下文切换](tasks/132-multi-context-switch.md).
+- **RAG And Vector Retrieval (133-138)**: [Embeddings Abstraction / 向量嵌入抽象层](tasks/133-embeddings-abstraction.md) through [RAG Evaluation / RAG 检索评估](tasks/138-rag-evaluation.md).
+- **Notifications And Jobs (139-142)**: [Notification Core / 通知核心](tasks/139-notification-core.md) through [Job Status Center / 后台任务状态中心](tasks/142-job-status-center.md).
+- **Plugin Platform (143-150)**: [Plugin Manifest Spec / 插件 Manifest 规范](tasks/143-plugin-manifest-spec.md) through [Plugin Test Harness / 插件测试工具](tasks/150-plugin-test-harness.md).
+
 The maintainer contract for fault isolation, three-tier rollback, the debugging runbook, and the internal interface compatibility policy lives in `architecture/10-modularity-and-recovery.md`. The autonomous runtime design lives in `architecture/11-autonomous-agent-runtime.md`.
 
 ## Definition Of Done
