@@ -331,6 +331,11 @@ def build_parser() -> argparse.ArgumentParser:
                 default=5,
                 help="iteration budget for the autonomous loop",
             )
+            group.add_argument(
+                "--verify",
+                action="store_true",
+                help="self-verify each output against criteria and reflect/retry on failure",
+            )
         if name == "status":
             group.add_argument(
                 "--capabilities",
@@ -1276,28 +1281,58 @@ def _handle_run(args: argparse.Namespace) -> int:
 
     provider = FakeProvider(name=args.provider or "fake", model=args.provider or "fake")
     kernel = AgentKernel(provider=provider, intent_router=IntentRouter())
+
+    verifier = criteria = None
+    if getattr(args, "verify", False):
+        import re
+
+        from .agent.reflection import Verifier
+
+        match = re.search(r"\d+", goal)
+        min_length = int(match.group()) if match else 200
+        verifier = Verifier(
+            verifiers={"min_length": lambda out, c: len(out) >= c["min_length"]}
+        )
+        criteria = {"min_length": min_length}
+
     loop = AgentLoop(
         kernel=kernel,
         budget=Budget(max_iterations=args.max_iterations),
         planner=_TaskPlanner(),
+        verifier=verifier,
+        criteria=criteria,
+        max_reflections=1,
     )
     result = loop.run(goal=goal)
     lines = [f"[{step.status}] step {step.index}: {step.text}" for step in result.steps]
+    sections = [
+        ReportSection("Steps", lines or ["(no steps)"]),
+        ReportSection(
+            "Outcome",
+            [
+                f"status: {result.status}",
+                f"iterations: {len(result.steps)}",
+                f"compactions: {result.compactions}",
+            ],
+        ),
+    ]
+    if verifier is not None:
+        reflections = sum(1 for e in result.events if e.get("type") == "reflection")
+        sections.append(
+            ReportSection(
+                "Verification",
+                [
+                    f"criteria: {criteria}",
+                    f"reflections: {reflections}",
+                    f"unverified_stop: {result.status == 'stopped_unverified'}",
+                ],
+            )
+        )
     report = Report(
         title="Autonomous Run",
         status="ok" if result.status in ("completed", "stopped_budget") else "degraded",
         next_action="Increase --max-iterations or refine the goal to reach completion",
-        sections=[
-            ReportSection("Steps", lines or ["(no steps)"]),
-            ReportSection(
-                "Outcome",
-                [
-                    f"status: {result.status}",
-                    f"iterations: {len(result.steps)}",
-                    f"compactions: {result.compactions}",
-                ],
-            ),
-        ],
+        sections=sections,
         data=result.to_dict(),
     )
     return _emit(report, args.format)
