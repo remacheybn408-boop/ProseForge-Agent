@@ -228,7 +228,7 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "chat":
             group.add_argument("--message", default=None, help="one-shot chat message")
             group.add_argument("--text", default=None, help="text to classify")
-            group.add_argument("--provider", default="fake", help="chat provider")
+            group.add_argument("--provider", default=None, help="chat provider")
             group.add_argument("--no-project", action="store_true", help="do not bind a project")
             group.add_argument("--project", default=None, help="project slug")
             group.add_argument("--mode", default="general_chat", help="conversation mode")
@@ -781,6 +781,14 @@ def _handle_chat(args: argparse.Namespace) -> int:
         return _emit(report, args.format)
     from .chat import ChatSessionStore
     from .llm import FakeProvider
+
+    if args.provider is None and args.message:
+        from .setup.first_run import FirstRunBootstrap
+
+        verdict = FirstRunBootstrap(Path(".pf-agent")).check()
+        if not verdict.ready:
+            print(verdict.guidance)
+            return 2
 
     project_slug = None if args.no_project else args.project
     provider = FakeProvider(name=args.provider or "fake", model=args.provider or "fake")
