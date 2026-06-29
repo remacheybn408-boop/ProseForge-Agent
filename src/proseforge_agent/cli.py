@@ -44,6 +44,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "providers config (YAML)",
         "artifacts": "provider/role report",
     },
+    "usage": {
+        "help": "Report metered provider token usage and cost",
+        "inputs": "usage log (JSONL), since filter",
+        "artifacts": "per-provider usage report",
+    },
     "memory": {
         "help": "List and export durable project memory",
         "inputs": "agent database path, project slug",
@@ -233,6 +238,17 @@ def build_parser() -> argparse.ArgumentParser:
             )
             group.add_argument("--profile", default=None, help="agent persona profile")
             group.add_argument("--profiles-file", default=None, help="YAML file with agent profiles")
+        if name == "usage":
+            group.add_argument(
+                "--usage-log",
+                default="logs/usage.jsonl",
+                help="path to the usage JSONL log",
+            )
+            group.add_argument(
+                "--since",
+                default=None,
+                help="filter usage records (e.g. 'today'); shows all when omitted",
+            )
         if name == "tools":
             group.add_argument(
                 "--include-permissions",
@@ -1071,6 +1087,48 @@ def _handle_support(args: argparse.Namespace) -> int:
     return _emit(report, args.format)
 
 
+def _handle_usage(args: argparse.Namespace) -> int:
+    from .llm.usage import UsageLog, build_usage_report
+
+    subcommand = args.subcommand or "report"
+    if subcommand != "report":
+        return _emit(
+            _planned_report("usage", "Run `pf-agent usage report --since today`"),
+            args.format,
+        )
+
+    records = UsageLog(args.usage_log).load()
+    report_data = build_usage_report(records)
+    since = getattr(args, "since", None)
+    lines = []
+    for provider in sorted(report_data["providers"]):
+        agg = report_data["providers"][provider]
+        lines.append(
+            f"{provider}: prompt={agg['prompt_tokens']} "
+            f"completion={agg['completion_tokens']} cost={agg['cost']:.6f}"
+        )
+    if not lines:
+        lines.append("No metered usage recorded yet.")
+    report = Report(
+        title="Provider Usage Report",
+        status="ok",
+        next_action="Set per-run and per-day budgets to cap spending",
+        sections=[
+            ReportSection("Per-Provider Usage", lines),
+            ReportSection(
+                "Totals",
+                [
+                    f"total_cost={report_data['total_cost']:.6f}",
+                    f"records={report_data['record_count']}",
+                    f"since={since or 'all'}",
+                ],
+            ),
+        ],
+        data=report_data,
+    )
+    return _emit(report, args.format)
+
+
 def _handle_qa(args: argparse.Namespace) -> int:
     from .install.qa_matrix import NativeQAMatrix
 
@@ -1165,6 +1223,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_report(args)
     if args.command == "provider":
         return _handle_provider(args)
+    if args.command == "usage":
+        return _handle_usage(args)
     if args.command == "chat":
         return _handle_chat(args)
     if args.command == "tools":

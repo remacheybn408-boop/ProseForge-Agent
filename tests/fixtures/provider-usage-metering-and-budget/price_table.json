@@ -1,0 +1,12 @@
+{
+  "deepseek": {
+    "deepseek-chat": {"input_per_1k": 0.00014, "output_per_1k": 0.00028},
+    "deepseek-reasoner": {"input_per_1k": 0.00055, "output_per_1k": 0.00219}
+  },
+  "openai": {
+    "gpt-4o": {"input_per_1k": 0.0025, "output_per_1k": 0.01}
+  },
+  "fake": {
+    "fake-novelist": {"input_per_1k": 0.0, "output_per_1k": 0.0}
+  }
+}
