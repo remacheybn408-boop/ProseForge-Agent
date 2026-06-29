@@ -34,12 +34,14 @@ class AgentKernel:
         session_store=None,
         retrieval=None,
         intent_router=None,
+        safety=None,
     ) -> None:
         self._provider = provider
         self._tools = tools
         self._session_store = session_store
         self._retrieval = retrieval
         self._intent_router = intent_router
+        self._safety = safety
 
     def run_turn(self, request: AgentTurnRequest) -> AgentTurnResult:
         trace_id = f"trace-{uuid4().hex[:12]}"
@@ -55,9 +57,14 @@ class AgentKernel:
         self._append_message(request.session_id, "user", request.text)
 
         intent = self._classify(request)
-        evidence_refs = self._retrieve_if_needed(request, intent, events, trace_id)
+        evidence = self._retrieve_if_needed(request, intent, events, trace_id)
+        evidence_refs = [item["id"] for item in evidence if "id" in item]
 
-        memory_ids = self._save_memory_if_needed(request, intent, events, trace_id)
+        effective_ceiling = self._assess_safety(request, evidence, events, trace_id)
+
+        memory_ids = self._save_memory_if_needed(
+            request, intent, events, trace_id, effective_ceiling
+        )
 
         if intent.target_tool:
             return self._run_tool(
@@ -67,6 +74,7 @@ class AgentKernel:
                 trace_id=trace_id,
                 evidence_refs=evidence_refs,
                 memory_ids=memory_ids,
+                permission_level=effective_ceiling,
             )
 
         text = self._call_provider(request, intent, events, trace_id, evidence_refs)
@@ -129,13 +137,48 @@ class AgentKernel:
         intent: AgentIntent,
         events: list[dict[str, Any]],
         trace_id: str,
-    ) -> list[str]:
+    ) -> list[dict[str, Any]]:
         if intent.name != "retrieve_context" or self._retrieval is None:
             return []
         evidence = self._retrieval.retrieve(request.project_slug, request.text)
         refs = [item["id"] for item in evidence if "id" in item]
         events.append({"type": "retrieval", "trace_id": trace_id, "refs": refs})
-        return refs
+        return list(evidence)
+
+    def _assess_safety(
+        self,
+        request: AgentTurnRequest,
+        evidence: list[dict[str, Any]],
+        events: list[dict[str, Any]],
+        trace_id: str,
+    ) -> str:
+        """Return the effective permission ceiling for this turn.
+
+        Retrieved evidence is untrusted: the guard scans it for prompt-injection
+        and can only lower the ceiling, never raise it above the session grant.
+        With no guard configured the session ceiling is used unchanged.
+        """
+        if self._safety is None:
+            return request.permission_level
+        untrusted_text = "\n".join(
+            str(item.get("text", "")) for item in evidence if isinstance(item, dict)
+        )
+        verdict = self._safety.assess(
+            untrusted_text,
+            provenance="untrusted",
+            session_ceiling=request.permission_level,
+        )
+        events.append(
+            {
+                "type": "safety_assessment",
+                "trace_id": trace_id,
+                "provenance": verdict.provenance,
+                "allowed_ceiling": verdict.allowed_ceiling,
+                "flags": list(verdict.flags),
+                "reason": verdict.reason,
+            }
+        )
+        return verdict.allowed_ceiling
 
     def _save_memory_if_needed(
         self,
@@ -143,10 +186,11 @@ class AgentKernel:
         intent: AgentIntent,
         events: list[dict[str, Any]],
         trace_id: str,
+        permission_level: str,
     ) -> list[str]:
         if intent.name != "update_memory_candidate":
             return []
-        if not self._permission_allows(request.permission_level, "draft_write"):
+        if not self._permission_allows(permission_level, "draft_write"):
             events.append({"type": "memory_skipped", "trace_id": trace_id, "reason": "permission"})
             return []
         if self._session_store is None or not hasattr(self._session_store, "save_memory_candidate"):
@@ -166,9 +210,11 @@ class AgentKernel:
         trace_id: str,
         evidence_refs: list[str],
         memory_ids: list[str],
+        permission_level: str | None = None,
     ) -> AgentTurnResult:
+        permission_level = permission_level or request.permission_level
         required = self._tool_permission(intent.target_tool) or intent.required_permission
-        if not self._permission_allows(request.permission_level, required):
+        if not self._permission_allows(permission_level, required):
             events.append(
                 {
                     "type": "permission_denied",

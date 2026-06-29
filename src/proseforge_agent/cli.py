@@ -236,6 +236,11 @@ def build_parser() -> argparse.ArgumentParser:
                 default="read_only",
                 help="maximum permission level for this turn",
             )
+            group.add_argument(
+                "--explain-safety",
+                action="store_true",
+                help="assess untrusted content with the injection guard and show the safety verdict",
+            )
             group.add_argument("--profile", default=None, help="agent persona profile")
             group.add_argument("--profiles-file", default=None, help="YAML file with agent profiles")
         if name == "usage":
@@ -775,10 +780,17 @@ def _handle_chat(args: argparse.Namespace) -> int:
         ).run()
     from .agent import AgentKernel, AgentTurnRequest, IntentRouter
 
+    explain_safety = getattr(args, "explain_safety", False)
+    safety_guard = None
+    if explain_safety:
+        from .agent.safety import InjectionGuard
+
+        safety_guard = InjectionGuard()
     kernel = AgentKernel(
         provider=provider,
         intent_router=IntentRouter(),
         session_store=session_store,
+        safety=safety_guard,
     )
     result = kernel.run_turn(
         AgentTurnRequest(
@@ -798,6 +810,24 @@ def _handle_chat(args: argparse.Namespace) -> int:
                     f"profile: {profile.name}",
                     f"mode: {profile.mode}",
                     f"permission_ceiling: {profile.permission_ceiling}",
+                ],
+            )
+        )
+    if explain_safety and safety_guard is not None:
+        verdict = safety_guard.assess(
+            args.message,
+            provenance="untrusted",
+            session_ceiling=permission_level,
+        )
+        sections.append(
+            ReportSection(
+                "Safety",
+                [
+                    f"provenance: {verdict.provenance}",
+                    f"session_grant: {permission_level}",
+                    f"allowed_ceiling: {verdict.allowed_ceiling}",
+                    f"flags: {', '.join(verdict.flags) or 'none'}",
+                    f"reason: {verdict.reason}",
                 ],
             )
         )
