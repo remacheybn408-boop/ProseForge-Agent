@@ -6,6 +6,7 @@ from .intent_router import IntentDecision, IntentRouter
 from .types import AgentIntent, AgentTurnRequest, AgentTurnResult, ToolCallResult
 from .permissions import PERMISSION_LEVELS, PermissionDecision, PermissionPolicy
 from .profiles import AgentProfile, AgentProfileRegistry
+from .sandbox import Approval, ExecRequest, ExecResult, Sandbox
 from .tools import (
     AgentTool,
     ToolContext,
@@ -31,6 +32,10 @@ __all__ = [
     "PermissionPolicy",
     "AgentProfile",
     "AgentProfileRegistry",
+    "Approval",
+    "ExecRequest",
+    "ExecResult",
+    "Sandbox",
     "AgentTool",
     "ToolContext",
     "ToolRegistry",

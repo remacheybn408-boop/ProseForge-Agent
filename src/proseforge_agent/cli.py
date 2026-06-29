@@ -320,6 +320,8 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "run":
             group.add_argument("--goal", default=None, help="goal for the autonomous run")
             group.add_argument("--provider", default="fake", help="provider for the run")
+            group.add_argument("--allow-exec", action="store_true", help="allow sandboxed command execution")
+            group.add_argument("--approve", action="store_true", help="approve sandboxed execution for this run")
             group.add_argument(
                 "--show-plan",
                 action="store_true",
@@ -1305,6 +1307,28 @@ def _handle_run(args: argparse.Namespace) -> int:
     )
     result = loop.run(goal=goal)
     lines = [f"[{step.status}] step {step.index}: {step.text}" for step in result.steps]
+    sandbox_data = None
+    if getattr(args, "allow_exec", False):
+        from .agent.safety import InjectionGuard
+        from .agent.sandbox import Approval, ExecRequest, Sandbox
+
+        sandbox_result = Sandbox(
+            permissions="system_write" if getattr(args, "approve", False) else "read_only",
+            safety=InjectionGuard(),
+            workspace_root=Path.cwd(),
+        ).run(
+            ExecRequest(
+                argv=[
+                    sys.executable,
+                    "-c",
+                    "import os; print('\\n'.join(sorted(os.listdir('.'))[:20]))",
+                ],
+                cwd=".",
+                timeout=5,
+            ),
+            approval=Approval(confirmed=bool(getattr(args, "approve", False))),
+        )
+        sandbox_data = sandbox_result.__dict__
     sections = [
         ReportSection("Steps", lines or ["(no steps)"]),
         ReportSection(
@@ -1328,12 +1352,23 @@ def _handle_run(args: argparse.Namespace) -> int:
                 ],
             )
         )
+    if sandbox_data is not None:
+        sections.append(
+            ReportSection(
+                "Sandbox",
+                [
+                    f"ok: {sandbox_data['ok']}",
+                    f"trace: {sandbox_data['trace_id']}",
+                    sandbox_data["stdout"].strip() or sandbox_data["error"] or "(no output)",
+                ],
+            )
+        )
     report = Report(
         title="Autonomous Run",
         status="ok" if result.status in ("completed", "stopped_budget") else "degraded",
         next_action="Increase --max-iterations or refine the goal to reach completion",
         sections=sections,
-        data=result.to_dict(),
+        data={**result.to_dict(), "sandbox": sandbox_data},
     )
     return _emit(report, args.format)
 
