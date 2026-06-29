@@ -4,6 +4,7 @@ from .events import BackgroundJobRunner, EventBus, EventRecord, JobResult
 from .kernel import AgentKernel
 from .intent_router import IntentDecision, IntentRouter
 from .types import AgentIntent, AgentTurnRequest, AgentTurnResult, ToolCallResult
+from .control import ControlSignal, ControlToken
 from .permissions import PERMISSION_LEVELS, PermissionDecision, PermissionPolicy
 from .profiles import AgentProfile, AgentProfileRegistry
 from .sandbox import Approval, ExecRequest, ExecResult, Sandbox
@@ -28,6 +29,8 @@ __all__ = [
     "AgentTurnRequest",
     "AgentTurnResult",
     "ToolCallResult",
+    "ControlSignal",
+    "ControlToken",
     "PERMISSION_LEVELS",
     "PermissionDecision",
     "PermissionPolicy",
