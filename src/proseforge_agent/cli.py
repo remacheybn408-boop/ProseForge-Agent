@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -103,6 +104,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "help": "Run allow-listed background agent jobs",
         "inputs": "job name, provider, dry-run flag",
         "artifacts": "event bus records, job report",
+    },
+    "setup": {
+        "help": "Run the guided first-use setup wizard",
+        "inputs": "setup mode, provider, repair/reconfigure flags",
+        "artifacts": "agent config, workspace directories, setup summary",
     },
     "init": {
         "help": "Initialize a ProseForge Agent workspace",
@@ -283,6 +289,23 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "jobs":
             group.add_argument("job_name", nargs="?", help="allow-listed background job")
             group.add_argument("--provider", default="fake", help="provider for the job")
+        if name == "setup":
+            group.add_argument("--quick", action="store_true", help="run quick guided setup")
+            group.add_argument("--full", action="store_true", help="run full guided setup")
+            group.add_argument("--minimal", action="store_true", help="run zero-key fake-provider setup")
+            group.add_argument("--non-interactive", action="store_true", help="run without prompts")
+            group.add_argument("--reconfigure", action="store_true", help="backup and rewrite config")
+            group.add_argument(
+                "--add-provider",
+                nargs="?",
+                const="deepseek",
+                default=None,
+                help="append a provider while keeping fake fallback",
+            )
+            group.add_argument("--skip-provider-test", action="store_true", help="skip provider ping")
+            group.add_argument("--no-shell", action="store_true", help="skip shell completion registration")
+            group.add_argument("--repair", action="store_true", help="repair config/workspace without deleting data")
+            group.add_argument("--print-config", action="store_true", help="print redacted effective config")
         if name == "init":
             group.add_argument("--portable", action="store_true", help="initialize portable .pf-agent workspace")
             group.add_argument("--native", action="store_true", help="initialize native app directories")
@@ -990,6 +1013,38 @@ def _handle_jobs(args: argparse.Namespace) -> int:
     return _emit(report, args.format)
 
 
+def _handle_setup(args: argparse.Namespace) -> int:
+    from .setup import SetupWizard, mode_from_flags, render_setup_lines
+
+    mode = mode_from_flags(
+        quick=args.quick,
+        full=args.full,
+        minimal=args.minimal,
+        non_interactive=args.non_interactive,
+    )
+    result = SetupWizard(root=Path(".pf-agent"), env=dict(os.environ)).run(
+        mode=mode,
+        reconfigure=args.reconfigure,
+        add_provider=args.add_provider,
+        skip_provider_test=args.skip_provider_test,
+        no_shell=args.no_shell,
+        repair=args.repair,
+        print_config=args.print_config,
+    )
+    if args.print_config:
+        print(result.rendered_config, end="")
+        return 0
+    report = Report(
+        title="Guided Setup",
+        status="ok" if result.completed else "blocked",
+        next_action='Run `pf-agent doctor`, then `pf-agent chat --provider fake --message "hello"`',
+        sections=[ReportSection("Summary", render_setup_lines(result))],
+        data=result.to_dict(),
+    )
+    _emit(report, args.format)
+    return 0 if result.completed else 1
+
+
 def _handle_init(args: argparse.Namespace) -> int:
     from .install.first_run import FirstRunWizard
 
@@ -1654,6 +1709,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_tools(args)
     if args.command == "jobs":
         return _handle_jobs(args)
+    if args.command == "setup":
+        return _handle_setup(args)
     if args.command == "init":
         return _handle_init(args)
     if args.command == "doctor":
