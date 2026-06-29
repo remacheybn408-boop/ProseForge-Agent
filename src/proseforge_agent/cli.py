@@ -294,6 +294,16 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--redact", action="store_true", help="redact paths and secrets")
         if name == "qa":
             group.add_argument("--show", action="store_true", help="show required native QA matrix")
+            group.add_argument(
+                "--check",
+                action="store_true",
+                help="validate the CI matrix against the native QA matrix (with 'ci')",
+            )
+            group.add_argument(
+                "--workflow",
+                default=".github/workflows/ci.yml",
+                help="path to the CI workflow file for 'qa ci'",
+            )
         if name == "release":
             group.add_argument("--complete-agent", action="store_true", help="run the complete agent release gate")
             group.add_argument("--write-report", action="store_true", help="write release report to reports/")
@@ -1181,6 +1191,8 @@ def _handle_qa(args: argparse.Namespace) -> int:
     from .install.qa_matrix import NativeQAMatrix
 
     matrix = NativeQAMatrix()
+    if args.subcommand == "ci":
+        return _handle_qa_ci(args, matrix)
     payload = matrix.to_dict()
     lines = []
     for platform, checks in payload["platforms"].items():
@@ -1194,6 +1206,56 @@ def _handle_qa(args: argparse.Namespace) -> int:
         data=payload,
     )
     return _emit(report, args.format)
+
+
+def _handle_qa_ci(args: argparse.Namespace, matrix) -> int:
+    from .errors import ConfigurationError
+    from .install.ci_matrix import CIWorkflow
+
+    try:
+        workflow = CIWorkflow.load(args.workflow)
+        axes = workflow.matrix()
+        workflow.validate_against_qa_matrix(matrix)
+        has_pytest = workflow.has_pytest_step()
+        installs_first = workflow.installs_package_before_tests()
+        status = "ok" if (has_pytest and installs_first) else "blocked"
+        detail = "CI matrix matches the native QA matrix"
+    except ConfigurationError as exc:
+        axes = {"os": [], "python-version": []}
+        has_pytest = installs_first = False
+        status = "blocked"
+        detail = str(exc)
+    report = Report(
+        title="CI Matrix Check",
+        status=status,
+        next_action="Keep the CI OS axis aligned with the native QA matrix",
+        sections=[
+            ReportSection(
+                "Matrix",
+                [
+                    f"os: {', '.join(axes['os']) or '(none)'}",
+                    f"python-version: {', '.join(axes['python-version']) or '(none)'}",
+                ],
+            ),
+            ReportSection(
+                "Gates",
+                [
+                    f"pytest_step: {'ok' if has_pytest else 'missing'}",
+                    f"installs_before_tests: {'ok' if installs_first else 'no'}",
+                    f"qa_matrix_alignment: {detail}",
+                ],
+            ),
+        ],
+        data={
+            "matrix": axes,
+            "has_pytest_step": has_pytest,
+            "installs_package_before_tests": installs_first,
+            "status": status,
+            "detail": detail,
+        },
+    )
+    _emit(report, args.format)
+    return 0 if status == "ok" else 1
 
 
 def _handle_release(args: argparse.Namespace) -> int:

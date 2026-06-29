@@ -1,0 +1,5 @@
+{
+  "os": ["ubuntu-latest", "windows-latest", "macos-latest"],
+  "python-version": ["3.10", "3.11", "3.12"],
+  "minimum_python": "3.10"
+}
