@@ -1,0 +1,7 @@
+{
+  "safe_echo": {
+    "argv": ["python", "-c", "print('hello')"],
+    "cwd": ".",
+    "timeout": 5
+  }
+}
