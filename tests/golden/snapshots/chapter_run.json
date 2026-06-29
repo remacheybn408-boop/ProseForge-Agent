@@ -1,0 +1,23 @@
+{
+  "chapter": 3,
+  "stages": [
+    {
+      "completion_tokens": 4,
+      "prompt_tokens": 1,
+      "stage": "planner",
+      "text": "[fake:fake-novelist] role=planner :: 为第三章草拟大纲"
+    },
+    {
+      "completion_tokens": 4,
+      "prompt_tokens": 1,
+      "stage": "drafter",
+      "text": "[fake:fake-novelist] role=drafter :: 写出第三章初稿开头"
+    },
+    {
+      "completion_tokens": 4,
+      "prompt_tokens": 1,
+      "stage": "reviewer",
+      "text": "[fake:fake-novelist] role=reviewer :: 审阅第三章初稿"
+    }
+  ]
+}
