@@ -136,6 +136,10 @@ class SetupWizard:
         self.root.mkdir(parents=True, exist_ok=True)
         config_text = self.config_generator.render(config)
         config_path.write_text(config_text, encoding="utf-8")
+        (self.root / ".env").write_text(
+            self.config_generator.render_env_template(provider_config),
+            encoding="utf-8",
+        )
 
         return SetupResult(
             completed=not errors,
