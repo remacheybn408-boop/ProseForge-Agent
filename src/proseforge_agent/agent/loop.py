@@ -52,6 +52,8 @@ class LoopResult:
     transcript_ref: str = ""
     events: list[dict[str, Any]] = field(default_factory=list)
     compactions: int = 0
+    resumable: bool = False
+    checkpoint: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -60,6 +62,8 @@ class LoopResult:
             "final_text": self.final_text,
             "transcript_ref": self.transcript_ref,
             "compactions": self.compactions,
+            "resumable": self.resumable,
+            "checkpoint": self.checkpoint,
         }
 
 
@@ -108,6 +112,8 @@ class AgentLoop:
         repeat_count = 0
         final_text = ""
         status = "stopped_budget"  # default if the budget is exhausted
+        checkpoint: dict[str, Any] = {}
+        resumable = False
 
         # A fresh reflector per run so its bounded budget resets.
         reflector = self._reflector
@@ -118,9 +124,30 @@ class AgentLoop:
         self._pending_instruction = None
 
         for index in range(self._budget.max_iterations):
-            if self._control is not None and getattr(self._control, "is_interrupted", lambda: False)():
+            control_signal = self._poll_control()
+            if control_signal is not None and control_signal.kind == "interrupt":
                 status = "interrupted"
+                resumable = True
+                checkpoint = self._checkpoint(goal, steps, status)
+                event = {
+                    "type": "control_interrupt",
+                    "trace_id": control_signal.trace_id or f"control-{index + 1}",
+                    "reason": control_signal.reason,
+                    "safe_point": index,
+                }
+                events.append(event)
+                self._emit(event)
                 break
+            if control_signal is not None and control_signal.kind == "steer":
+                self._pending_instruction = control_signal.instruction
+                event = {
+                    "type": "control_steer",
+                    "trace_id": control_signal.trace_id or f"control-{index + 1}",
+                    "instruction": control_signal.instruction,
+                    "safe_point": index,
+                }
+                events.append(event)
+                self._emit(event)
 
             request = self._build_request(goal, plan, index)
             result = self._kernel.run_turn(request)
@@ -195,6 +222,8 @@ class AgentLoop:
             transcript_ref="",
             events=events,
             compactions=compactions,
+            resumable=resumable,
+            checkpoint=checkpoint,
         )
 
     # -- helpers --------------------------------------------------------
@@ -238,6 +267,27 @@ class AgentLoop:
         recent = working_context[-keep:]
         summary = f"[compacted {len(older)} earlier steps]"
         return [summary, *recent]
+
+    def _poll_control(self):
+        if self._control is None:
+            return None
+        poll = getattr(self._control, "poll", None)
+        if callable(poll):
+            return poll()
+        if getattr(self._control, "is_interrupted", lambda: False)():
+            from .control import ControlToken
+
+            return ControlToken.interrupt_signal("legacy interrupt signal")
+        return None
+
+    @staticmethod
+    def _checkpoint(goal: str, steps: list[StepRecord], status: str) -> dict[str, Any]:
+        return {
+            "goal": goal,
+            "status": status,
+            "completed_steps": [step.to_dict() for step in steps],
+            "next_step_index": len(steps) + 1,
+        }
 
     def _emit(self, event: dict[str, Any]) -> None:
         if self._event_bus is None:

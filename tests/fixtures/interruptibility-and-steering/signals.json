@@ -1,0 +1,10 @@
+{
+  "interrupt": {
+    "kind": "interrupt",
+    "reason": "user requested stop"
+  },
+  "steer": {
+    "kind": "steer",
+    "instruction": "focus on the antagonist"
+  }
+}
