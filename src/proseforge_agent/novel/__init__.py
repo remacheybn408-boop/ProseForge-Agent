@@ -1,6 +1,7 @@
 """Novel project operations."""
 
 from .artifacts import GRAPH_NAME, ArtifactGraphStore, ArtifactRecord
+from .bible import BIBLE_SECTIONS, CanonBibleManager
 from .exporter import BookExporter, ExportResult
 from .importer import BulkImporter, ImportedChapter, ImportResult
 from .manifest import MANIFEST_NAME, NovelProjectManifest, NovelProjectStore
@@ -14,8 +15,10 @@ __all__ = [
     "PUBLISHING_NAME",
     "ArtifactGraphStore",
     "ArtifactRecord",
+    "BIBLE_SECTIONS",
     "BookExporter",
     "BulkImporter",
+    "CanonBibleManager",
     "ChapterReorganizer",
     "ImportedChapter",
     "ImportResult",
