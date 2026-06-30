@@ -160,6 +160,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "project slug, character id, arc updates",
         "artifacts": "character arc store and whole-book report",
     },
+    "relation": {
+        "help": "Manage character, faction, and organization relationship graphs",
+        "inputs": "project slug, relation endpoints and type",
+        "artifacts": "relationship graph data, markdown, and Graphviz dot",
+    },
     "setup": {
         "help": "Run the guided first-use setup wizard",
         "inputs": "setup mode, provider, repair/reconfigure flags",
@@ -426,6 +431,20 @@ def build_parser() -> argparse.ArgumentParser:
             )
             group.add_argument("--chapter", action="append", default=None, help="chapter appearance")
             group.add_argument("--arc-status", default="", help="arc status")
+        if name == "relation":
+            group.add_argument("--slug", default=None, help="project slug")
+            group.add_argument("--source", default=None, help="relation source node")
+            group.add_argument("--target", default=None, help="relation target node")
+            group.add_argument("--type", default="friend", help="relation type")
+            group.add_argument("--evidence", action="append", default=None, help="evidence id or chapter")
+            group.add_argument("--status", default="active", help="relation status")
+            group.add_argument("--note", default="", help="relation note")
+            group.add_argument(
+                "--graph-format",
+                choices=["json", "markdown", "dot"],
+                default="json",
+                help="relationship graph export format",
+            )
         if name == "chapter":
             group.add_argument("chapter_ids", nargs="*", help="chapter ids for reorganization")
             group.add_argument("--slug", default=None, help="project slug")
@@ -1322,6 +1341,77 @@ def _handle_character_arc(args: argparse.Namespace) -> int:
         next_action="Use arc reports when revising emotional continuity",
         sections=[ReportSection("Summary", report_data["summary"] or ["(none)"])],
         data=report_data,
+    )
+    return _emit(report, args.format)
+
+
+def _handle_relation(args: argparse.Namespace) -> int:
+    if args.subcommand not in {"add", "list", "graph"} or not args.slug:
+        return _emit(_planned_report("relation", "Run `pf-agent relation add --slug <slug>`"), args.format)
+    from .novel import RelationshipGraph
+
+    graph = RelationshipGraph(Path(".pf-agent") / "workspace", slug=args.slug)
+    if args.subcommand == "add":
+        if not args.source or not args.target:
+            return _emit(_planned_report("relation", "Pass --source and --target for relation add"), args.format)
+        try:
+            edge = graph.add_relation(
+                source=args.source,
+                target=args.target,
+                type=args.type,
+                evidence=args.evidence or [],
+                status=args.status,
+                note=args.note,
+            )
+        except ValueError as exc:
+            report = Report(
+                title="Relationship Graph",
+                status="blocked",
+                next_action="Use a supported relation type",
+                sections=[ReportSection("Error", [str(exc)])],
+                data={"error": str(exc)},
+            )
+            _emit(report, args.format)
+            return 1
+        report = Report(
+            title="Relationship Graph",
+            status="ok",
+            next_action="Run `pf-agent relation graph --slug <slug>` to export graph context",
+            sections=[
+                ReportSection(
+                    "Relation",
+                    [f"{edge.source} -> {edge.target}", f"type={edge.type}", f"status={edge.status}"],
+                )
+            ],
+            data=edge.to_dict(),
+        )
+        return _emit(report, args.format)
+    if args.subcommand == "list":
+        edges = graph.list()
+        report = Report(
+            title="Relationship Graph List",
+            status="ok",
+            next_action="Use relation graph exports as structured evidence",
+            sections=[
+                ReportSection(
+                    "Relations",
+                    [f"{edge.source} -> {edge.target}: {edge.type}" for edge in edges] or ["(none)"],
+                )
+            ],
+            data={"relations": [edge.to_dict() for edge in edges]},
+        )
+        return _emit(report, args.format)
+    graph_data = graph.graph(format=args.graph_format)
+    lines = graph_data.splitlines() if isinstance(graph_data, str) else [
+        f"nodes={len(graph_data['nodes'])}",
+        f"edges={len(graph_data['edges'])}",
+    ]
+    report = Report(
+        title="Relationship Graph",
+        status="ok",
+        next_action="Inject graph evidence into retrieval packs for relationship-sensitive scenes",
+        sections=[ReportSection("Graph", lines or ["(empty)"])],
+        data={"format": args.graph_format, "graph": graph_data},
     )
     return _emit(report, args.format)
 
@@ -2635,6 +2725,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_foreshadow(args)
     if args.command == "character-arc":
         return _handle_character_arc(args)
+    if args.command == "relation":
+        return _handle_relation(args)
     if args.command == "setup":
         return _handle_setup(args)
     if args.command == "init":

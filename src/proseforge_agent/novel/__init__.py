@@ -10,6 +10,7 @@ from .importer import BulkImporter, ImportedChapter, ImportResult
 from .manifest import MANIFEST_NAME, NovelProjectManifest, NovelProjectStore
 from .plot_threads import PLOT_THREADS_NAME, PlotThread, PlotThreadManager
 from .publishing import PUBLISHING_NAME, PublishingMetadata, PublishingMetadataStore
+from .relationship_graph import RELATIONSHIP_GRAPH_NAME, RELATION_TYPES, RelationshipEdge, RelationshipGraph
 from .reorganize import ChapterReorganizer
 from .scenes import SceneRecord, SceneWorkflow
 from .timeline import TIMELINE_NAME, TimelineEngine, TimelineEvent
@@ -45,6 +46,10 @@ __all__ = [
     "PublishingMetadata",
     "PublishingMetadataStore",
     "RESOLUTION_ACTIONS",
+    "RELATIONSHIP_GRAPH_NAME",
+    "RELATION_TYPES",
+    "RelationshipEdge",
+    "RelationshipGraph",
     "SceneRecord",
     "SceneWorkflow",
     "TimelineEngine",
