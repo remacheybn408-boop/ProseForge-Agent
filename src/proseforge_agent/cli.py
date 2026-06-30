@@ -95,6 +95,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "message, mode, provider",
         "artifacts": "agent turn report",
     },
+    "context": {
+        "help": "Inspect context window usage and compact session history",
+        "inputs": "provider, session id, token budget",
+        "artifacts": "context usage report and compacted message summary",
+    },
     "tools": {
         "help": "List internal tools and permission levels",
         "inputs": "tool registry",
@@ -389,6 +394,12 @@ def build_parser() -> argparse.ArgumentParser:
             )
             group.add_argument("--profile", default=None, help="agent persona profile")
             group.add_argument("--profiles-file", default=None, help="YAML file with agent profiles")
+        if name == "context":
+            group.add_argument("--provider", default="fake", help="provider family/name")
+            group.add_argument("--session", default=None, help="chat session id")
+            group.add_argument("--max-context", type=int, default=None, help="override provider context window")
+            group.add_argument("--reserve", type=int, default=256, help="reserved completion tokens")
+            group.add_argument("--keep-last", type=int, default=6, help="messages to keep after compaction")
         if name == "project":
             group.add_argument("--slug", default=None, help="project slug")
             group.add_argument("--title", default=None, help="project title")
@@ -2732,6 +2743,70 @@ def _handle_chat(args: argparse.Namespace) -> int:
     return _emit(report, args.format)
 
 
+def _handle_context(args: argparse.Namespace) -> int:
+    if args.subcommand not in {"status", "compact"}:
+        return _emit(_planned_report("context", "Run `pf-agent context status`"), args.format)
+    from .agent import ContextWindowManager
+    from .chat import ChatSessionStore
+    from .llm import Message
+
+    manager = ContextWindowManager()
+    store = ChatSessionStore(Path(".pf-agent"))
+    messages: list[Message] = []
+    if args.session:
+        context = store.load_context(args.session)
+        messages = [Message(role=message.role, content=message.content) for message in context.messages]
+    if args.subcommand == "compact":
+        if not args.session:
+            return _emit(_planned_report("context", "Pass --session for context compact"), args.format)
+        compacted = manager.compact_messages(messages, keep_last=args.keep_last)
+        compacted_count = max(0, len(messages) - max(0, args.keep_last))
+        report = Report(
+            title="Context Window",
+            status="ok",
+            next_action="Use compacted summaries before building large prompts",
+            sections=[
+                ReportSection(
+                    "Compaction",
+                    [
+                        f"session={args.session}",
+                        f"original_messages={len(messages)}",
+                        f"compacted_messages={compacted_count}",
+                        f"result_messages={len(compacted)}",
+                    ],
+                )
+            ],
+            data={"messages": [message.__dict__ for message in compacted]},
+        )
+        return _emit(report, args.format)
+    usage = manager.status(
+        provider=args.provider,
+        messages=messages,
+        evidence=[],
+        reserve_tokens=args.reserve,
+        max_context_tokens=args.max_context,
+    )
+    report = Report(
+        title="Context Window",
+        status="ok",
+        next_action="Reduce evidence or compact the session if remaining tokens are low",
+        sections=[
+            ReportSection(
+                "Usage",
+                [
+                    f"provider={usage.provider}",
+                    f"max_context_tokens={usage.max_context_tokens}",
+                    f"prompt_tokens={usage.prompt_tokens}",
+                    f"evidence_budget_tokens={usage.evidence_budget_tokens}",
+                    f"remaining_tokens={usage.remaining_tokens}",
+                ],
+            )
+        ],
+        data=usage.to_dict(),
+    )
+    return _emit(report, args.format)
+
+
 def _handle_tools(args: argparse.Namespace) -> int:
     from .agent import default_tool_registry
 
@@ -3515,6 +3590,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_usage(args)
     if args.command == "chat":
         return _handle_chat(args)
+    if args.command == "context":
+        return _handle_context(args)
     if args.command == "chapter":
         return _handle_chapter(args)
     if args.command == "tools":
