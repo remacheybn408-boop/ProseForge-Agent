@@ -130,6 +130,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "project slug, title, author, metadata fields",
         "artifacts": "publishing.yaml",
     },
+    "bible": {
+        "help": "Manage explicit canon bible entries",
+        "inputs": "project slug, section, entry fields",
+        "artifacts": "bible YAML files and snapshots",
+    },
     "setup": {
         "help": "Run the guided first-use setup wizard",
         "inputs": "setup mode, provider, repair/reconfigure flags",
@@ -330,6 +335,13 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--keywords", default=None, help="comma-separated keywords")
             group.add_argument("--copyright", default=None, help="copyright statement")
             group.add_argument("--ai-usage-statement", default=None, help="AI usage statement")
+        if name == "bible":
+            group.add_argument("bible_arg", nargs="?", help="bible section or entry type")
+            group.add_argument("--slug", default=None, help="project slug")
+            group.add_argument("--id", default=None, help="entry id")
+            group.add_argument("--name", default=None, help="entry display name")
+            group.add_argument("--role", default=None, help="character role or entry role")
+            group.add_argument("--text", default=None, help="entry text")
         if name == "chapter":
             group.add_argument("chapter_ids", nargs="*", help="chapter ids for reorganization")
             group.add_argument("--slug", default=None, help="project slug")
@@ -827,6 +839,50 @@ def _handle_publishing(args: argparse.Namespace) -> int:
         status=status,
         next_action="Use publishing metadata during export and platform submission",
         sections=[ReportSection("Metadata", lines)],
+        data=data,
+    )
+    _emit(report, args.format)
+    return 0 if status == "ok" else 1
+
+
+def _handle_bible(args: argparse.Namespace) -> int:
+    if args.subcommand not in {"add", "list", "freeze", "snapshot"} or not args.slug:
+        return _emit(_planned_report("bible", "Run `pf-agent bible add character --slug <slug>`"), args.format)
+    from .novel import CanonBibleManager
+
+    manager = CanonBibleManager(Path(".pf-agent") / "workspace", slug=args.slug)
+    if args.subcommand == "add":
+        entry = {
+            key: value
+            for key, value in {
+                "id": args.id,
+                "name": args.name,
+                "role": args.role,
+                "text": args.text,
+            }.items()
+            if value
+        }
+        data = manager.add(args.bible_arg or "character", entry)
+        lines = [f"{key}={value}" for key, value in data.items()]
+        status = "ok" if data.get("status") == "ok" else "blocked"
+    elif args.subcommand == "list":
+        entries = manager.list(args.bible_arg or "characters")
+        data = {"entries": entries}
+        lines = [str(entry) for entry in entries] or ["(none)"]
+        status = "ok"
+    elif args.subcommand == "freeze":
+        data = manager.freeze()
+        lines = ["frozen=true"]
+        status = "ok"
+    else:
+        data = manager.snapshot()
+        lines = [f"id={data['id']}", f"path={data['path']}"]
+        status = "ok"
+    report = Report(
+        title="Canon Bible",
+        status=status,
+        next_action="Use bible snapshots as explicit canon evidence",
+        sections=[ReportSection("Bible", lines)],
         data=data,
     )
     _emit(report, args.format)
@@ -2123,6 +2179,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_export(args)
     if args.command == "publishing":
         return _handle_publishing(args)
+    if args.command == "bible":
+        return _handle_bible(args)
     if args.command == "setup":
         return _handle_setup(args)
     if args.command == "init":
