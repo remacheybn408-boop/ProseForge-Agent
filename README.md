@@ -15,10 +15,11 @@ workflow state, conversational agent loop, and background event processing.
 
 ## Status
 
-**569 tests passing.** The implementation covers task cards 1–70 of the
+**712 tests passing.** The implementation covers task cards 1–100 of the
 project plan — the full core, provider, agent runtime, and chat stack
-(1–60), the hardening cards (61–67), and the first autonomous runtime cards
-(68–70).
+(1–60), the hardening cards (61–67), the autonomous runtime cards (68–70),
+and the agent-expansion, guided-setup, novel-operations, story-intelligence,
+and editorial tracks (71–100).
 
 **Core layer** — config, workspace, ProseForge engine adapter, provider
 registry (10 provider profiles), retrieval evidence packs, memory schema
@@ -52,6 +53,27 @@ contract/golden regression-test tier built on canonical fakes.
 (plan → act → verify → reflect → repeat), a task planner with
 dependency-aware TODO tracking, and self-verification with bounded
 reflection (pluggable domain verifiers such as the ProseForge review gate).
+
+**Agent tooling (71–75)** — a general tool framework (filesystem and web
+tools), a tool execution sandbox, sub-agent delegation, interruptibility and
+steering, and an agent evaluation harness.
+
+**Guided setup (76–80)** — the `pf-agent setup` guided installation wizard,
+multiple setup modes, a config generator, setup recovery, and first-run
+bootstrap.
+
+**Novel project operations (81–87)** — a novel project manifest, an artifact
+graph, bulk import, scene-level workflow, chapter reorganization, an
+export/compilation pipeline, and publishing metadata.
+
+**Canon and story intelligence (88–94)** — a canon bible manager, a
+continuity conflict resolver, a timeline engine, a plot-thread manager, a
+foreshadowing tracker, a character-arc tracker, and a relationship graph.
+
+**Writing quality and editorial systems (95–100)** — a writing domain tools
+registry, explicit writing rules, a tone/style profile compiler, writing
+quality gates, a literary regression suite, and a rewrite strategy library
+(nine selectable strategies producing per-strategy revision artifacts).
 
 **Release gate** — automated checks for provider certification, memory audit
 enforcement, docs and examples presence, and offline fake-provider demo.
@@ -147,6 +169,14 @@ preview the decomposed task plan:
 ```powershell
 python -m proseforge_agent.cli run --goal "draft a one-line opening" --provider fake --max-iterations 5
 python -m proseforge_agent.cli run --goal "写满 200 字的开头" --provider fake --verify
+```
+
+List the rewrite strategy library, or apply a strategy to produce a
+per-strategy revision artifact for a chapter:
+
+```powershell
+python -m proseforge_agent.cli rewrite strategies list
+python -m proseforge_agent.cli rewrite --slug my-novel --strategy condense --chapter ch_001
 ```
 
 Inspect resolved capabilities and safe-mode status:
