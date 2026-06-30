@@ -155,6 +155,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "project slug, foreshadowing metadata, current chapter",
         "artifacts": "foreshadowing store and overdue report",
     },
+    "character-arc": {
+        "help": "Track character desires, changes, relationships, and appearances",
+        "inputs": "project slug, character id, arc updates",
+        "artifacts": "character arc store and whole-book report",
+    },
     "setup": {
         "help": "Run the guided first-use setup wizard",
         "inputs": "setup mode, provider, repair/reconfigure flags",
@@ -405,6 +410,22 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--current-chapter", type=int, default=None, help="current chapter number for overdue checks")
             group.add_argument("--max-gap", type=int, default=5, help="maximum chapters without payoff")
             group.add_argument("--resolved-chapter", default="", help="chapter where the clue was resolved")
+        if name == "character-arc":
+            group.add_argument("--slug", default=None, help="project slug")
+            group.add_argument("--character", default=None, help="character id")
+            group.add_argument("--desire", default="", help="character desire")
+            group.add_argument("--fear", default="", help="character fear")
+            group.add_argument("--flaw", default="", help="character flaw")
+            group.add_argument("--belief", default="", help="character belief")
+            group.add_argument("--turning-point", action="append", default=None, help="turning point as chapter:change")
+            group.add_argument(
+                "--relationship-change",
+                action="append",
+                default=None,
+                help="relationship change as character:change",
+            )
+            group.add_argument("--chapter", action="append", default=None, help="chapter appearance")
+            group.add_argument("--arc-status", default="", help="arc status")
         if name == "chapter":
             group.add_argument("chapter_ids", nargs="*", help="chapter ids for reorganization")
             group.add_argument("--slug", default=None, help="project slug")
@@ -1223,6 +1244,93 @@ def _handle_foreshadow(args: argparse.Namespace) -> int:
     )
     _emit(report, args.format)
     return 0 if result.get("status") == "resolved" else 1
+
+
+def _handle_character_arc(args: argparse.Namespace) -> int:
+    if args.subcommand not in {"init", "update", "report"} or not args.slug:
+        return _emit(_planned_report("character-arc", "Run `pf-agent character-arc init --slug <slug>`"), args.format)
+    from .novel import CharacterArcTracker
+
+    tracker = CharacterArcTracker(Path(".pf-agent") / "workspace", slug=args.slug)
+    if args.subcommand == "init":
+        if not args.character:
+            return _emit(_planned_report("character-arc", "Pass --character for character-arc init"), args.format)
+        arc = tracker.init_arc(
+            character_id=args.character,
+            desire=args.desire,
+            fear=args.fear,
+            flaw=args.flaw,
+            belief=args.belief,
+            arc_status=args.arc_status or "introduced",
+        )
+        report = Report(
+            title="Character Arc",
+            status="ok",
+            next_action="Update arc turning points as chapters are drafted",
+            sections=[
+                ReportSection(
+                    "Arc",
+                    [
+                        f"character={arc.character_id}",
+                        f"desire={arc.desire}",
+                        f"belief={arc.belief}",
+                        f"status={arc.arc_status}",
+                    ],
+                )
+            ],
+            data=arc.to_dict(),
+        )
+        return _emit(report, args.format)
+    if args.subcommand == "update":
+        if not args.character:
+            return _emit(_planned_report("character-arc", "Pass --character for character-arc update"), args.format)
+        arc = tracker.update_arc(
+            character_id=args.character,
+            desire=args.desire,
+            fear=args.fear,
+            flaw=args.flaw,
+            belief=args.belief,
+            turning_points=[_split_pair(item, "chapter", "change") for item in args.turning_point or []],
+            relationship_changes=[
+                _split_pair(item, "character", "change") for item in args.relationship_change or []
+            ],
+            chapter_appearances=args.chapter or [],
+            arc_status=args.arc_status,
+        )
+        report = Report(
+            title="Character Arc Update",
+            status="ok",
+            next_action="Run `pf-agent character-arc report --slug <slug>` for whole-book changes",
+            sections=[
+                ReportSection(
+                    "Arc",
+                    [
+                        f"character={arc.character_id}",
+                        f"turning_points={len(arc.turning_points)}",
+                        f"appearances={len(arc.chapter_appearances)}",
+                        f"status={arc.arc_status}",
+                    ],
+                )
+            ],
+            data=arc.to_dict(),
+        )
+        return _emit(report, args.format)
+    report_data = tracker.report()
+    report = Report(
+        title="Character Arc Report",
+        status="ok",
+        next_action="Use arc reports when revising emotional continuity",
+        sections=[ReportSection("Summary", report_data["summary"] or ["(none)"])],
+        data=report_data,
+    )
+    return _emit(report, args.format)
+
+
+def _split_pair(value: str, left_key: str, right_key: str) -> dict[str, str]:
+    left, separator, right = value.partition(":")
+    if not separator:
+        return {left_key: "", right_key: value}
+    return {left_key: left.strip(), right_key: right.strip()}
 
 
 def _handle_provider_probe(args: argparse.Namespace) -> int:
@@ -2525,6 +2633,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_plot_thread(args)
     if args.command == "foreshadow":
         return _handle_foreshadow(args)
+    if args.command == "character-arc":
+        return _handle_character_arc(args)
     if args.command == "setup":
         return _handle_setup(args)
     if args.command == "init":

@@ -2,6 +2,7 @@
 
 from .artifacts import GRAPH_NAME, ArtifactGraphStore, ArtifactRecord
 from .bible import BIBLE_SECTIONS, CanonBibleManager
+from .character_arcs import CHARACTER_ARCS_NAME, CharacterArc, CharacterArcTracker
 from .continuity import ContinuityConflict, ContinuityResolver, RESOLUTION_ACTIONS
 from .exporter import BookExporter, ExportResult
 from .foreshadowing import FORESHADOWING_NAME, ForeshadowingRecord, ForeshadowingTracker
@@ -25,6 +26,9 @@ __all__ = [
     "BookExporter",
     "BulkImporter",
     "CanonBibleManager",
+    "CHARACTER_ARCS_NAME",
+    "CharacterArc",
+    "CharacterArcTracker",
     "ContinuityConflict",
     "ContinuityResolver",
     "ChapterReorganizer",
