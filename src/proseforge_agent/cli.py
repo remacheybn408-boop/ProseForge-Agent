@@ -180,6 +180,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "project slug and chapter id",
         "artifacts": "quality gate report with actionable violations",
     },
+    "literary": {
+        "help": "Run literary style regression baselines and drift tests",
+        "inputs": "project slug, golden sample directory",
+        "artifacts": "literary baseline and drift report",
+    },
     "setup": {
         "help": "Run the guided first-use setup wizard",
         "inputs": "setup mode, provider, repair/reconfigure flags",
@@ -472,6 +477,10 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "quality":
             group.add_argument("--slug", default=None, help="project slug")
             group.add_argument("--chapter", default=None, help="chapter id to check")
+        if name == "literary":
+            group.add_argument("--slug", default=None, help="project slug")
+            group.add_argument("--golden-dir", default="tests/literary/golden", help="golden sample directory")
+            group.add_argument("--threshold", type=float, default=0.25, help="drift threshold")
         if name == "chapter":
             group.add_argument("chapter_ids", nargs="*", help="chapter ids for reorganization")
             group.add_argument("--slug", default=None, help="project slug")
@@ -1595,6 +1604,41 @@ def _handle_quality(args: argparse.Namespace) -> int:
         status=data["status"],
         next_action="Use the report before release or regression comparison",
         sections=[ReportSection("Summary", lines)],
+        data=data,
+    )
+    return _emit(report, args.format)
+
+
+def _handle_literary(args: argparse.Namespace) -> int:
+    if args.subcommand not in {"baseline", "test"} or not args.slug:
+        return _emit(_planned_report("literary", "Run `pf-agent literary baseline --slug <slug>`"), args.format)
+    from .novel import LiteraryRegressionSuite, read_golden_samples
+
+    suite = LiteraryRegressionSuite(Path(".pf-agent") / "workspace", slug=args.slug, threshold=args.threshold)
+    samples = read_golden_samples(args.golden_dir)
+    if args.subcommand == "baseline":
+        data = suite.baseline(samples)
+        lines = [f"samples={len(data['samples'])}", f"threshold={data['threshold']}"]
+        for sample in data["samples"]:
+            lines.append(f"{sample['id']}: baseline")
+        report = Report(
+            title="Literary Regression",
+            status="ok",
+            next_action="Run `pf-agent literary test --slug <slug>` after prompt or style changes",
+            sections=[ReportSection("Baseline", lines)],
+            data=data,
+        )
+        return _emit(report, args.format)
+    data = suite.test(samples)
+    lines = [
+        f"{item['sample']} {item['metric']}: expected={item['expected']} actual={item['actual']}"
+        for item in data["drift"]
+    ] or ["(no drift)"]
+    report = Report(
+        title="Literary Regression",
+        status=data["status"],
+        next_action="Review prompt, model, or style changes when drift is degraded",
+        sections=[ReportSection("Drift", lines)],
         data=data,
     )
     return _emit(report, args.format)
@@ -2924,6 +2968,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_style(args)
     if args.command == "quality":
         return _handle_quality(args)
+    if args.command == "literary":
+        return _handle_literary(args)
     if args.command == "setup":
         return _handle_setup(args)
     if args.command == "init":
