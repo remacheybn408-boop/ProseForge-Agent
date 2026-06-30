@@ -205,6 +205,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "project slug, chapter id, version ids, branch name",
         "artifacts": "versioned drafts with checksum and provider/prompt metadata",
     },
+    "editorial": {
+        "help": "Run the editorial pipeline: stage a chapter from outline to final",
+        "inputs": "project slug, chapter id, target stage",
+        "artifacts": "per-stage editorial artifacts and pipeline state",
+    },
     "setup": {
         "help": "Run the guided first-use setup wizard",
         "inputs": "setup mode, provider, repair/reconfigure flags",
@@ -523,6 +528,11 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--name", default=None, help="branch name")
             group.add_argument("--from-version", default=None, help="base version id for branch")
             group.add_argument("--approve", action="store_true", help="approve a rollback")
+        if name == "editorial":
+            group.add_argument("--slug", default=None, help="project slug")
+            group.add_argument("--chapter", default=None, help="chapter id")
+            group.add_argument("--to", default=None, help="target editorial stage for promote")
+            group.add_argument("--approve", action="store_true", help="approve a high-risk promote")
         if name == "chapter":
             group.add_argument("chapter_ids", nargs="*", help="chapter ids for reorganization")
             group.add_argument("--slug", default=None, help="project slug")
@@ -1934,6 +1944,78 @@ def _handle_draft(args: argparse.Namespace) -> int:
         return 1
 
 
+def _handle_editorial(args: argparse.Namespace) -> int:
+    from .novel import EditorialPipeline
+
+    sub = args.subcommand
+    if not args.slug or sub not in {"run", "status", "promote"}:
+        return _emit(
+            _planned_report("editorial", "Run `pf-agent editorial run --slug <slug> --chapter <id>`"),
+            args.format,
+        )
+    pipeline = EditorialPipeline(Path(".pf-agent") / "workspace", slug=args.slug)
+    try:
+        if sub == "run":
+            if not args.chapter:
+                return _emit(_planned_report("editorial", "Pass --chapter for `editorial run`"), args.format)
+            state = pipeline.run(args.chapter)
+            return _emit(
+                Report(
+                    title="Editorial Pipeline",
+                    status="ok",
+                    next_action="Promote to final with `editorial promote --to final --approve`",
+                    sections=[
+                        ReportSection("State", [f"chapter={state.chapter}", f"current_stage={state.current_stage}", f"completed={','.join(state.completed)}"]),
+                        ReportSection("Artifacts", [f"{artifact.stage}: {artifact.path}" for artifact in state.artifacts]),
+                    ],
+                    data=state.to_dict(),
+                ),
+                args.format,
+            )
+        if sub == "status":
+            status = pipeline.status()
+            lines = [
+                f"{entry['chapter']}: {entry['current_stage']} (completed={len(entry['completed'])})"
+                for entry in status.to_dict()["chapters"]
+            ] or ["no chapters in the pipeline"]
+            return _emit(
+                Report(
+                    title="Editorial Status",
+                    status="ok",
+                    next_action="Run or promote a chapter to advance it",
+                    sections=[ReportSection("Chapters", lines)],
+                    data=status.to_dict(),
+                ),
+                args.format,
+            )
+        # promote
+        if not args.chapter or not args.to:
+            return _emit(_planned_report("editorial", "Pass --chapter and --to for promote"), args.format)
+        result = pipeline.promote(args.chapter, to=args.to, approve=args.approve)
+        status = "ok" if result.status == "promoted" else "blocked"
+        next_action = "Stage promoted" if result.approved else "Re-run with --approve for this high-risk promote"
+        return _emit(
+            Report(
+                title="Editorial Promote",
+                status=status,
+                next_action=next_action,
+                sections=[ReportSection("Promote", [f"chapter={result.chapter}", f"to={result.to}", f"status={result.status}", f"approved={result.approved}"])],
+                data=result.to_dict(),
+            ),
+            args.format,
+        )
+    except ValueError as exc:
+        report = Report(
+            title="Editorial",
+            status="blocked",
+            next_action="Use a valid editorial stage",
+            sections=[ReportSection("Error", [str(exc)])],
+            data={"error": str(exc)},
+        )
+        _emit(report, args.format)
+        return 1
+
+
 def _split_pair(value: str, left_key: str, right_key: str) -> dict[str, str]:
     left, separator, right = value.partition(":")
     if not separator:
@@ -3268,6 +3350,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_search(args)
     if args.command == "draft":
         return _handle_draft(args)
+    if args.command == "editorial":
+        return _handle_editorial(args)
     if args.command == "setup":
         return _handle_setup(args)
     if args.command == "init":
