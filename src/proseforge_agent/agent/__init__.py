@@ -28,6 +28,7 @@ from .prompt_templates import (
     PromptTemplateValidation,
     PromptTemplateValidationError,
 )
+from .request_cache import CachedResponse, RequestCache, RequestCacheKey
 from .sandbox import Approval, ExecRequest, ExecResult, Sandbox
 from .subagent import Scope, SubAgentResult, SubAgentRunner
 from .structured_output import (
@@ -96,6 +97,9 @@ __all__ = [
     "PromptTemplateRegistry",
     "PromptTemplateValidation",
     "PromptTemplateValidationError",
+    "CachedResponse",
+    "RequestCache",
+    "RequestCacheKey",
     "ReplayResult",
     "Approval",
     "ExecRequest",

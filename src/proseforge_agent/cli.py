@@ -320,6 +320,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "offline status",
         "artifacts": "offline capability report",
     },
+    "cache": {
+        "help": "Inspect and clear provider request cache",
+        "inputs": "cache subcommand",
+        "artifacts": "request cache entries and stats",
+    },
     "run": {
         "help": "Run an autonomous, goal-directed agent loop",
         "inputs": "goal, provider, iteration budget, show-plan flag",
@@ -4081,6 +4086,50 @@ def _handle_offline(args: argparse.Namespace) -> int:
     return _emit(report, getattr(args, "format", "terminal"))
 
 
+def _handle_cache(args: argparse.Namespace) -> int:
+    from .agent import RequestCache
+
+    cache = RequestCache(Path(".pf-agent"))
+    subcommand = args.subcommand or "stats"
+    if subcommand == "list":
+        entries = cache.list()
+        report = Report(
+            title="Request Cache",
+            status="ok",
+            next_action="Use `pf-agent cache clear` to remove cached provider responses",
+            sections=[
+                ReportSection(
+                    "Entries",
+                    [f"{entry.key.value} provider={entry.key.provider} model={entry.key.model}" for entry in entries]
+                    or ["(none)"],
+                )
+            ],
+            data={"entries": [entry.to_dict() for entry in entries]},
+        )
+        return _emit(report, args.format)
+    if subcommand == "clear":
+        cleared = cache.clear()
+        report = Report(
+            title="Request Cache",
+            status="ok",
+            next_action="Cache cleared; future provider calls will be misses",
+            sections=[ReportSection("Clear", [f"cleared={cleared}"])],
+            data={"cleared": cleared},
+        )
+        return _emit(report, args.format)
+    if subcommand == "stats":
+        stats = cache.stats()
+        report = Report(
+            title="Request Cache",
+            status="ok",
+            next_action="Inspect cache keys before relying on repeated generations",
+            sections=[ReportSection("Stats", [f"entries={stats['entries']}"])],
+            data=stats,
+        )
+        return _emit(report, args.format)
+    return _emit(_planned_report("cache", "Run `pf-agent cache stats`"), args.format)
+
+
 def _offline_gate(args: argparse.Namespace) -> int | None:
     if not getattr(args, "offline", False) or args.command == "offline":
         return None
@@ -4346,6 +4395,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_mcp(args)
     if args.command == "offline":
         return _handle_offline(args)
+    if args.command == "cache":
+        return _handle_cache(args)
     if args.command == "scene":
         return _handle_scene(args)
     if args.command == "export":
