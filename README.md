@@ -15,11 +15,18 @@ workflow state, conversational agent loop, and background event processing.
 
 ## Status
 
-**712 tests passing.** The implementation covers task cards 1–100 of the
+**741 tests passing.** The implementation covers task cards 1–105 of the
 project plan — the full core, provider, agent runtime, and chat stack
 (1–60), the hardening cards (61–67), the autonomous runtime cards (68–70),
 and the agent-expansion, guided-setup, novel-operations, story-intelligence,
-and editorial tracks (71–100).
+and editorial tracks (71–105).
+
+**Editorial systems (95–105)** — writing domain tools, explicit writing
+rules, tone/style compiler, writing quality gates, literary regression
+suite, rewrite strategy library, plus reader-experience review,
+whole-manuscript search, a novel project health doctor, draft versioning
+with diff/branch/approval-gated rollback, and a staged editorial pipeline
+(outline → … → final).
 
 **Core layer** — config, workspace, ProseForge engine adapter, provider
 registry (10 provider profiles), retrieval evidence packs, memory schema
