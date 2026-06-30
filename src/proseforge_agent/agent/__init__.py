@@ -2,6 +2,7 @@
 
 from .events import BackgroundJobRunner, EventBus, EventRecord, JobResult
 from .eval import EvalHarness, EvalReport, EvalSuite, EvalTaskResult, GoldenTask
+from .attachments import AttachmentIngestResult, AttachmentIngestor
 from .function_calling import (
     ProviderToolCall,
     StructuredToolAdapter,
@@ -41,6 +42,8 @@ from .tools import (
 
 __all__ = [
     "BackgroundJobRunner",
+    "AttachmentIngestResult",
+    "AttachmentIngestor",
     "EvalHarness",
     "EvalReport",
     "EvalSuite",
