@@ -40,6 +40,8 @@ class AgentTool:
     output_schema: dict[str, Any]
     callable: Callable[..., Any]
     description: str = ""
+    domain: str = "agent"
+    aliases: tuple[str, ...] = ()
     enabled: bool = True
 
     def invoke(self, payload: dict[str, Any], context: ToolContext | None = None) -> Any:
@@ -64,8 +66,11 @@ class ToolRegistry:
     def get(self, name: str) -> AgentTool | None:
         return self._tools.get(name)
 
-    def list(self) -> list[AgentTool]:
-        return [self._tools[name] for name in sorted(self._tools)]
+    def list(self, *, domain: str | None = None) -> list[AgentTool]:
+        tools = [self._tools[name] for name in sorted(self._tools)]
+        if domain is None:
+            return tools
+        return [tool for tool in tools if tool.domain == domain]
 
     def required_permission(self, name: str) -> str:
         tool = self.get(name)
@@ -113,6 +118,24 @@ class ToolRegistry:
 def _ok(name: str) -> Callable[[dict[str, Any]], dict[str, Any]]:
     def call(payload: dict[str, Any]) -> dict[str, Any]:
         return {"ok": True, "tool": name, "payload": payload}
+
+    return call
+
+
+def _writing_result(tool_name: str, operation: str) -> Callable[[dict[str, Any]], dict[str, Any]]:
+    def call(payload: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "ok": True,
+            "tool": tool_name,
+            "result": {
+                "operation": operation,
+                "structured": True,
+                "status": "planned",
+                "input": dict(payload),
+                "sections": [],
+                "warnings": [],
+            },
+        }
 
     return call
 
@@ -227,6 +250,83 @@ def general_tool_registry() -> ToolRegistry:
     return register_general_tools(ToolRegistry())
 
 
+def register_writing_domain_tools(registry: ToolRegistry) -> ToolRegistry:
+    """Register built-in writing domain tools as agent-callable declarations."""
+    output_schema = {"required": ["ok", "tool", "result"]}
+    specs = (
+        (
+            "writing.expand_scene",
+            "/expand-scene",
+            "expand_scene",
+            "draft_write",
+            "Expand a scene while preserving canon intent",
+            ["text"],
+        ),
+        (
+            "writing.condense_chapter",
+            "/condense-chapter",
+            "condense_chapter",
+            "draft_write",
+            "Condense a chapter into a tighter draft",
+            ["text"],
+        ),
+        (
+            "writing.polish_dialogue",
+            "/polish-dialogue",
+            "polish_dialogue",
+            "draft_write",
+            "Polish dialogue beats without changing plot facts",
+            ["text"],
+        ),
+        (
+            "writing.enhance_description",
+            "/enhance-description",
+            "enhance_description",
+            "draft_write",
+            "Enhance sensory and setting description",
+            ["text"],
+        ),
+        (
+            "writing.check_chronology",
+            "/check-chronology",
+            "check_chronology",
+            "read_only",
+            "Check chronology against timeline evidence",
+            ["text"],
+        ),
+        (
+            "writing.suggest_title",
+            "/suggest-title",
+            "suggest_title",
+            "draft_write",
+            "Suggest structured title candidates",
+            ["text"],
+        ),
+        (
+            "writing.outline_chapter",
+            "/outline-chapter",
+            "outline_chapter",
+            "draft_write",
+            "Outline a chapter from goal and evidence",
+            ["goal"],
+        ),
+    )
+    for name, alias, operation, permission, description, required in specs:
+        registry.register(
+            AgentTool(
+                name=name,
+                permission=permission,
+                input_schema={"required": required},
+                output_schema=output_schema,
+                callable=_writing_result(name, operation),
+                description=description,
+                domain="writing",
+                aliases=(alias,),
+            )
+        )
+    return registry
+
+
 def default_tool_registry() -> ToolRegistry:
     """Build the current set of built-in tool declarations."""
     registry = ToolRegistry()
@@ -253,6 +353,7 @@ def default_tool_registry() -> ToolRegistry:
                 description=description,
             )
         )
+    register_writing_domain_tools(registry)
     register_general_tools(registry)
     return registry
 
@@ -265,4 +366,5 @@ __all__ = [
     "default_tool_registry",
     "general_tool_registry",
     "register_general_tools",
+    "register_writing_domain_tools",
 ]

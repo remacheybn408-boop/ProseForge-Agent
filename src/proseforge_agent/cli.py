@@ -469,6 +469,7 @@ def build_parser() -> argparse.ArgumentParser:
                 action="store_true",
                 help="include permission levels in the tool list",
             )
+            group.add_argument("--domain", default=None, help="filter tools by domain")
         if name == "jobs":
             group.add_argument("job_name", nargs="?", help="allow-listed background job")
             group.add_argument("--provider", default="fake", help="provider for the job")
@@ -1925,27 +1926,34 @@ def _handle_tools(args: argparse.Namespace) -> int:
     from .agent import default_tool_registry
 
     registry = default_tool_registry()
+    tools = registry.list(domain=args.domain)
     lines = []
-    for tool in registry.list():
+    for tool in tools:
+        aliases = f" aliases={', '.join(tool.aliases)}" if tool.aliases else ""
         if args.include_permissions:
-            lines.append(f"{tool.name} -> {tool.permission} ({tool.description})")
+            lines.append(f"{tool.name}{aliases} -> {tool.permission} [{tool.domain}] ({tool.description})")
         else:
-            lines.append(f"{tool.name} ({tool.description})")
+            lines.append(f"{tool.name}{aliases} [{tool.domain}] ({tool.description})")
     report = Report(
         title="Agent Tools",
         status="ok",
         next_action="Authorize tool calls through PermissionPolicy",
-        sections=[ReportSection("Tools", lines)],
+        sections=[ReportSection("Tools", lines or ["(none)"])],
         data={
             "tools": [
                 {
                     "name": tool.name,
                     "permission": tool.permission,
+                    "domain": tool.domain,
+                    "aliases": list(tool.aliases),
+                    "input_schema": tool.input_schema,
+                    "output_schema": tool.output_schema,
                     "description": tool.description,
                     "enabled": tool.enabled,
                 }
-                for tool in registry.list()
-            ]
+                for tool in tools
+            ],
+            "domain": args.domain,
         },
     )
     return _emit(report, args.format)

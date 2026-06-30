@@ -17,6 +17,7 @@ from .tools import (
     ToolResult,
     default_tool_registry,
     general_tool_registry,
+    register_writing_domain_tools,
 )
 
 __all__ = [
@@ -56,4 +57,5 @@ __all__ = [
     "JobResult",
     "default_tool_registry",
     "general_tool_registry",
+    "register_writing_domain_tools",
 ]
