@@ -105,6 +105,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "template id, session id, override text",
         "artifacts": "prompt template and session prompt records",
     },
+    "prompt-template": {
+        "help": "List and validate workflow prompt templates",
+        "inputs": "prompt template id",
+        "artifacts": "prompt template registry report",
+    },
     "tools": {
         "help": "List internal tools and permission levels",
         "inputs": "tool registry",
@@ -411,6 +416,8 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--session", default=None, help="chat session id")
             group.add_argument("--template", default=None, help="system prompt template id")
             group.add_argument("--text", default=None, help="literal session prompt override")
+        if name == "prompt-template":
+            group.add_argument("template_id", nargs="?", help="workflow prompt template id")
         if name == "project":
             group.add_argument("--slug", default=None, help="project slug")
             group.add_argument("--title", default=None, help="project title")
@@ -2597,6 +2604,58 @@ def _handle_prompt(args: argparse.Namespace) -> int:
     return _emit(_planned_report("prompt", "Run `pf-agent prompt list`"), args.format)
 
 
+def _handle_prompt_template(args: argparse.Namespace) -> int:
+    from .agent import PromptTemplateRegistry
+
+    registry = PromptTemplateRegistry.builtins()
+    subcommand = args.subcommand or "list"
+    if subcommand == "list":
+        templates = registry.list()
+        report = Report(
+            title="Prompt Templates",
+            status="ok",
+            next_action="Run `pf-agent prompt-template validate <id>` before wiring a workflow",
+            sections=[
+                ReportSection(
+                    "Templates",
+                    [
+                        f"{template.id}@{template.version} "
+                        f"vars={','.join(template.variables)} "
+                        f"evidence={','.join(template.required_evidence)}"
+                        for template in templates
+                    ],
+                )
+            ],
+            data={"templates": [template.to_dict() for template in templates]},
+        )
+        return _emit(report, args.format)
+    if subcommand == "validate":
+        if not args.template_id:
+            return _emit(
+                _planned_report("prompt-template", "Pass a template id to validate"),
+                args.format,
+            )
+        validation = registry.validate_definition(args.template_id)
+        report = Report(
+            title="Prompt Template Validation",
+            status="ok" if validation.valid else "fail",
+            next_action="Use only valid registry templates in workflow prompt calls",
+            sections=[
+                ReportSection(
+                    "Validation",
+                    [
+                        f"template={validation.template_id}",
+                        f"valid={validation.valid}",
+                        *(validation.errors or ["errors=none"]),
+                    ],
+                )
+            ],
+            data=validation.to_dict(),
+        )
+        return _emit(report, args.format)
+    return _emit(_planned_report("prompt-template", "Run `pf-agent prompt-template list`"), args.format)
+
+
 def _handle_chat(args: argparse.Namespace) -> int:
     if args.subcommand == "sessions":
         from .chat import ChatSessionStore
@@ -3674,6 +3733,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_context(args)
     if args.command == "prompt":
         return _handle_prompt(args)
+    if args.command == "prompt-template":
+        return _handle_prompt_template(args)
     if args.command == "chapter":
         return _handle_chapter(args)
     if args.command == "tools":

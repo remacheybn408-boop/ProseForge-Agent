@@ -16,6 +16,12 @@ from .control import ControlSignal, ControlToken
 from .context_window import ContextUsageReport, ContextWindowManager
 from .permissions import PERMISSION_LEVELS, PermissionDecision, PermissionPolicy
 from .profiles import AgentProfile, AgentProfileRegistry
+from .prompt_templates import (
+    PromptTemplate,
+    PromptTemplateRegistry,
+    PromptTemplateValidation,
+    PromptTemplateValidationError,
+)
 from .sandbox import Approval, ExecRequest, ExecResult, Sandbox
 from .subagent import Scope, SubAgentResult, SubAgentRunner
 from .structured_output import (
@@ -63,6 +69,10 @@ __all__ = [
     "PermissionPolicy",
     "AgentProfile",
     "AgentProfileRegistry",
+    "PromptTemplate",
+    "PromptTemplateRegistry",
+    "PromptTemplateValidation",
+    "PromptTemplateValidationError",
     "Approval",
     "ExecRequest",
     "ExecResult",
