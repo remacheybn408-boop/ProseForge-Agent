@@ -105,6 +105,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "job name, provider, dry-run flag",
         "artifacts": "event bus records, job report",
     },
+    "artifacts": {
+        "help": "Inspect novel artifact dependency graphs",
+        "inputs": "project slug, artifact id",
+        "artifacts": "artifacts.graph.yaml",
+    },
     "setup": {
         "help": "Run the guided first-use setup wizard",
         "inputs": "setup mode, provider, repair/reconfigure flags",
@@ -274,6 +279,9 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--title", default=None, help="project title")
             group.add_argument("--author", default=None, help="project author")
             group.add_argument("--language", default="zh-CN", help="project language")
+        if name == "artifacts":
+            group.add_argument("artifact_id", nargs="?", help="artifact id for trace")
+            group.add_argument("--slug", default=None, help="project slug")
         if name == "usage":
             group.add_argument(
                 "--usage-log",
@@ -537,6 +545,57 @@ def _handle_project(args: argparse.Namespace) -> int:
     )
     _emit(report, args.format)
     return 0 if validation["status"] == "ok" else 1
+
+
+def _handle_artifacts(args: argparse.Namespace) -> int:
+    if args.subcommand not in {"list", "graph", "trace"} or not args.slug:
+        return _emit(
+            _planned_report("artifacts", "Run `pf-agent artifacts list --slug <slug>`"),
+            args.format,
+        )
+    from .novel import ArtifactGraphStore
+
+    graph = ArtifactGraphStore(Path(".pf-agent") / "workspace", slug=args.slug)
+    if args.subcommand == "list":
+        records = graph.list()
+        report = Report(
+            title="Artifact List",
+            status="ok",
+            next_action="Use `pf-agent artifacts trace <id> --slug <slug>` to inspect provenance",
+            sections=[
+                ReportSection(
+                    "Artifacts",
+                    [f"{record.id} ({record.type})" for record in records] or ["(none)"],
+                )
+            ],
+            data={"artifacts": [record.to_dict() for record in records]},
+        )
+        return _emit(report, args.format)
+    if args.subcommand == "graph":
+        edges = graph.edges()
+        report = Report(
+            title="Artifact Graph",
+            status="ok",
+            next_action="Keep draft/review/revision/export artifacts traceable",
+            sections=[
+                ReportSection(
+                    "Edges",
+                    [f"{source} -> {target}" for source, target in edges] or ["(no edges)"],
+                )
+            ],
+            data={"edges": [{"source": source, "target": target} for source, target in edges]},
+        )
+        return _emit(report, args.format)
+    trace = graph.trace(args.artifact_id or "")
+    report = Report(
+        title="Artifact Trace",
+        status="ok" if trace else "blocked",
+        next_action="Add missing source artifacts before accepting generated outputs",
+        sections=[ReportSection("Trace", trace or ["artifact not found"])],
+        data={"artifact_id": args.artifact_id, "trace": trace},
+    )
+    _emit(report, args.format)
+    return 0 if trace else 1
 
 
 def _handle_provider_probe(args: argparse.Namespace) -> int:
@@ -1817,6 +1876,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_tools(args)
     if args.command == "jobs":
         return _handle_jobs(args)
+    if args.command == "artifacts":
+        return _handle_artifacts(args)
     if args.command == "setup":
         return _handle_setup(args)
     if args.command == "init":
