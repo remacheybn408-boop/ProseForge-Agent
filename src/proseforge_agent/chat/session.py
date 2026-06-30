@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -22,6 +22,7 @@ class ChatSession:
     project_slug: str | None = None
     workflow_run_id: str | None = None
     title: str | None = None
+    status: str = "active"
     created_at: str = ""
     updated_at: str = ""
     messages_path: str = ""
@@ -77,6 +78,7 @@ class ChatSessionStore:
             project_slug=project_slug,
             workflow_run_id=workflow_run_id,
             title=title,
+            status="active",
             created_at=now,
             updated_at=now,
             messages_path=messages_path,
@@ -123,7 +125,12 @@ class ChatSessionStore:
         self._write_session(_replace_session(session, updated_at=message.created_at))
         return message
 
-    def list(self, *, project_slug: str | None = None) -> list[ChatSession]:
+    def list(
+        self,
+        *,
+        project_slug: str | None = None,
+        include_deleted: bool = False,
+    ) -> list[ChatSession]:
         """List sessions, optionally filtered by project slug."""
         if not self.sessions_dir.exists():
             return []
@@ -135,8 +142,33 @@ class ChatSessionStore:
                 continue
             if project_slug is not None and session.project_slug != project_slug:
                 continue
+            if not include_deleted and session.status == "deleted":
+                continue
             sessions.append(session)
         return sorted(sessions, key=lambda item: (item.updated_at, item.id), reverse=True)
+
+    def archive(self, session_id: str) -> ChatSession:
+        return self._set_status(session_id, "archived")
+
+    def restore(self, session_id: str) -> ChatSession:
+        return self._set_status(session_id, "active")
+
+    def pin(self, session_id: str) -> ChatSession:
+        return self._set_status(session_id, "pinned")
+
+    def delete(self, session_id: str) -> ChatSession:
+        return self._set_status(session_id, "deleted")
+
+    def cleanup(self, *, older_than_days: int) -> list[ChatSession]:
+        cutoff = datetime.now(UTC) - timedelta(days=older_than_days)
+        cleaned: list[ChatSession] = []
+        for session in self.list(include_deleted=True):
+            if session.status in {"pinned", "deleted"}:
+                continue
+            updated = _parse_datetime(session.updated_at)
+            if updated is not None and updated < cutoff:
+                cleaned.append(self.delete(session.id))
+        return sorted(cleaned, key=lambda item: item.id)
 
     def load_context(self, session_id: str, *, limit: int | None = None) -> ChatContext:
         """Load session metadata and transcript messages."""
@@ -197,6 +229,14 @@ class ChatSessionStore:
         )
         return candidate_id
 
+    def _set_status(self, session_id: str, status: str) -> ChatSession:
+        if status not in {"active", "archived", "pinned", "deleted", "branched"}:
+            raise ConfigurationError(f"unsupported chat session status: {status}")
+        session = self._load_session(session_id)
+        updated = _replace_session(session, status=status, updated_at=_now())
+        self._write_session(updated)
+        return updated
+
     def _load_session(self, session_id: str) -> ChatSession:
         session_id = self._clean_session_id(session_id)
         path = self._metadata_file(session_id)
@@ -243,6 +283,7 @@ class ChatSessionStore:
             project_slug=payload.get("project_slug"),
             workflow_run_id=payload.get("workflow_run_id"),
             title=payload.get("title"),
+            status=str(payload.get("status", "active")),
             created_at=str(payload.get("created_at", "")),
             updated_at=str(payload.get("updated_at", "")),
             messages_path=str(payload["messages_path"]),
@@ -262,6 +303,18 @@ class ChatSessionStore:
 
 def _now() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def _parse_datetime(value: str) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed
 
 
 def _new_session_id() -> str:

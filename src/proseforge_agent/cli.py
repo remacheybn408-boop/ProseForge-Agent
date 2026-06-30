@@ -95,6 +95,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "message, mode, provider",
         "artifacts": "agent turn report",
     },
+    "session": {
+        "help": "Manage conversation session lifecycle",
+        "inputs": "session id, project filter, cleanup age",
+        "artifacts": "chat session metadata",
+    },
     "context": {
         "help": "Inspect context window usage and compact session history",
         "inputs": "provider, session id, token budget",
@@ -431,6 +436,11 @@ def build_parser() -> argparse.ArgumentParser:
             )
             group.add_argument("--profile", default=None, help="agent persona profile")
             group.add_argument("--profiles-file", default=None, help="YAML file with agent profiles")
+        if name == "session":
+            group.add_argument("session_id", nargs="?", help="chat session id")
+            group.add_argument("--project", default=None, help="project slug")
+            group.add_argument("--include-deleted", action="store_true", help="include deleted sessions")
+            group.add_argument("--older-than", default="90d", help="cleanup age such as 90d")
         if name == "context":
             group.add_argument("--provider", default="fake", help="provider family/name")
             group.add_argument("--session", default=None, help="chat session id")
@@ -3186,6 +3196,84 @@ def _handle_prompt_template(args: argparse.Namespace) -> int:
     return _emit(_planned_report("prompt-template", "Run `pf-agent prompt-template list`"), args.format)
 
 
+def _handle_session(args: argparse.Namespace) -> int:
+    from .chat import ChatSessionStore
+
+    store = ChatSessionStore(Path(".pf-agent"))
+    subcommand = args.subcommand or "list"
+    if subcommand == "list":
+        sessions = store.list(project_slug=args.project, include_deleted=args.include_deleted)
+        report = Report(
+            title="Conversation Sessions",
+            status="ok",
+            next_action="Use `pf-agent session show <id>` for transcript metadata",
+            sections=[
+                ReportSection(
+                    "Sessions",
+                    [
+                        f"{session.id}: status={session.status} mode={session.mode}"
+                        + (f" project={session.project_slug}" if session.project_slug else "")
+                        for session in sessions
+                    ]
+                    or ["(none)"],
+                )
+            ],
+            data={"sessions": [session.__dict__ for session in sessions]},
+        )
+        return _emit(report, args.format)
+    if subcommand == "cleanup":
+        cleaned = store.cleanup(older_than_days=_parse_days(args.older_than))
+        report = Report(
+            title="Conversation Sessions",
+            status="ok",
+            next_action="Cleanup is soft-delete; use include-deleted to inspect removed sessions",
+            sections=[ReportSection("Cleanup", [f"{session.id}: {session.status}" for session in cleaned] or ["(none)"])],
+            data={"cleaned": [session.__dict__ for session in cleaned]},
+        )
+        return _emit(report, args.format)
+    if not args.session_id:
+        return _emit(_planned_report("session", f"Pass a session id for `session {subcommand}`"), args.format)
+    if subcommand == "show":
+        context = store.load_context(args.session_id)
+        session = context.session
+    elif subcommand == "archive":
+        session = store.archive(args.session_id)
+    elif subcommand == "restore":
+        session = store.restore(args.session_id)
+    elif subcommand == "delete":
+        session = store.delete(args.session_id)
+    elif subcommand == "pin":
+        session = store.pin(args.session_id)
+    else:
+        return _emit(_planned_report("session", "Run `pf-agent session list`"), args.format)
+    report = Report(
+        title="Conversation Sessions",
+        status="ok",
+        next_action="Use session lifecycle commands to keep active context focused",
+        sections=[
+            ReportSection(
+                "Session",
+                [
+                    f"id={session.id}",
+                    f"status={session.status}",
+                    f"mode={session.mode}",
+                    f"project={session.project_slug or '(none)'}",
+                    f"updated_at={session.updated_at}",
+                ],
+            )
+        ],
+        data=session.__dict__,
+    )
+    return _emit(report, args.format)
+
+
+def _parse_days(value: str) -> int:
+    value = str(value).strip().lower()
+    if value.endswith("d"):
+        value = value[:-1]
+    return max(0, int(value))
+
+
 def _handle_chat(args: argparse.Namespace) -> int:
     if args.subcommand == "sessions":
         from .chat import ChatSessionStore
@@ -4371,6 +4459,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_usage(args)
     if args.command == "chat":
         return _handle_chat(args)
+    if args.command == "session":
+        return _handle_session(args)
     if args.command == "context":
         return _handle_context(args)
     if args.command == "prompt":
