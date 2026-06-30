@@ -185,6 +185,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "project slug, golden sample directory",
         "artifacts": "literary baseline and drift report",
     },
+    "rewrite": {
+        "help": "Apply named rewrite strategies and list the strategy library",
+        "inputs": "project slug, chapter id, strategy",
+        "artifacts": "revision artifact per chapter and strategy",
+    },
     "setup": {
         "help": "Run the guided first-use setup wizard",
         "inputs": "setup mode, provider, repair/reconfigure flags",
@@ -481,6 +486,11 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--slug", default=None, help="project slug")
             group.add_argument("--golden-dir", default="tests/literary/golden", help="golden sample directory")
             group.add_argument("--threshold", type=float, default=0.25, help="drift threshold")
+        if name == "rewrite":
+            group.add_argument("rewrite_arg", nargs="?", help="rewrite subcommand argument")
+            group.add_argument("--slug", default=None, help="project slug")
+            group.add_argument("--strategy", default=None, help="rewrite strategy")
+            group.add_argument("--chapter", default=None, help="chapter id")
         if name == "chapter":
             group.add_argument("chapter_ids", nargs="*", help="chapter ids for reorganization")
             group.add_argument("--slug", default=None, help="project slug")
@@ -1640,6 +1650,56 @@ def _handle_literary(args: argparse.Namespace) -> int:
         next_action="Review prompt, model, or style changes when drift is degraded",
         sections=[ReportSection("Drift", lines)],
         data=data,
+    )
+    return _emit(report, args.format)
+
+
+def _handle_rewrite(args: argparse.Namespace) -> int:
+    from .novel import RewriteStrategyLibrary
+
+    library = RewriteStrategyLibrary(Path(".pf-agent") / "workspace", slug=args.slug or "")
+    if args.subcommand == "strategies" and args.rewrite_arg == "list":
+        strategies = library.list_strategies()
+        report = Report(
+            title="Rewrite Strategies",
+            status="ok",
+            next_action="Run `pf-agent rewrite --strategy <name> --chapter <id>`",
+            sections=[
+                ReportSection(
+                    "Strategies",
+                    [f"{strategy.name}: {strategy.description}" for strategy in strategies],
+                )
+            ],
+            data={"strategies": [strategy.to_dict() for strategy in strategies]},
+        )
+        return _emit(report, args.format)
+    if args.subcommand is not None:
+        return _emit(_planned_report("rewrite", "Run `pf-agent rewrite strategies list`"), args.format)
+    if not args.slug or not args.strategy or not args.chapter:
+        return _emit(_planned_report("rewrite", "Pass --slug, --strategy, and --chapter"), args.format)
+    try:
+        result = library.rewrite(strategy=args.strategy, chapter=args.chapter)
+    except ValueError as exc:
+        report = Report(
+            title="Rewrite",
+            status="blocked",
+            next_action="Pick a strategy from `pf-agent rewrite strategies list`",
+            sections=[ReportSection("Error", [str(exc)])],
+            data={"error": str(exc)},
+        )
+        _emit(report, args.format)
+        return 1
+    report = Report(
+        title="Rewrite",
+        status="ok",
+        next_action="Review the revision artifact before replacing chapter text",
+        sections=[
+            ReportSection(
+                "Revision",
+                [f"chapter={result.chapter}", f"strategy={result.strategy}", f"path={result.path}"],
+            )
+        ],
+        data=result.to_dict(),
     )
     return _emit(report, args.format)
 
@@ -2970,6 +3030,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_quality(args)
     if args.command == "literary":
         return _handle_literary(args)
+    if args.command == "rewrite":
+        return _handle_rewrite(args)
     if args.command == "setup":
         return _handle_setup(args)
     if args.command == "init":
