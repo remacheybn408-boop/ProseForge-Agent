@@ -14,6 +14,7 @@ from .client import (
     default_demo_client,
 )
 from .approval import MCPApprovalGate, MCPApprovalQueue, MCPApprovalRequest
+from .credentials import MCPCredentialBoundary, redact_sensitive
 from .registry import MCPServerConfig, MCPServerRegistry
 from .policy import MCPPolicy, MCPPolicyDecision, MCPPolicyStore
 from .schema import MCPSchemaCache, MCPSchemaValidationResult, MCPSchemaValidator, MCPSchemaVersion
@@ -23,6 +24,7 @@ __all__ = [
     "MCPApprovalGate",
     "MCPApprovalQueue",
     "MCPApprovalRequest",
+    "MCPCredentialBoundary",
     "MCPClient",
     "MCPPrompt",
     "MCPResource",
@@ -42,4 +44,5 @@ __all__ = [
     "StaticMCPTransport",
     "StdioMCPTransport",
     "default_demo_client",
+    "redact_sensitive",
 ]
