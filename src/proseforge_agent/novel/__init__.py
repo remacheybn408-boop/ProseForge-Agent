@@ -13,6 +13,7 @@ from .publishing import PUBLISHING_NAME, PublishingMetadata, PublishingMetadataS
 from .relationship_graph import RELATIONSHIP_GRAPH_NAME, RELATION_TYPES, RelationshipEdge, RelationshipGraph
 from .reorganize import ChapterReorganizer
 from .scenes import SceneRecord, SceneWorkflow
+from .style_profile import STYLE_PROFILE_NAME, StyleProfile, StyleProfileCompiler
 from .timeline import TIMELINE_NAME, TimelineEngine, TimelineEvent
 from .writing_rules import RULE_LEVELS, WRITING_RULES_NAME, WritingRule, WritingRulesStore
 
@@ -54,6 +55,9 @@ __all__ = [
     "RULE_LEVELS",
     "SceneRecord",
     "SceneWorkflow",
+    "STYLE_PROFILE_NAME",
+    "StyleProfile",
+    "StyleProfileCompiler",
     "TimelineEngine",
     "TimelineEvent",
     "WRITING_RULES_NAME",
