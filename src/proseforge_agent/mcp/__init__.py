@@ -13,6 +13,7 @@ from .client import (
     StdioMCPTransport,
     default_demo_client,
 )
+from .registry import MCPServerConfig, MCPServerRegistry
 
 __all__ = [
     "MCPCapabilityReport",
@@ -20,6 +21,8 @@ __all__ = [
     "MCPPrompt",
     "MCPResource",
     "MCPServerSpec",
+    "MCPServerConfig",
+    "MCPServerRegistry",
     "MCPTool",
     "MCPTransport",
     "PlaceholderMCPTransport",
