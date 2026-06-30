@@ -2973,6 +2973,67 @@ def _handle_provider(args: argparse.Namespace) -> int:
         return _handle_provider_routes(args)
     if args.subcommand == "certify":
         return _handle_provider_certify(args)
+    if args.subcommand == "fallback-status":
+        chain = ["deepseek", "qwen", "openai", "fake"]
+        report = Report(
+            title="Provider Fallback",
+            status="ok",
+            next_action="Run `pf-agent provider test-chain` to verify fallback behavior",
+            sections=[
+                ReportSection(
+                    "Chain",
+                    [
+                        "deepseek -> qwen -> openai -> fake",
+                        "fallback_errors=timeout, rate_limit, invalid_response, unavailable, quota, context_too_large, model_missing",
+                    ],
+                )
+            ],
+            data={"fallback_chain": chain},
+        )
+        return _emit(report, args.format)
+    if args.subcommand == "test-chain":
+        from .agent import ProviderFallbackChain
+        from .errors import ProviderError
+        from .llm import FakeProvider, Message, ProviderRequest
+
+        class FailingProvider:
+            def __init__(self, name: str, code: str) -> None:
+                self.name = name
+                self.model = name
+                self.code = code
+
+            def generate(self, request: ProviderRequest):
+                error = ProviderError(f"{self.name} simulated {self.code}")
+                error.code = self.code
+                raise error
+
+        request = ProviderRequest(role="drafter", messages=[Message(role="user", content="fallback probe")])
+        result = ProviderFallbackChain(
+            [
+                FailingProvider("deepseek", "timeout"),
+                FailingProvider("qwen", "rate_limit"),
+                FailingProvider("openai", "model_missing"),
+                FakeProvider(name="fake", model="fake"),
+            ]
+        ).generate(request)
+        report = Report(
+            title="Provider Fallback",
+            status="ok",
+            next_action="Use fake fallback for offline-safe smoke tests",
+            sections=[
+                ReportSection(
+                    "Attempts",
+                    [
+                        f"{attempt.provider}: {attempt.status}"
+                        + (f" reason={attempt.fallback_reason}" if attempt.fallback_reason else "")
+                        for attempt in result.attempts
+                    ],
+                ),
+                ReportSection("Selected", [f"selected={result.selected_provider}"]),
+            ],
+            data=result.to_dict(),
+        )
+        return _emit(report, args.format)
     if not args.providers:
         report = _planned_report("provider", "Pass --providers <config.yaml> to list providers")
         return _emit(report, args.format)

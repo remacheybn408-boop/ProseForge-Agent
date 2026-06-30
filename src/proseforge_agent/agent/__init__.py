@@ -19,6 +19,7 @@ from .control import ControlSignal, ControlToken
 from .context_window import ContextUsageReport, ContextWindowManager
 from .permissions import PERMISSION_LEVELS, PermissionDecision, PermissionPolicy
 from .profiles import AgentProfile, AgentProfileRegistry
+from .provider_fallback import ProviderFallbackAttempt, ProviderFallbackChain, ProviderFallbackResult
 from .prompt_templates import (
     PromptTemplate,
     PromptTemplateRegistry,
@@ -79,6 +80,9 @@ __all__ = [
     "PermissionPolicy",
     "AgentProfile",
     "AgentProfileRegistry",
+    "ProviderFallbackAttempt",
+    "ProviderFallbackChain",
+    "ProviderFallbackResult",
     "PromptTemplate",
     "PromptTemplateRegistry",
     "PromptTemplateValidation",
