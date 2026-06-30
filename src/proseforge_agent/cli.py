@@ -304,6 +304,13 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--characters", default="", help="comma-separated characters")
             group.add_argument("--conflict", default="", help="scene conflict")
             group.add_argument("--tone", default="", help="emotional tone")
+        if name == "chapter":
+            group.add_argument("chapter_ids", nargs="*", help="chapter ids for reorganization")
+            group.add_argument("--slug", default=None, help="project slug")
+            group.add_argument("--to-volume", default=None, help="target volume id")
+            group.add_argument("--after", default=None, help="chapter id to insert after")
+            group.add_argument("--at-scene", default=None, help="scene id for split")
+            group.add_argument("--into", default=None, help="merged chapter id")
         if name == "usage":
             group.add_argument(
                 "--usage-log",
@@ -690,6 +697,40 @@ def _handle_scene(args: argparse.Namespace) -> int:
         data=data,
     )
     return _emit(report, args.format)
+
+
+def _handle_chapter(args: argparse.Namespace) -> int:
+    if args.subcommand not in {"move", "split", "merge", "renumber"} or not args.slug:
+        return _emit(_planned_report("chapter", "Run `pf-agent chapter renumber --slug <slug>`"), args.format)
+    from .novel import ChapterReorganizer
+
+    reorganizer = ChapterReorganizer(Path(".pf-agent") / "workspace", slug=args.slug)
+    if args.subcommand == "move":
+        result = reorganizer.move(
+            args.chapter_ids[0] if args.chapter_ids else "",
+            to_volume=args.to_volume,
+            after=args.after,
+        )
+    elif args.subcommand == "split":
+        result = reorganizer.split(
+            args.chapter_ids[0] if args.chapter_ids else "",
+            at_scene=args.at_scene or "",
+        )
+    elif args.subcommand == "merge":
+        left = args.chapter_ids[0] if len(args.chapter_ids) > 0 else ""
+        right = args.chapter_ids[1] if len(args.chapter_ids) > 1 else ""
+        result = reorganizer.merge(left, right, into=args.into or left)
+    else:
+        result = reorganizer.renumber()
+    report = Report(
+        title="Chapter Reorganization",
+        status="ok" if result.get("status") == "ok" else "blocked",
+        next_action="Review reorg.log and manifest before drafting further",
+        sections=[ReportSection("Result", [f"{key}={value}" for key, value in result.items()])],
+        data=result,
+    )
+    _emit(report, args.format)
+    return 0 if result.get("status") == "ok" else 1
 
 
 def _handle_provider_probe(args: argparse.Namespace) -> int:
@@ -1966,6 +2007,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_usage(args)
     if args.command == "chat":
         return _handle_chat(args)
+    if args.command == "chapter":
+        return _handle_chapter(args)
     if args.command == "tools":
         return _handle_tools(args)
     if args.command == "jobs":
