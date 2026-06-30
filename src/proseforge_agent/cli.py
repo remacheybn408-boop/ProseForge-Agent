@@ -130,6 +130,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "manuscript path, project slug",
         "artifacts": "raw import archive, chapters, manifest mappings",
     },
+    "ingest": {
+        "help": "Ingest attachments into searchable project artifacts",
+        "inputs": "file, image, or folder path and project slug",
+        "artifacts": "attachment artifact, searchable text, memory candidate",
+    },
     "scene": {
         "help": "Run scene-level draft, review, rewrite, and merge steps",
         "inputs": "project slug, chapter id, scene id",
@@ -430,6 +435,10 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "import":
             group.add_argument("path", nargs="?", help="file or folder to import")
             group.add_argument("--slug", default=None, help="project slug")
+        if name == "ingest":
+            group.add_argument("path", nargs="?", help="attachment file or folder")
+            group.add_argument("--slug", default=None, help="project slug")
+            group.add_argument("--provider", default="fake", help="vision provider for images")
         if name == "scene":
             group.add_argument("--slug", default=None, help="project slug")
             group.add_argument("--chapter", default=None, help="chapter id")
@@ -968,6 +977,42 @@ def _handle_import(args: argparse.Namespace) -> int:
             ReportSection("Warnings", result.warnings),
         ],
         data=result.to_dict(),
+    )
+    return _emit(report, args.format)
+
+
+def _handle_ingest(args: argparse.Namespace) -> int:
+    if args.subcommand not in {"file", "image", "folder"} or not args.path or not args.slug:
+        return _emit(
+            _planned_report("ingest", "Run `pf-agent ingest file <path> --slug <slug>`"),
+            args.format,
+        )
+    from .agent import AttachmentIngestor
+
+    describer = (lambda path: f"fake vision description for {path.name}") if args.provider == "fake" else None
+    ingestor = AttachmentIngestor(Path(".pf-agent"), vision_describer=describer)
+    if args.subcommand == "folder":
+        results = ingestor.ingest_folder(args.path, slug=args.slug)
+    elif args.subcommand == "image":
+        results = [ingestor.ingest_image(args.path, slug=args.slug)]
+    else:
+        results = [ingestor.ingest_file(args.path, slug=args.slug)]
+
+    lines = [
+        f"{result.id} {result.kind} status={result.status} searchable={result.searchable_path}"
+        for result in results
+    ] or ["(none)"]
+    warnings = [warning for result in results for warning in result.warnings]
+    report = Report(
+        title="Attachment Ingestion",
+        status="ok" if all(result.status == "ok" for result in results) else "degraded",
+        next_action="Review memory candidates before promoting attachment facts to canon",
+        sections=[
+            ReportSection("Project", [f"slug={args.slug}"]),
+            ReportSection("Artifacts", lines),
+            ReportSection("Warnings", warnings or ["(none)"]),
+        ],
+        data={"results": [result.to_dict() for result in results]},
     )
     return _emit(report, args.format)
 
@@ -3745,6 +3790,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_artifacts(args)
     if args.command == "import":
         return _handle_import(args)
+    if args.command == "ingest":
+        return _handle_ingest(args)
     if args.command == "scene":
         return _handle_scene(args)
     if args.command == "export":
