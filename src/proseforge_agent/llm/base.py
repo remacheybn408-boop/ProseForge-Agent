@@ -31,6 +31,7 @@ class ProviderRequest:
     messages: list[Message]
     temperature: float = 0.7
     max_tokens: int | None = None
+    tools: list[dict] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
