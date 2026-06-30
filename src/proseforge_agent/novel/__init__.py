@@ -11,6 +11,7 @@ from .literary_regression import LITERARY_BASELINE_NAME, LiteraryRegressionSuite
 from .manifest import MANIFEST_NAME, NovelProjectManifest, NovelProjectStore
 from .manuscript_search import SEARCH_SCOPES, ManuscriptSearch, SearchHit, SearchResult
 from .plot_threads import PLOT_THREADS_NAME, PlotThread, PlotThreadManager
+from .project_health import HealthIssue, HealthReport, PROJECT_HEALTH_DIRS, ProjectHealthDoctor, QUARANTINE_DIR
 from .publishing import PUBLISHING_NAME, PublishingMetadata, PublishingMetadataStore
 from .reader_review import (
     READER_REPORT_DIR,
@@ -63,6 +64,11 @@ __all__ = [
     "SearchResult",
     "PlotThread",
     "PlotThreadManager",
+    "PROJECT_HEALTH_DIRS",
+    "QUARANTINE_DIR",
+    "HealthIssue",
+    "HealthReport",
+    "ProjectHealthDoctor",
     "PublishingMetadata",
     "PublishingMetadataStore",
     "READER_REPORT_DIR",
