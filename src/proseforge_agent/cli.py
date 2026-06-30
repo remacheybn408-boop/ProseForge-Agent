@@ -220,6 +220,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "project slug, daily/export subcommand, target words",
         "artifacts": "analytics summary, daily trend, and CSV export",
     },
+    "backup": {
+        "help": "Create, verify, and restore checksum-verified project backups",
+        "inputs": "project slug, backup id, dry-run flag",
+        "artifacts": "backup snapshots with checksum manifest",
+    },
     "setup": {
         "help": "Run the guided first-use setup wizard",
         "inputs": "setup mode, provider, repair/reconfigure flags",
@@ -545,6 +550,9 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--approve", action="store_true", help="approve a high-risk promote")
         if name == "approval":
             group.add_argument("approval_id", nargs="?", help="approval id for show/approve/reject")
+            group.add_argument("--slug", default=None, help="project slug")
+        if name == "backup":
+            group.add_argument("backup_id", nargs="?", help="backup id for verify/restore")
             group.add_argument("--slug", default=None, help="project slug")
         if name == "stats":
             group.add_argument("--slug", default=None, help="project slug")
@@ -2147,6 +2155,78 @@ def _handle_stats(args: argparse.Namespace) -> int:
     )
 
 
+def _handle_backup(args: argparse.Namespace) -> int:
+    from .novel import BackupManager
+
+    sub = args.subcommand
+    backup_id = getattr(args, "backup_id", None)
+    if not args.slug or sub not in {"create", "verify", "restore", "list"}:
+        return _emit(_planned_report("backup", "Run `pf-agent backup create --slug <slug>`"), args.format)
+    manager = BackupManager(Path(".pf-agent") / "workspace", slug=args.slug)
+    try:
+        if sub == "create":
+            backup = manager.create()
+            return _emit(
+                Report(
+                    title="Backup Create",
+                    status="ok" if backup.status == "verified" else "blocked",
+                    next_action="Verify or dry-run restore this backup",
+                    sections=[ReportSection("Backup", [f"id={backup.id}", f"files={backup.file_count}", f"status={backup.status}", f"path={backup.path}"])],
+                    data=backup.to_dict(),
+                ),
+                args.format,
+            )
+        if sub == "list":
+            backups = manager.list()
+            lines = [f"{backup.id} files={backup.file_count} {backup.created_at}" for backup in backups] or ["no backups"]
+            return _emit(
+                Report(
+                    title="Backups",
+                    status="ok",
+                    next_action="Verify or restore a backup by id",
+                    sections=[ReportSection("Backups", lines)],
+                    data={"backups": [backup.to_dict() for backup in backups]},
+                ),
+                args.format,
+            )
+        if not backup_id:
+            return _emit(_planned_report("backup", f"Pass a backup id for `backup {sub}`"), args.format)
+        if sub == "verify":
+            result = manager.verify(backup_id)
+            return _emit(
+                Report(
+                    title="Backup Verify",
+                    status="ok" if result.status == "verified" else "blocked",
+                    next_action="Restore from a verified backup",
+                    sections=[ReportSection("Verify", [f"backup={result.backup_id}", f"status={result.status}", f"checked={result.checked}", f"mismatches={len(result.mismatches)}"])],
+                    data=result.to_dict(),
+                ),
+                args.format,
+            )
+        # restore
+        result = manager.restore(backup_id, dry_run=bool(getattr(args, "dry_run", False)))
+        return _emit(
+            Report(
+                title="Backup Restore",
+                status="ok",
+                next_action="Re-run without --dry-run to actually restore" if not result.restored else "Restore complete",
+                sections=[ReportSection("Restore", [f"backup={result.backup_id}", f"status={result.status}", f"restored={result.restored}", f"files={len(result.files)}"])],
+                data=result.to_dict(),
+            ),
+            args.format,
+        )
+    except ValueError as exc:
+        report = Report(
+            title="Backup",
+            status="blocked",
+            next_action="Use an existing backup id",
+            sections=[ReportSection("Error", [str(exc)])],
+            data={"error": str(exc)},
+        )
+        _emit(report, args.format)
+        return 1
+
+
 def _split_pair(value: str, left_key: str, right_key: str) -> dict[str, str]:
     left, separator, right = value.partition(":")
     if not separator:
@@ -3487,6 +3567,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_approval(args)
     if args.command == "stats":
         return _handle_stats(args)
+    if args.command == "backup":
+        return _handle_backup(args)
     if args.command == "setup":
         return _handle_setup(args)
     if args.command == "init":
