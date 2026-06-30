@@ -1,6 +1,7 @@
 """Novel project operations."""
 
 from .approval_queue import APPROVALS_DIR, HIGH_RISK_ACTIONS, ApprovalQueue, ApprovalRequest
+from .backup_verification import BACKUPS_DIR, Backup, BackupManager, RestoreResult, VerifyResult
 from .artifacts import GRAPH_NAME, ArtifactGraphStore, ArtifactRecord
 from .bible import BIBLE_SECTIONS, CanonBibleManager
 from .character_arcs import CHARACTER_ARCS_NAME, CharacterArc, CharacterArcTracker
@@ -46,6 +47,11 @@ __all__ = [
     "HIGH_RISK_ACTIONS",
     "ApprovalQueue",
     "ApprovalRequest",
+    "BACKUPS_DIR",
+    "Backup",
+    "BackupManager",
+    "RestoreResult",
+    "VerifyResult",
     "GRAPH_NAME",
     "MANIFEST_NAME",
     "PUBLISHING_NAME",
