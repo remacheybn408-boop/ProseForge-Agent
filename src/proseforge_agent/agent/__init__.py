@@ -2,6 +2,13 @@
 
 from .events import BackgroundJobRunner, EventBus, EventRecord, JobResult
 from .eval import EvalHarness, EvalReport, EvalSuite, EvalTaskResult, GoldenTask
+from .function_calling import (
+    ProviderToolCall,
+    StructuredToolAdapter,
+    StructuredToolResult,
+    ToolCallLoop,
+    ToolLoopResult,
+)
 from .kernel import AgentKernel
 from .intent_router import IntentDecision, IntentRouter
 from .types import AgentIntent, AgentTurnRequest, AgentTurnResult, ToolCallResult
@@ -29,6 +36,11 @@ __all__ = [
     "GoldenTask",
     "EventBus",
     "EventRecord",
+    "ProviderToolCall",
+    "StructuredToolAdapter",
+    "StructuredToolResult",
+    "ToolCallLoop",
+    "ToolLoopResult",
     "AgentKernel",
     "IntentDecision",
     "IntentRouter",
