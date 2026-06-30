@@ -10,6 +10,7 @@ import yaml
 
 from .artifacts import ArtifactGraphStore, ArtifactRecord
 from .manifest import MANIFEST_NAME
+from .publishing import PublishingMetadataStore
 
 
 SUPPORTED_EXPORT_FORMATS = {"txt", "markdown", "pdf", "epub"}
@@ -93,12 +94,17 @@ class BookExporter:
     ) -> str:
         manifest = self._manifest()
         project = manifest.get("project", {})
+        publishing = PublishingMetadataStore(self.root, slug=self.slug).load().data
         title = project.get("title") or self.slug
-        author = project.get("author") or ""
+        title = publishing.get("title") or title
+        author = publishing.get("pen_name") or publishing.get("author") or project.get("author") or ""
+        copyright_text = publishing.get("copyright") or "Copyright"
+        ai_usage = publishing.get("ai_usage_statement") or ""
         parts = [
             front_matter or f"# {title}\n\nby {author}".strip(),
             "",
-            "Copyright",
+            copyright_text,
+            ai_usage,
             "",
             "Table of Contents",
             *[f"- {chapter.get('title') or chapter.get('id')}" for chapter in chapters],

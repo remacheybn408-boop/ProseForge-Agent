@@ -125,6 +125,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "project slug, format, optional chapter range",
         "artifacts": "book export artifact",
     },
+    "publishing": {
+        "help": "Manage publishing metadata",
+        "inputs": "project slug, title, author, metadata fields",
+        "artifacts": "publishing.yaml",
+    },
     "setup": {
         "help": "Run the guided first-use setup wizard",
         "inputs": "setup mode, provider, repair/reconfigure flags",
@@ -315,6 +320,16 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--from-chapter", default=None, help="first chapter id")
             group.add_argument("--to-chapter", default=None, help="last chapter id")
             group.add_argument("--back-matter", default=None, help="back matter text")
+        if name == "publishing":
+            group.add_argument("--slug", default=None, help="project slug")
+            group.add_argument("--title", default=None, help="book title")
+            group.add_argument("--subtitle", default=None, help="book subtitle")
+            group.add_argument("--author", default=None, help="author")
+            group.add_argument("--pen-name", default=None, help="pen name")
+            group.add_argument("--summary", default=None, help="summary")
+            group.add_argument("--keywords", default=None, help="comma-separated keywords")
+            group.add_argument("--copyright", default=None, help="copyright statement")
+            group.add_argument("--ai-usage-statement", default=None, help="AI usage statement")
         if name == "chapter":
             group.add_argument("chapter_ids", nargs="*", help="chapter ids for reorganization")
             group.add_argument("--slug", default=None, help="project slug")
@@ -775,6 +790,47 @@ def _handle_export(args: argparse.Namespace) -> int:
         data=result.to_dict(),
     )
     return _emit(report, "terminal")
+
+
+def _handle_publishing(args: argparse.Namespace) -> int:
+    if args.subcommand not in {"init", "edit", "validate"} or not args.slug:
+        return _emit(_planned_report("publishing", "Run `pf-agent publishing init --slug <slug>`"), args.format)
+    from .novel import PublishingMetadataStore
+
+    store = PublishingMetadataStore(Path(".pf-agent") / "workspace", slug=args.slug)
+    fields = {
+        "title": args.title,
+        "subtitle": args.subtitle,
+        "author": args.author,
+        "pen_name": args.pen_name,
+        "summary": args.summary,
+        "keywords": [item.strip() for item in args.keywords.split(",")] if args.keywords else None,
+        "copyright": args.copyright,
+        "ai_usage_statement": args.ai_usage_statement,
+    }
+    if args.subcommand == "init":
+        metadata = store.init(**fields)
+        data = metadata.to_dict()
+        status = "ok"
+        lines = [f"path={metadata.path}", f"title={metadata.data.get('title')}"]
+    elif args.subcommand == "edit":
+        metadata = store.edit(**fields)
+        data = metadata.to_dict()
+        status = "ok"
+        lines = [f"path={metadata.path}", f"summary={metadata.data.get('summary')}"]
+    else:
+        data = store.validate()
+        status = "ok" if data["status"] == "ok" else "blocked"
+        lines = [f"valid={str(data['status'] == 'ok').lower()}", *data["errors"]]
+    report = Report(
+        title="Publishing Metadata",
+        status=status,
+        next_action="Use publishing metadata during export and platform submission",
+        sections=[ReportSection("Metadata", lines)],
+        data=data,
+    )
+    _emit(report, args.format)
+    return 0 if status == "ok" else 1
 
 
 def _handle_provider_probe(args: argparse.Namespace) -> int:
@@ -2065,6 +2121,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_scene(args)
     if args.command == "export":
         return _handle_export(args)
+    if args.command == "publishing":
+        return _handle_publishing(args)
     if args.command == "setup":
         return _handle_setup(args)
     if args.command == "init":
