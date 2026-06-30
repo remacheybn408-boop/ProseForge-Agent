@@ -2475,6 +2475,63 @@ def _handle_approval(args: argparse.Namespace) -> int:
 
     sub = args.subcommand
     approval_id = getattr(args, "approval_id", None)
+    if not args.slug:
+        if sub not in {"list", "show", "approve", "reject"}:
+            return _emit(
+                _planned_report("approval", "Run `pf-agent approval list` or pass --slug for project approvals"),
+                args.format,
+            )
+        from .mcp import MCPApprovalQueue
+
+        queue = MCPApprovalQueue(Path(".pf-agent"))
+        try:
+            if sub == "list":
+                items = queue.list()
+                lines = [f"{item.id}: {item.action} [{item.status}] {item.summary}" for item in items] or ["(none)"]
+                return _emit(
+                    Report(
+                        title="Approval Queue",
+                        status="ok",
+                        next_action="Approve or reject pending MCP requests by id",
+                        sections=[ReportSection("Requests", lines)],
+                        data={"requests": [item.to_dict() for item in items]},
+                    ),
+                    args.format,
+                )
+            if not approval_id:
+                return _emit(_planned_report("approval", f"Pass an approval id for `approval {sub}`"), args.format)
+            if sub == "show":
+                item = queue.show(approval_id)
+            elif sub == "approve":
+                item = queue.approve(approval_id)
+            else:
+                item = queue.reject(approval_id)
+            return _emit(
+                Report(
+                    title="Approval",
+                    status="ok",
+                    next_action="The MCP tool call follows this decision",
+                    sections=[
+                        ReportSection(
+                            "Request",
+                            [f"id={item.id}", f"action={item.action}", f"status={item.status}", f"summary={item.summary}"],
+                        )
+                    ],
+                    data=item.to_dict(),
+                ),
+                args.format,
+            )
+        except Exception as exc:  # noqa: BLE001 - render queue errors consistently
+            return _emit(
+                Report(
+                    title="Approval",
+                    status="blocked",
+                    next_action="Use an existing pending approval id",
+                    sections=[ReportSection("Error", [str(exc)])],
+                    data={"error": str(exc)},
+                ),
+                args.format,
+            )
     if not args.slug or sub not in {"list", "show", "approve", "reject"}:
         return _emit(
             _planned_report("approval", "Run `pf-agent approval list --slug <slug>`"),
