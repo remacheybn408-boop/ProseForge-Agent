@@ -110,6 +110,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "project slug, artifact id",
         "artifacts": "artifacts.graph.yaml",
     },
+    "import": {
+        "help": "Import existing manuscripts into a novel project",
+        "inputs": "manuscript path, project slug",
+        "artifacts": "raw import archive, chapters, manifest mappings",
+    },
     "setup": {
         "help": "Run the guided first-use setup wizard",
         "inputs": "setup mode, provider, repair/reconfigure flags",
@@ -281,6 +286,9 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--language", default="zh-CN", help="project language")
         if name == "artifacts":
             group.add_argument("artifact_id", nargs="?", help="artifact id for trace")
+            group.add_argument("--slug", default=None, help="project slug")
+        if name == "import":
+            group.add_argument("path", nargs="?", help="file or folder to import")
             group.add_argument("--slug", default=None, help="project slug")
         if name == "usage":
             group.add_argument(
@@ -596,6 +604,33 @@ def _handle_artifacts(args: argparse.Namespace) -> int:
     )
     _emit(report, args.format)
     return 0 if trace else 1
+
+
+def _handle_import(args: argparse.Namespace) -> int:
+    if args.subcommand not in {"preview", "manuscript"} or not args.path or not args.slug:
+        return _emit(
+            _planned_report("import", "Run `pf-agent import manuscript <path> --slug <slug>`"),
+            args.format,
+        )
+    from .novel import BulkImporter
+
+    importer = BulkImporter(Path(".pf-agent") / "workspace", slug=args.slug)
+    result = importer.preview(args.path) if args.subcommand == "preview" else importer.import_manuscript(args.path)
+    title = "Import Preview" if result.preview else "Bulk Import"
+    report = Report(
+        title=title,
+        status=result.status,
+        next_action="Review chapter mapping before drafting from imported material",
+        sections=[
+            ReportSection(
+                "Chapters",
+                [f"{chapter.id}: {chapter.title}" for chapter in result.chapters] or ["(none)"],
+            ),
+            ReportSection("Warnings", result.warnings),
+        ],
+        data=result.to_dict(),
+    )
+    return _emit(report, args.format)
 
 
 def _handle_provider_probe(args: argparse.Namespace) -> int:
@@ -1878,6 +1913,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_jobs(args)
     if args.command == "artifacts":
         return _handle_artifacts(args)
+    if args.command == "import":
+        return _handle_import(args)
     if args.command == "setup":
         return _handle_setup(args)
     if args.command == "init":
