@@ -120,6 +120,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "project slug, chapter id, scene id",
         "artifacts": "scene files, chapter draft, artifact graph records",
     },
+    "export": {
+        "help": "Compile and export a novel project",
+        "inputs": "project slug, format, optional chapter range",
+        "artifacts": "book export artifact",
+    },
     "setup": {
         "help": "Run the guided first-use setup wizard",
         "inputs": "setup mode, provider, repair/reconfigure flags",
@@ -225,7 +230,7 @@ def build_parser() -> argparse.ArgumentParser:
     for name, spec in COMMAND_GROUPS.items():
         group = subparsers.add_parser(
             name,
-            parents=[shared],
+            parents=[] if name == "export" else [shared],
             help=spec["help"],
             description=(
                 f"{spec['help']}.\n"
@@ -304,6 +309,12 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--characters", default="", help="comma-separated characters")
             group.add_argument("--conflict", default="", help="scene conflict")
             group.add_argument("--tone", default="", help="emotional tone")
+        if name == "export":
+            group.add_argument("--slug", default=None, help="project slug")
+            group.add_argument("--format", default="txt", help="export format")
+            group.add_argument("--from-chapter", default=None, help="first chapter id")
+            group.add_argument("--to-chapter", default=None, help="last chapter id")
+            group.add_argument("--back-matter", default=None, help="back matter text")
         if name == "chapter":
             group.add_argument("chapter_ids", nargs="*", help="chapter ids for reorganization")
             group.add_argument("--slug", default=None, help="project slug")
@@ -731,6 +742,39 @@ def _handle_chapter(args: argparse.Namespace) -> int:
     )
     _emit(report, args.format)
     return 0 if result.get("status") == "ok" else 1
+
+
+def _handle_export(args: argparse.Namespace) -> int:
+    if not args.slug:
+        return _emit(_planned_report("export", "Run `pf-agent export --slug <slug> --format txt`"), "terminal")
+    from .novel import BookExporter
+
+    chapter_range = None
+    if args.from_chapter or args.to_chapter:
+        chapter_range = (args.from_chapter or args.to_chapter, args.to_chapter or args.from_chapter)
+    result = BookExporter(Path(".pf-agent") / "workspace", slug=args.slug).export(
+        format=args.format,
+        chapter_range=chapter_range,
+        back_matter=args.back_matter,
+    )
+    report = Report(
+        title="Book Export",
+        status=result.status,
+        next_action="Review the exported book artifact before publishing",
+        sections=[
+            ReportSection(
+                "Export",
+                [
+                    f"format={result.format}",
+                    f"path={result.path}",
+                    f"chapters={', '.join(result.chapters)}",
+                    *[f"warning={warning}" for warning in result.warnings],
+                ],
+            )
+        ],
+        data=result.to_dict(),
+    )
+    return _emit(report, "terminal")
 
 
 def _handle_provider_probe(args: argparse.Namespace) -> int:
@@ -2019,6 +2063,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_import(args)
     if args.command == "scene":
         return _handle_scene(args)
+    if args.command == "export":
+        return _handle_export(args)
     if args.command == "setup":
         return _handle_setup(args)
     if args.command == "init":
