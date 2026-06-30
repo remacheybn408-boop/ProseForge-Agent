@@ -18,6 +18,7 @@ from .types import AgentIntent, AgentTurnRequest, AgentTurnResult, ToolCallResul
 from .control import ControlSignal, ControlToken
 from .context_window import ContextUsageReport, ContextWindowManager
 from .degradation import CapabilityReport, CapabilityRuntime, FeatureCheck, FeatureDeclaration, FeatureLevel
+from .offline import OfflineDecision, OfflinePolicy
 from .permissions import PERMISSION_LEVELS, PermissionDecision, PermissionPolicy
 from .profiles import AgentProfile, AgentProfileRegistry
 from .provider_fallback import ProviderFallbackAttempt, ProviderFallbackChain, ProviderFallbackResult
@@ -81,6 +82,8 @@ __all__ = [
     "FeatureCheck",
     "FeatureDeclaration",
     "FeatureLevel",
+    "OfflineDecision",
+    "OfflinePolicy",
     "PERMISSION_LEVELS",
     "PermissionDecision",
     "PermissionPolicy",

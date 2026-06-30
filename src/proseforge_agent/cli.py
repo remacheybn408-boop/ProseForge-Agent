@@ -315,6 +315,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "capabilities flag, config",
         "artifacts": "capability map report",
     },
+    "offline": {
+        "help": "Show offline mode capability status",
+        "inputs": "offline status",
+        "artifacts": "offline capability report",
+    },
     "run": {
         "help": "Run an autonomous, goal-directed agent loop",
         "inputs": "goal, provider, iteration budget, show-plan flag",
@@ -354,6 +359,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--version", action="version", version=f"%(prog)s {__version__}"
     )
+    parser.add_argument("--offline", action="store_true", help="disable remote/network-dependent actions")
 
     shared = _output_parser()
     subparsers = parser.add_subparsers(dest="command", metavar="<group>")
@@ -4057,6 +4063,48 @@ def _handle_status(args: argparse.Namespace) -> int:
     return _emit(report, args.format)
 
 
+def _handle_offline(args: argparse.Namespace) -> int:
+    from .agent import OfflinePolicy
+
+    policy = OfflinePolicy()
+    status = policy.status()
+    report = Report(
+        title="Offline Mode",
+        status="ok",
+        next_action='Use `pf-agent --offline chat --provider fake --message "hello"` for zero-network smoke tests',
+        sections=[
+            ReportSection("Allowed", status["allowed"]),
+            ReportSection("Blocked", status["blocked"]),
+        ],
+        data=status,
+    )
+    return _emit(report, getattr(args, "format", "terminal"))
+
+
+def _offline_gate(args: argparse.Namespace) -> int | None:
+    if not getattr(args, "offline", False) or args.command == "offline":
+        return None
+    from .agent import OfflinePolicy
+
+    decision = OfflinePolicy().check(
+        args.command or "",
+        provider=getattr(args, "provider", None),
+        export_format=getattr(args, "format", None),
+        tool_name=getattr(args, "tool_name", None),
+    )
+    if decision.allowed:
+        return None
+    report = Report(
+        title="Offline Mode",
+        status="blocked",
+        next_action="Switch to fake/local capabilities or rerun without --offline",
+        sections=[ReportSection("Blocked", [decision.reason])],
+        data=decision.to_dict(),
+    )
+    _emit(report, getattr(args, "format", "terminal"))
+    return 2
+
+
 def _handle_qa(args: argparse.Namespace) -> int:
     from .install.qa_matrix import NativeQAMatrix
 
@@ -4261,6 +4309,9 @@ def _handle_planned(group: str):
 
 
 def _dispatch(args: argparse.Namespace) -> int:
+    offline_block = _offline_gate(args)
+    if offline_block is not None:
+        return offline_block
     if args.command == "report":
         return _handle_report(args)
     if args.command == "project":
@@ -4293,6 +4344,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_debug(args)
     if args.command == "mcp":
         return _handle_mcp(args)
+    if args.command == "offline":
+        return _handle_offline(args)
     if args.command == "scene":
         return _handle_scene(args)
     if args.command == "export":
