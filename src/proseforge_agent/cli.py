@@ -3231,6 +3231,27 @@ def _handle_session(args: argparse.Namespace) -> int:
             data={"cleaned": [session.__dict__ for session in cleaned]},
         )
         return _emit(report, args.format)
+    if subcommand == "search":
+        if not args.session_id:
+            return _emit(_planned_report("session", "Pass a query to `session search`"), args.format)
+        results = store.search(args.session_id, project_slug=args.project)
+        report = Report(
+            title="Conversation Search",
+            status="ok",
+            next_action="Open the matching session before using old context as current canon",
+            sections=[
+                ReportSection(
+                    "Results",
+                    [
+                        f"{result.session_id} {result.kind} {result.source}: {result.snippet}"
+                        for result in results
+                    ]
+                    or ["(none)"],
+                )
+            ],
+            data={"results": [result.to_dict() for result in results]},
+        )
+        return _emit(report, args.format)
     if not args.session_id:
         return _emit(_planned_report("session", f"Pass a session id for `session {subcommand}`"), args.format)
     if subcommand == "show":
