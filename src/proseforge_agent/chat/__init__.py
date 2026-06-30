@@ -5,6 +5,14 @@ from .memory import ChatMemoryExtractor, MemoryCandidate
 from .prompts import ChatPromptBuilder, PromptItem, PromptPack
 from .retrieval import ChatAnswer, ChatCitation, ChatEvidence, ChatRetrievalResponder
 from .session import ChatContext, ChatMessage, ChatSession, ChatSessionStore
+from .system_prompts import (
+    ComposedSystemPrompt,
+    SessionPromptRecord,
+    SystemPromptComposer,
+    SystemPromptRegistry,
+    SystemPromptStore,
+    SystemPromptTemplate,
+)
 
 __all__ = [
     "ChatAnswer",
@@ -21,5 +29,11 @@ __all__ = [
     "PromptPack",
     "ChatSession",
     "ChatSessionStore",
+    "ComposedSystemPrompt",
     "HandoffPackage",
+    "SessionPromptRecord",
+    "SystemPromptComposer",
+    "SystemPromptRegistry",
+    "SystemPromptStore",
+    "SystemPromptTemplate",
 ]

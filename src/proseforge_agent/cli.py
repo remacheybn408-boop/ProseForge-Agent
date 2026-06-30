@@ -100,6 +100,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "provider, session id, token budget",
         "artifacts": "context usage report and compacted message summary",
     },
+    "prompt": {
+        "help": "Manage system prompt templates and session overrides",
+        "inputs": "template id, session id, override text",
+        "artifacts": "prompt template and session prompt records",
+    },
     "tools": {
         "help": "List internal tools and permission levels",
         "inputs": "tool registry",
@@ -357,6 +362,7 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--no-project", action="store_true", help="do not bind a project")
             group.add_argument("--project", default=None, help="project slug")
             group.add_argument("--mode", default="general_chat", help="conversation mode")
+            group.add_argument("--system", default=None, help="system prompt override for this chat turn")
             group.add_argument(
                 "--show-prompt",
                 action="store_true",
@@ -400,6 +406,11 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--max-context", type=int, default=None, help="override provider context window")
             group.add_argument("--reserve", type=int, default=256, help="reserved completion tokens")
             group.add_argument("--keep-last", type=int, default=6, help="messages to keep after compaction")
+        if name == "prompt":
+            group.add_argument("prompt_arg", nargs="?", help="prompt template id for show")
+            group.add_argument("--session", default=None, help="chat session id")
+            group.add_argument("--template", default=None, help="system prompt template id")
+            group.add_argument("--text", default=None, help="literal session prompt override")
         if name == "project":
             group.add_argument("--slug", default=None, help="project slug")
             group.add_argument("--title", default=None, help="project title")
@@ -2517,6 +2528,75 @@ def _handle_provider(args: argparse.Namespace) -> int:
     return _emit(report, args.format)
 
 
+def _handle_prompt(args: argparse.Namespace) -> int:
+    from .chat import SystemPromptRegistry, SystemPromptStore
+
+    registry = SystemPromptRegistry.builtins()
+    store = SystemPromptStore(Path(".pf-agent"))
+    subcommand = args.subcommand or "list"
+    if subcommand == "list":
+        templates = registry.list()
+        report = Report(
+            title="System Prompts",
+            status="ok",
+            next_action="Use `pf-agent prompt show <id>` to inspect a template",
+            sections=[
+                ReportSection(
+                    "Templates",
+                    [f"{template.id}@{template.version}" for template in templates],
+                )
+            ],
+            data={"templates": [template.to_dict() for template in templates]},
+        )
+        return _emit(report, args.format)
+    if subcommand == "show":
+        template_id = args.prompt_arg or args.template
+        if not template_id:
+            return _emit(_planned_report("prompt", "Pass a template id to `pf-agent prompt show`"), args.format)
+        template = registry.get(template_id)
+        report = Report(
+            title="System Prompt",
+            status="ok",
+            next_action="Use `pf-agent prompt set --session <id> --template <id>` to pin it",
+            sections=[
+                ReportSection("Template", [f"id={template.id}", f"version={template.version}"]),
+                ReportSection("Text", template.text.splitlines()),
+                ReportSection("Changelog", template.changelog or ["(none)"]),
+            ],
+            data=template.to_dict(),
+        )
+        return _emit(report, args.format)
+    if subcommand == "set":
+        if not args.session:
+            return _emit(_planned_report("prompt", "Pass --session before setting a prompt"), args.format)
+        if args.text:
+            record = store.set_session_override(args.session, args.text)
+        else:
+            record = store.set_session_template(
+                args.session,
+                args.template or args.prompt_arg or "professional_novel_editor",
+                registry=registry,
+            )
+        report = Report(
+            title="Session System Prompt",
+            status="ok",
+            next_action="Run `pf-agent chat --show-prompt` to inspect composed prompt data",
+            sections=[
+                ReportSection(
+                    "Record",
+                    [
+                        f"session={record.session_id}",
+                        f"template={record.template_id}",
+                        f"version={record.version}",
+                    ],
+                )
+            ],
+            data=record.to_dict(),
+        )
+        return _emit(report, args.format)
+    return _emit(_planned_report("prompt", "Run `pf-agent prompt list`"), args.format)
+
+
 def _handle_chat(args: argparse.Namespace) -> int:
     if args.subcommand == "sessions":
         from .chat import ChatSessionStore
@@ -2593,7 +2673,7 @@ def _handle_chat(args: argparse.Namespace) -> int:
         text = args.message or args.text or ""
         print(
             ChatPromptBuilder()
-            .build(text=text, mode=mode, project_slug=project_slug)
+            .build(text=text, mode=mode, project_slug=project_slug, system_override=args.system)
             .render_markdown()
         )
         return 0
@@ -3592,6 +3672,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_chat(args)
     if args.command == "context":
         return _handle_context(args)
+    if args.command == "prompt":
+        return _handle_prompt(args)
     if args.command == "chapter":
         return _handle_chapter(args)
     if args.command == "tools":
