@@ -369,6 +369,7 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--title", default=None, help="project title")
             group.add_argument("--author", default=None, help="project author")
             group.add_argument("--language", default="zh-CN", help="project language")
+            group.add_argument("--fix", action="store_true", help="apply safe repairs (project doctor)")
         if name == "artifacts":
             group.add_argument("artifact_id", nargs="?", help="artifact id for trace")
             group.add_argument("--slug", default=None, help="project slug")
@@ -713,12 +714,41 @@ def _handle_report(args: argparse.Namespace) -> int:
     return _emit(report, args.format)
 
 
+def _handle_project_doctor(args: argparse.Namespace) -> int:
+    from .novel import ProjectHealthDoctor
+
+    doctor = ProjectHealthDoctor(Path(".pf-agent") / "workspace", slug=args.slug)
+    result = doctor.diagnose(fix=bool(getattr(args, "fix", False)))
+    issue_lines = [
+        f"{issue.kind}: {issue.target} ({issue.severity}, fixable={issue.fixable}) — {issue.detail}"
+        for issue in result.issues
+    ] or ["no issues detected"]
+    sections = [
+        ReportSection("Summary", [f"slug={result.slug}", f"status={result.status}", f"issues={len(result.issues)}"]),
+        ReportSection("Issues", issue_lines),
+    ]
+    if result.fixed:
+        sections.append(ReportSection("Fixed", list(result.fixed)))
+    report = Report(
+        title="Project Health",
+        status=result.status,
+        next_action="Run `pf-agent project doctor --slug <slug> --fix` to apply safe repairs"
+        if result.status != "ok"
+        else "Project structure is healthy",
+        sections=sections,
+        data=result.to_dict(),
+    )
+    return _emit(report, args.format)
+
+
 def _handle_project(args: argparse.Namespace) -> int:
-    if args.subcommand not in {"init", "manifest", "validate"} or not args.slug:
+    if args.subcommand not in {"init", "manifest", "validate", "doctor"} or not args.slug:
         return _emit(
             _planned_report("project", "Run `pf-agent project init --slug <slug>`"),
             args.format,
         )
+    if args.subcommand == "doctor":
+        return _handle_project_doctor(args)
     from .novel import NovelProjectStore
 
     store = NovelProjectStore(Path(".pf-agent") / "workspace")
