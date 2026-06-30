@@ -140,6 +140,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "session id and optional step number",
         "artifacts": "redacted audit trail reports",
     },
+    "mcp": {
+        "help": "Inspect configured MCP servers and exposed capabilities",
+        "inputs": "server id",
+        "artifacts": "MCP capability, tool, resource, and prompt reports",
+    },
     "scene": {
         "help": "Run scene-level draft, review, rewrite, and merge steps",
         "inputs": "project slug, chapter id, scene id",
@@ -447,6 +452,8 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "debug":
             group.add_argument("debug_session", nargs="?", help="audit session id")
             group.add_argument("--step", type=int, default=1, help="audit step number")
+        if name == "mcp":
+            group.add_argument("server", nargs="?", help="MCP server id")
         if name == "scene":
             group.add_argument("--slug", default=None, help="project slug")
             group.add_argument("--chapter", default=None, help="chapter id")
@@ -1093,6 +1100,82 @@ def _handle_debug(args: argparse.Namespace) -> int:
         data=replay.to_dict(),
     )
     return _emit(report, args.format)
+
+
+def _handle_mcp(args: argparse.Namespace) -> int:
+    if args.subcommand not in {None, "list", "inspect", "tools", "resources", "prompts"}:
+        return _emit(_planned_report("mcp", "Run `pf-agent mcp list`"), args.format)
+    from .mcp import default_demo_client
+
+    if args.subcommand in {None, "list"}:
+        client = default_demo_client()
+        report = Report(
+            title="MCP Servers",
+            status="ok",
+            next_action="Run `pf-agent mcp inspect <server>` to discover capabilities",
+            sections=[ReportSection("Servers", [f"{client.spec.id} ({client.spec.transport})"])],
+            data={"servers": [client.spec.to_dict()]},
+        )
+        return _emit(report, args.format)
+
+    server = args.server or "filesystem"
+    client = default_demo_client(server)
+    client.start()
+    try:
+        if args.subcommand == "inspect":
+            capabilities = client.inspect()
+            tools = client.list_tools()
+            resources = client.list_resources()
+            prompts = client.list_prompts()
+            report = Report(
+                title="MCP Server",
+                status="ok",
+                next_action="Route MCP tool calls through approval and policy gates before execution",
+                sections=[
+                    ReportSection("Capabilities", [f"{key}={value}" for key, value in capabilities.capabilities.items()]),
+                    ReportSection("Tools", [tool.name for tool in tools] or ["(none)"]),
+                    ReportSection("Resources", [resource.uri for resource in resources] or ["(none)"]),
+                    ReportSection("Prompts", [prompt.name for prompt in prompts] or ["(none)"]),
+                ],
+                data={
+                    "capabilities": capabilities.to_dict(),
+                    "tools": [tool.to_dict() for tool in tools],
+                    "resources": [resource.to_dict() for resource in resources],
+                    "prompts": [prompt.to_dict() for prompt in prompts],
+                },
+            )
+            return _emit(report, args.format)
+        if args.subcommand == "tools":
+            tools = client.list_tools()
+            report = Report(
+                title="MCP Tools",
+                status="ok",
+                next_action="Validate MCP tool schemas before allowing calls",
+                sections=[ReportSection("Tools", [f"{tool.name}: {tool.description}" for tool in tools] or ["(none)"])],
+                data={"tools": [tool.to_dict() for tool in tools]},
+            )
+            return _emit(report, args.format)
+        if args.subcommand == "resources":
+            resources = client.list_resources()
+            report = Report(
+                title="MCP Resources",
+                status="ok",
+                next_action="Apply MCP resource policy before reading external context",
+                sections=[ReportSection("Resources", [resource.uri for resource in resources] or ["(none)"])],
+                data={"resources": [resource.to_dict() for resource in resources]},
+            )
+            return _emit(report, args.format)
+        prompts = client.list_prompts()
+        report = Report(
+            title="MCP Prompts",
+            status="ok",
+            next_action="Treat external prompts as untrusted context until reviewed",
+            sections=[ReportSection("Prompts", [prompt.name for prompt in prompts] or ["(none)"])],
+            data={"prompts": [prompt.to_dict() for prompt in prompts]},
+        )
+        return _emit(report, args.format)
+    finally:
+        client.close()
 
 
 def _handle_scene(args: argparse.Namespace) -> int:
@@ -3895,6 +3978,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_ingest(args)
     if args.command == "debug":
         return _handle_debug(args)
+    if args.command == "mcp":
+        return _handle_mcp(args)
     if args.command == "scene":
         return _handle_scene(args)
     if args.command == "export":
