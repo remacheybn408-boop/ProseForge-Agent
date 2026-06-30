@@ -195,6 +195,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "project slug, chapter id or volume id",
         "artifacts": "structured reader report with actionable suggestions",
     },
+    "search": {
+        "help": "Search the whole manuscript for a keyword or exact phrase",
+        "inputs": "query, project slug, scope, exact flag",
+        "artifacts": "ranked file/chapter/line hits with snippets",
+    },
     "setup": {
         "help": "Run the guided first-use setup wizard",
         "inputs": "setup mode, provider, repair/reconfigure flags",
@@ -500,6 +505,10 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--slug", default=None, help="project slug")
             group.add_argument("--chapter", default=None, help="chapter id")
             group.add_argument("--volume", default=None, help="volume id")
+        if name == "search":
+            group.add_argument("--slug", default=None, help="project slug")
+            group.add_argument("--scope", default="manuscript", help="search scope: manuscript or all")
+            group.add_argument("--exact", action="store_true", help="match the query as an exact phrase")
         if name == "chapter":
             group.add_argument("chapter_ids", nargs="*", help="chapter ids for reorganization")
             group.add_argument("--slug", default=None, help="project slug")
@@ -1751,6 +1760,44 @@ def _handle_reader_review(args: argparse.Namespace) -> int:
             ReportSection("Suggestions", suggestion_lines),
         ],
         data=report_data.to_dict(),
+    )
+    return _emit(report, args.format)
+
+
+def _handle_search(args: argparse.Namespace) -> int:
+    from .novel import ManuscriptSearch
+
+    query = args.subcommand
+    if not args.slug or not query:
+        return _emit(
+            _planned_report("search", 'Run `pf-agent search "<query>" --slug <slug>`'),
+            args.format,
+        )
+    searcher = ManuscriptSearch(Path(".pf-agent") / "workspace", slug=args.slug)
+    try:
+        result = searcher.search(query, scope=args.scope, exact=args.exact)
+    except ValueError as exc:
+        report = Report(
+            title="Manuscript Search",
+            status="blocked",
+            next_action="Use scope 'manuscript' or 'all' and a non-empty query",
+            sections=[ReportSection("Error", [str(exc)])],
+            data={"error": str(exc)},
+        )
+        _emit(report, args.format)
+        return 1
+    hit_lines = [
+        f"{hit.chapter or hit.domain}:{hit.line} {hit.snippet}" for hit in result.hits
+    ] or ["no matches"]
+    report = Report(
+        title="Manuscript Search",
+        status="ok",
+        next_action="Open the cited file at the reported line",
+        sections=[
+            ReportSection("Query", [f"query={result.query}", f"scope={result.scope}", f"exact={result.exact}", f"count={result.count}"]),
+            ReportSection("Hits", hit_lines),
+        ],
+        data=result.to_dict(),
     )
     return _emit(report, args.format)
 
@@ -3085,6 +3132,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_rewrite(args)
     if args.command == "reader-review":
         return _handle_reader_review(args)
+    if args.command == "search":
+        return _handle_search(args)
     if args.command == "setup":
         return _handle_setup(args)
     if args.command == "init":
