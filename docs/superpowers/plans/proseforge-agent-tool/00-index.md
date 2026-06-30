@@ -165,6 +165,12 @@ These cards target Hermes-like completeness without desktop UI shells or OS GUI 
 - **Skill Learning Loop (174-179)**: [Skill Specification And Registry](tasks/174-skill-specification-and-registry.md) through [User Model And Memory Nudges](tasks/179-user-model-and-memory-nudges.md).
 - **Hosted Ops, Observability, And Research Data (180-182)**: [Hosted Cron And Scale To Zero](tasks/180-hosted-cron-and-scale-to-zero.md) through [Middleware Hooks And Trajectory Datasets](tasks/182-middleware-hooks-and-trajectory-datasets.md).
 
+### Release And Distribution Engineering (183-185)
+
+Appendix track for the **actual shipping** that the packaging-readiness cards deliberately left out: Tasks 47/48 verify entry points and the binary manifest *contract*, and Task 60 aggregates the gate, but none of them run a real build or publish. Numbered at the tail so it does not renumber or reorder Cards 101–182; it depends only on the already-complete readiness work and blocks none of those cards.
+
+- **Release And Distribution Engineering (183-185)**: [PyPI / TestPyPI Publish / 真实发布到 PyPI](tasks/183-pypi-publish.md) through [OS Installers And Signing / 安装包与签名](tasks/185-os-installers-and-signing.md).
+
 The maintainer contract for fault isolation, three-tier rollback, the debugging runbook, and the internal interface compatibility policy lives in `architecture/10-modularity-and-recovery.md`. The autonomous runtime design lives in `architecture/11-autonomous-agent-runtime.md`.
 
 ## Definition Of Done

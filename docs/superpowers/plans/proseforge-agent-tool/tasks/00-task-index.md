@@ -281,6 +281,14 @@ These cards close the gap between the current ProseForge Agent platform plan and
 181. [Observer Hooks And Telemetry Export](181-observer-hooks-and-telemetry-export.md)
 182. [Middleware Hooks And Trajectory Datasets](182-middleware-hooks-and-trajectory-datasets.md)
 
+## Release And Distribution Engineering Cards (183–185)
+
+These cards own the **actual shipping** that the 1–60 packaging cards deliberately left out: Tasks 47/48 verify packaging *readiness* (console entry point, dependency resolution, binary manifest contract) and Task 60 aggregates the release gate, but none of them run a real build or publish to a registry. Like the Hardening Cards (61–65), they are numbered as an appendix to avoid renumbering existing cards and to keep the recommended order of Cards 101–182 unchanged. They depend only on the already-complete readiness work and block no 101–182 card.
+
+183. [PyPI / TestPyPI Publish / 真实发布到 PyPI](183-pypi-publish.md) — execute after Task 47 (package checks); reuses `PackageChecker` for pre-publish validation, builds the wheel/sdist, and publishes via TestPyPI then PyPI.
+184. [Standalone Binary Build / 真实二进制构建](184-standalone-binary-build.md) — execute after Task 48 (binary manifest); runs a real PyInstaller build against the `BinaryManifest` contract and the `pf-agent --version` smoke command.
+185. [OS Installers And Signing / 安装包与签名](185-os-installers-and-signing.md) — execute after Tasks 49–51 and 184; reuses Task 43 `AppDirs` to produce and sign `.msi` / `.dmg` / `install.sh` artifacts.
+
 ## Execution Rule
 
 Execute one card at a time. Run the card's verification commands before starting the next card. If verification fails, stop and fix the current card instead of carrying broken assumptions forward.
