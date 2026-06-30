@@ -37,6 +37,7 @@ from .rewrite_strategies import REWRITE_STRATEGIES, RewriteResult, RewriteStrate
 from .scenes import SceneRecord, SceneWorkflow
 from .style_profile import STYLE_PROFILE_NAME, StyleProfile, StyleProfileCompiler
 from .timeline import TIMELINE_NAME, TimelineEngine, TimelineEvent
+from .writing_analytics import ANALYTICS_DIR, AnalyticsSummary, DailyStat, WritingAnalytics
 from .writing_rules import RULE_LEVELS, WRITING_RULES_NAME, WritingRule, WritingRulesStore
 from .writing_quality import QUALITY_REPORT_DIR, QualityCheckResult, QualityViolation, WritingQualityGateRunner
 
@@ -122,6 +123,10 @@ __all__ = [
     "StyleProfileCompiler",
     "TimelineEngine",
     "TimelineEvent",
+    "ANALYTICS_DIR",
+    "AnalyticsSummary",
+    "DailyStat",
+    "WritingAnalytics",
     "WRITING_RULES_NAME",
     "WritingRule",
     "WritingQualityGateRunner",
