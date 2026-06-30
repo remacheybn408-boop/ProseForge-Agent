@@ -4,6 +4,7 @@ from .events import BackgroundJobRunner, EventBus, EventRecord, JobResult
 from .eval import EvalHarness, EvalReport, EvalSuite, EvalTaskResult, GoldenTask
 from .attachments import AttachmentIngestResult, AttachmentIngestor
 from .audit import AuditStep, AuditTrailStore, ReplayResult
+from .execution_guard import ExecutionGuard, ExecutionGuardResult, ExecutionPolicy
 from .function_calling import (
     ProviderToolCall,
     StructuredToolAdapter,
@@ -54,6 +55,9 @@ __all__ = [
     "GoldenTask",
     "EventBus",
     "EventRecord",
+    "ExecutionGuard",
+    "ExecutionGuardResult",
+    "ExecutionPolicy",
     "ProviderToolCall",
     "StructuredToolAdapter",
     "StructuredToolResult",
