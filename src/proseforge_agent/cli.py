@@ -215,6 +215,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "project slug, approval id",
         "artifacts": "approval queue entries with decision status",
     },
+    "stats": {
+        "help": "Show writing analytics: word trends, effort, and completion prediction",
+        "inputs": "project slug, daily/export subcommand, target words",
+        "artifacts": "analytics summary, daily trend, and CSV export",
+    },
     "setup": {
         "help": "Run the guided first-use setup wizard",
         "inputs": "setup mode, provider, repair/reconfigure flags",
@@ -320,7 +325,7 @@ def build_parser() -> argparse.ArgumentParser:
     for name, spec in COMMAND_GROUPS.items():
         group = subparsers.add_parser(
             name,
-            parents=[] if name == "export" else [shared],
+            parents=[] if name in {"export", "stats"} else [shared],
             help=spec["help"],
             description=(
                 f"{spec['help']}.\n"
@@ -541,6 +546,15 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "approval":
             group.add_argument("approval_id", nargs="?", help="approval id for show/approve/reject")
             group.add_argument("--slug", default=None, help="project slug")
+        if name == "stats":
+            group.add_argument("--slug", default=None, help="project slug")
+            group.add_argument("--target-words", type=int, default=None, help="target word count for prediction")
+            group.add_argument(
+                "--format",
+                choices=["markdown", "json", "terminal", "csv"],
+                default="terminal",
+                help="output format (csv applies to `stats export`)",
+            )
         if name == "chapter":
             group.add_argument("chapter_ids", nargs="*", help="chapter ids for reorganization")
             group.add_argument("--slug", default=None, help="project slug")
@@ -2079,6 +2093,60 @@ def _handle_approval(args: argparse.Namespace) -> int:
         return 1
 
 
+def _handle_stats(args: argparse.Namespace) -> int:
+    from .novel import WritingAnalytics
+
+    sub = args.subcommand
+    if not args.slug or sub not in {None, "daily", "export"}:
+        return _emit(_planned_report("stats", "Run `pf-agent stats --slug <slug>`"), args.format)
+    analytics = WritingAnalytics(Path(".pf-agent") / "workspace", slug=args.slug)
+    if sub == "export":
+        print(analytics.export_csv(), end="")
+        return 0
+    if sub == "daily":
+        daily = analytics.daily()
+        lines = [f"{stat.date}: {stat.words} words, {stat.revisions} rev, {stat.minutes} min" for stat in daily] or ["no recorded days"]
+        return _emit(
+            Report(
+                title="Writing Analytics — Daily",
+                status="ok",
+                next_action="Export the trend with `pf-agent stats export --slug <slug> --format csv`",
+                sections=[ReportSection("Daily", lines)],
+                data={"daily": [stat.to_dict() for stat in daily]},
+            ),
+            args.format,
+        )
+    summary = analytics.summary(target_words=args.target_words)
+    prediction = (
+        f"{summary.days_remaining} days at {summary.avg_daily_words}/day"
+        if summary.days_remaining is not None
+        else "set --target-words for a prediction"
+    )
+    return _emit(
+        Report(
+            title="Writing Analytics",
+            status="ok",
+            next_action="Use `pf-agent stats daily` or `stats export` for detail",
+            sections=[
+                ReportSection(
+                    "Totals",
+                    [
+                        f"total_words={summary.total_words}",
+                        f"chapters={len(summary.chapter_words)}",
+                        f"revisions={summary.total_revisions}",
+                        f"cost={summary.total_cost}",
+                        f"days_recorded={summary.days_recorded}",
+                        f"avg_daily_words={summary.avg_daily_words}",
+                    ],
+                ),
+                ReportSection("Prediction", [prediction]),
+            ],
+            data=summary.to_dict(),
+        ),
+        args.format,
+    )
+
+
 def _split_pair(value: str, left_key: str, right_key: str) -> dict[str, str]:
     left, separator, right = value.partition(":")
     if not separator:
@@ -3417,6 +3485,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_editorial(args)
     if args.command == "approval":
         return _handle_approval(args)
+    if args.command == "stats":
+        return _handle_stats(args)
     if args.command == "setup":
         return _handle_setup(args)
     if args.command == "init":
