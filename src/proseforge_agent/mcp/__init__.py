@@ -14,6 +14,7 @@ from .client import (
     default_demo_client,
 )
 from .registry import MCPServerConfig, MCPServerRegistry
+from .policy import MCPPolicy, MCPPolicyDecision, MCPPolicyStore
 
 __all__ = [
     "MCPCapabilityReport",
@@ -23,6 +24,9 @@ __all__ = [
     "MCPServerSpec",
     "MCPServerConfig",
     "MCPServerRegistry",
+    "MCPPolicy",
+    "MCPPolicyDecision",
+    "MCPPolicyStore",
     "MCPTool",
     "MCPTransport",
     "PlaceholderMCPTransport",
