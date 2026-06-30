@@ -170,6 +170,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "rule text or id, level, project slug, chapter",
         "artifacts": "writing rule store and evidence records",
     },
+    "style": {
+        "help": "Compile style preferences into executable checks",
+        "inputs": "project slug, preferences, chapter id",
+        "artifacts": "compiled style profile and style check report",
+    },
     "setup": {
         "help": "Run the guided first-use setup wizard",
         "inputs": "setup mode, provider, repair/reconfigure flags",
@@ -455,6 +460,10 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--slug", default=None, help="project slug")
             group.add_argument("--level", default="project", help="rule level: global, project, or chapter")
             group.add_argument("--chapter", default="", help="chapter id for chapter-level rules")
+        if name == "style":
+            group.add_argument("--slug", default=None, help="project slug")
+            group.add_argument("--preference", action="append", default=None, help="style preference to compile")
+            group.add_argument("--chapter", default=None, help="chapter id to check")
         if name == "chapter":
             group.add_argument("chapter_ids", nargs="*", help="chapter ids for reorganization")
             group.add_argument("--slug", default=None, help="project slug")
@@ -1486,6 +1495,54 @@ def _handle_rules(args: argparse.Namespace) -> int:
     )
     _emit(report, args.format)
     return 0 if result["removed"] else 1
+
+
+def _handle_style(args: argparse.Namespace) -> int:
+    if args.subcommand not in {"compile", "check"} or not args.slug:
+        return _emit(_planned_report("style", "Run `pf-agent style compile --slug <slug>`"), args.format)
+    from .novel import StyleProfileCompiler
+
+    compiler = StyleProfileCompiler(Path(".pf-agent") / "workspace", slug=args.slug)
+    if args.subcommand == "compile":
+        profile = compiler.compile(args.preference) if args.preference else compiler.compile_from_rules()
+        report = Report(
+            title="Style Profile",
+            status="ok",
+            next_action="Run `pf-agent style check --slug <slug> --chapter <id>` before review",
+            sections=[
+                ReportSection(
+                    "Checks",
+                    [
+                        f"punctuation={', '.join(profile.punctuation_checks) or 'none'}",
+                        f"lexical={', '.join(profile.lexical_checks) or 'none'}",
+                        f"narration={', '.join(profile.narration_distance_checks) or 'none'}",
+                        f"review_gates={', '.join(profile.review_gate_rules) or 'none'}",
+                    ],
+                )
+            ],
+            data=profile.to_dict(),
+        )
+        return _emit(report, args.format)
+    if not args.chapter:
+        return _emit(_planned_report("style", "Pass --chapter for style check"), args.format)
+    result = compiler.check_chapter(args.chapter)
+    report = Report(
+        title="Style Check",
+        status=result["status"],
+        next_action="Fix style violations or revise the compiled style profile",
+        sections=[
+            ReportSection(
+                "Violations",
+                [
+                    f"{violation['code']}: {violation['message']}"
+                    for violation in result["violations"]
+                ]
+                or ["(none)"],
+            )
+        ],
+        data=result,
+    )
+    return _emit(report, args.format)
 
 
 def _split_pair(value: str, left_key: str, right_key: str) -> dict[str, str]:
@@ -2808,6 +2865,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_relation(args)
     if args.command == "rules":
         return _handle_rules(args)
+    if args.command == "style":
+        return _handle_style(args)
     if args.command == "setup":
         return _handle_setup(args)
     if args.command == "init":
