@@ -145,6 +145,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "project slug, event date/order/location/characters",
         "artifacts": "timeline event store and conflict report",
     },
+    "plot-thread": {
+        "help": "Track long-running plot threads and stale payoffs",
+        "inputs": "project slug, thread metadata, current chapter",
+        "artifacts": "plot thread store and stale-thread report",
+    },
     "setup": {
         "help": "Run the guided first-use setup wizard",
         "inputs": "setup mode, provider, repair/reconfigure flags",
@@ -371,6 +376,18 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--effect", action="append", default=None, help="causal successor event id")
             group.add_argument("--chapter", default="", help="chapter id")
             group.add_argument("--scene", default="", help="scene id")
+        if name == "plot-thread":
+            group.add_argument("--slug", default=None, help="project slug")
+            group.add_argument("--id", default=None, help="plot thread id")
+            group.add_argument("--type", default="subplot", help="plot thread type")
+            group.add_argument("--status", default="active", help="plot thread status")
+            group.add_argument("--first-appearance", default="", help="first chapter or scene appearance")
+            group.add_argument("--last-touched", default="", help="last chapter or scene where the thread moved")
+            group.add_argument("--expected-payoff", default="", help="expected payoff chapter or note")
+            group.add_argument("--linked-chapter", action="append", default=None, help="chapter linked to the thread")
+            group.add_argument("--linked-character", action="append", default=None, help="character linked to the thread")
+            group.add_argument("--current-chapter", type=int, default=None, help="current chapter number for stale checks")
+            group.add_argument("--max-gap", type=int, default=3, help="maximum chapters without progress")
         if name == "chapter":
             group.add_argument("chapter_ids", nargs="*", help="chapter ids for reorganization")
             group.add_argument("--slug", default=None, help="project slug")
@@ -1028,6 +1045,80 @@ def _handle_timeline(args: argparse.Namespace) -> int:
             )
         ],
         data={"events": [event.to_dict() for event in events]},
+    )
+    return _emit(report, args.format)
+
+
+def _handle_plot_thread(args: argparse.Namespace) -> int:
+    if args.subcommand not in {"add", "list", "stale"} or not args.slug:
+        return _emit(_planned_report("plot-thread", "Run `pf-agent plot-thread add --slug <slug>`"), args.format)
+    from .novel import PlotThreadManager
+
+    manager = PlotThreadManager(Path(".pf-agent") / "workspace", slug=args.slug)
+    if args.subcommand == "add":
+        if not args.id:
+            return _emit(_planned_report("plot-thread", "Pass --id for plot-thread add"), args.format)
+        thread = manager.add_thread(
+            id=args.id,
+            type=args.type,
+            status=args.status,
+            first_appearance=args.first_appearance,
+            last_touched=args.last_touched,
+            expected_payoff=args.expected_payoff,
+            linked_chapters=args.linked_chapter or [],
+            linked_characters=args.linked_character or [],
+        )
+        report = Report(
+            title="Plot Thread",
+            status="ok",
+            next_action="Run `pf-agent plot-thread stale --slug <slug>` during chapter planning",
+            sections=[
+                ReportSection(
+                    "Thread",
+                    [
+                        f"id={thread.id}",
+                        f"type={thread.type}",
+                        f"status={thread.status}",
+                        f"expected_payoff={thread.expected_payoff}",
+                    ],
+                )
+            ],
+            data=thread.to_dict(),
+        )
+        return _emit(report, args.format)
+    if args.subcommand == "list":
+        threads = manager.list()
+        report = Report(
+            title="Plot Thread List",
+            status="ok",
+            next_action="Review stale threads before accepting late-book drafts",
+            sections=[
+                ReportSection(
+                    "Threads",
+                    [f"{thread.id}: {thread.type} {thread.status}" for thread in threads] or ["(none)"],
+                )
+            ],
+            data={"threads": [thread.to_dict() for thread in threads]},
+        )
+        return _emit(report, args.format)
+    if args.current_chapter is None:
+        return _emit(_planned_report("plot-thread", "Pass --current-chapter for stale checks"), args.format)
+    stale_threads = manager.stale(current_chapter=args.current_chapter, max_gap=args.max_gap)
+    report = Report(
+        title="Plot Thread Stale",
+        status="ok" if not stale_threads else "degraded",
+        next_action="Touch, resolve, or intentionally defer every stale plot thread",
+        sections=[
+            ReportSection(
+                "Stale",
+                [
+                    f"{thread['id']}: stale {thread['chapters_since_touched']} chapters"
+                    for thread in stale_threads
+                ]
+                or ["(none)"],
+            )
+        ],
+        data={"threads": stale_threads},
     )
     return _emit(report, args.format)
 
@@ -2328,6 +2419,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_continuity(args)
     if args.command == "timeline":
         return _handle_timeline(args)
+    if args.command == "plot-thread":
+        return _handle_plot_thread(args)
     if args.command == "setup":
         return _handle_setup(args)
     if args.command == "init":

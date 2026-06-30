@@ -6,6 +6,7 @@ from .continuity import ContinuityConflict, ContinuityResolver, RESOLUTION_ACTIO
 from .exporter import BookExporter, ExportResult
 from .importer import BulkImporter, ImportedChapter, ImportResult
 from .manifest import MANIFEST_NAME, NovelProjectManifest, NovelProjectStore
+from .plot_threads import PLOT_THREADS_NAME, PlotThread, PlotThreadManager
 from .publishing import PUBLISHING_NAME, PublishingMetadata, PublishingMetadataStore
 from .reorganize import ChapterReorganizer
 from .scenes import SceneRecord, SceneWorkflow
@@ -15,6 +16,7 @@ __all__ = [
     "GRAPH_NAME",
     "MANIFEST_NAME",
     "PUBLISHING_NAME",
+    "PLOT_THREADS_NAME",
     "TIMELINE_NAME",
     "ArtifactGraphStore",
     "ArtifactRecord",
@@ -30,6 +32,8 @@ __all__ = [
     "ExportResult",
     "NovelProjectManifest",
     "NovelProjectStore",
+    "PlotThread",
+    "PlotThreadManager",
     "PublishingMetadata",
     "PublishingMetadataStore",
     "RESOLUTION_ACTIONS",
