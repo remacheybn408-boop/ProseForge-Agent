@@ -3,6 +3,7 @@
 from .artifacts import GRAPH_NAME, ArtifactGraphStore, ArtifactRecord
 from .importer import BulkImporter, ImportedChapter, ImportResult
 from .manifest import MANIFEST_NAME, NovelProjectManifest, NovelProjectStore
+from .scenes import SceneRecord, SceneWorkflow
 
 __all__ = [
     "GRAPH_NAME",
@@ -14,4 +15,6 @@ __all__ = [
     "ImportResult",
     "NovelProjectManifest",
     "NovelProjectStore",
+    "SceneRecord",
+    "SceneWorkflow",
 ]
