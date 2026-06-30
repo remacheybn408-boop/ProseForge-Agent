@@ -165,6 +165,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "project slug, relation endpoints and type",
         "artifacts": "relationship graph data, markdown, and Graphviz dot",
     },
+    "rules": {
+        "help": "Manage explicit writing rules for draft/review/rewrite evidence",
+        "inputs": "rule text or id, level, project slug, chapter",
+        "artifacts": "writing rule store and evidence records",
+    },
     "setup": {
         "help": "Run the guided first-use setup wizard",
         "inputs": "setup mode, provider, repair/reconfigure flags",
@@ -445,6 +450,11 @@ def build_parser() -> argparse.ArgumentParser:
                 default="json",
                 help="relationship graph export format",
             )
+        if name == "rules":
+            group.add_argument("rule_text", nargs="?", help="rule text for add or rule id for remove")
+            group.add_argument("--slug", default=None, help="project slug")
+            group.add_argument("--level", default="project", help="rule level: global, project, or chapter")
+            group.add_argument("--chapter", default="", help="chapter id for chapter-level rules")
         if name == "chapter":
             group.add_argument("chapter_ids", nargs="*", help="chapter ids for reorganization")
             group.add_argument("--slug", default=None, help="project slug")
@@ -1415,6 +1425,67 @@ def _handle_relation(args: argparse.Namespace) -> int:
         data={"format": args.graph_format, "graph": graph_data},
     )
     return _emit(report, args.format)
+
+
+def _handle_rules(args: argparse.Namespace) -> int:
+    if args.subcommand not in {"add", "list", "remove"}:
+        return _emit(_planned_report("rules", "Run `pf-agent rules add \"<rule>\"`"), args.format)
+    from .novel import WritingRulesStore
+
+    store = WritingRulesStore(Path(".pf-agent") / "workspace", slug=args.slug)
+    if args.subcommand == "add":
+        if not args.rule_text:
+            return _emit(_planned_report("rules", "Pass rule text for rules add"), args.format)
+        try:
+            rule = store.add(args.rule_text, level=args.level, chapter=args.chapter)
+        except ValueError as exc:
+            report = Report(
+                title="Writing Rules",
+                status="blocked",
+                next_action="Use global, project, or chapter rule level",
+                sections=[ReportSection("Error", [str(exc)])],
+                data={"error": str(exc)},
+            )
+            _emit(report, args.format)
+            return 1
+        report = Report(
+            title="Writing Rules",
+            status="ok",
+            next_action="Draft, review, and rewrite flows can read these rules as evidence",
+            sections=[
+                ReportSection(
+                    "Rule",
+                    [f"id={rule.id}", f"level={rule.level}", f"chapter={rule.chapter}", f"text={rule.text}"],
+                )
+            ],
+            data=rule.to_dict(),
+        )
+        return _emit(report, args.format)
+    if args.subcommand == "list":
+        rules = store.list()
+        report = Report(
+            title="Writing Rules",
+            status="ok",
+            next_action="Remove obsolete rules or keep them explicit for future drafts",
+            sections=[
+                ReportSection(
+                    "Rules",
+                    [f"{rule.id}: [{rule.level}] {rule.text}" for rule in rules] or ["(none)"],
+                )
+            ],
+            data={"rules": [rule.to_dict() for rule in rules]},
+        )
+        return _emit(report, args.format)
+    result = store.remove(args.rule_text or "")
+    report = Report(
+        title="Writing Rules",
+        status="ok" if result["removed"] else "blocked",
+        next_action="Run `pf-agent rules list` to confirm active rules",
+        sections=[ReportSection("Remove", [f"{key}={value}" for key, value in result.items()])],
+        data=result,
+    )
+    _emit(report, args.format)
+    return 0 if result["removed"] else 1
 
 
 def _split_pair(value: str, left_key: str, right_key: str) -> dict[str, str]:
@@ -2735,6 +2806,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_character_arc(args)
     if args.command == "relation":
         return _handle_relation(args)
+    if args.command == "rules":
+        return _handle_rules(args)
     if args.command == "setup":
         return _handle_setup(args)
     if args.command == "init":
