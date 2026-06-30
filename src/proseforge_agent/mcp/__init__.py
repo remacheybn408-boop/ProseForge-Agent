@@ -16,6 +16,7 @@ from .client import (
 from .approval import MCPApprovalGate, MCPApprovalQueue, MCPApprovalRequest
 from .registry import MCPServerConfig, MCPServerRegistry
 from .policy import MCPPolicy, MCPPolicyDecision, MCPPolicyStore
+from .schema import MCPSchemaCache, MCPSchemaValidationResult, MCPSchemaValidator, MCPSchemaVersion
 
 __all__ = [
     "MCPCapabilityReport",
@@ -25,6 +26,10 @@ __all__ = [
     "MCPClient",
     "MCPPrompt",
     "MCPResource",
+    "MCPSchemaCache",
+    "MCPSchemaValidationResult",
+    "MCPSchemaValidator",
+    "MCPSchemaVersion",
     "MCPServerSpec",
     "MCPServerConfig",
     "MCPServerRegistry",
