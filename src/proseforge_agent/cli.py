@@ -175,6 +175,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "project slug, preferences, chapter id",
         "artifacts": "compiled style profile and style check report",
     },
+    "quality": {
+        "help": "Run writing quality gates and summarize chapter reports",
+        "inputs": "project slug and chapter id",
+        "artifacts": "quality gate report with actionable violations",
+    },
     "setup": {
         "help": "Run the guided first-use setup wizard",
         "inputs": "setup mode, provider, repair/reconfigure flags",
@@ -463,6 +468,9 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "style":
             group.add_argument("--slug", default=None, help="project slug")
             group.add_argument("--preference", action="append", default=None, help="style preference to compile")
+            group.add_argument("--chapter", default=None, help="chapter id to check")
+        if name == "quality":
+            group.add_argument("--slug", default=None, help="project slug")
             group.add_argument("--chapter", default=None, help="chapter id to check")
         if name == "chapter":
             group.add_argument("chapter_ids", nargs="*", help="chapter ids for reorganization")
@@ -1541,6 +1549,53 @@ def _handle_style(args: argparse.Namespace) -> int:
             )
         ],
         data=result,
+    )
+    return _emit(report, args.format)
+
+
+def _handle_quality(args: argparse.Namespace) -> int:
+    if args.subcommand not in {"check", "report"} or not args.slug:
+        return _emit(_planned_report("quality", "Run `pf-agent quality check --slug <slug> --chapter <id>`"), args.format)
+    from .novel import WritingQualityGateRunner
+
+    runner = WritingQualityGateRunner(Path(".pf-agent") / "workspace", slug=args.slug)
+    if args.subcommand == "check":
+        if not args.chapter:
+            return _emit(_planned_report("quality", "Pass --chapter for quality check"), args.format)
+        result = runner.check_chapter(args.chapter)
+        report = Report(
+            title="Quality Check",
+            status=result["status"],
+            next_action="Fix reported violations before accepting the chapter",
+            sections=[
+                ReportSection(
+                    "Violations",
+                    [
+                        (
+                            f"{item['code']} line={item['line']} column={item['column']}: "
+                            f"{item['suggestion']}"
+                        )
+                        for item in result["violations"]
+                    ]
+                    or ["(none)"],
+                )
+            ],
+            data=result,
+        )
+        return _emit(report, args.format)
+    data = runner.report()
+    lines = [
+        f"chapters={data['summary']['chapters']}",
+        f"total_violations={data['summary']['total_violations']}",
+    ]
+    for chapter in data["chapters"]:
+        lines.append(f"{chapter.get('chapter')}: {len(chapter.get('violations', []))} violations")
+    report = Report(
+        title="Quality Report",
+        status=data["status"],
+        next_action="Use the report before release or regression comparison",
+        sections=[ReportSection("Summary", lines)],
+        data=data,
     )
     return _emit(report, args.format)
 
@@ -2867,6 +2922,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_rules(args)
     if args.command == "style":
         return _handle_style(args)
+    if args.command == "quality":
+        return _handle_quality(args)
     if args.command == "setup":
         return _handle_setup(args)
     if args.command == "init":
