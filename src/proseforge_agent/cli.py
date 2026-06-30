@@ -140,6 +140,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "project slug, conflict id, resolution action",
         "artifacts": "continuity conflict report and audit log",
     },
+    "timeline": {
+        "help": "Manage story timeline events and consistency checks",
+        "inputs": "project slug, event date/order/location/characters",
+        "artifacts": "timeline event store and conflict report",
+    },
     "setup": {
         "help": "Run the guided first-use setup wizard",
         "inputs": "setup mode, provider, repair/reconfigure flags",
@@ -351,6 +356,21 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--slug", default=None, help="project slug")
             group.add_argument("--conflict", default=None, help="conflict id")
             group.add_argument("--action", default="defer", help="resolution action")
+        if name == "timeline":
+            group.add_argument("--slug", default=None, help="project slug")
+            group.add_argument("--id", default=None, help="timeline event id")
+            group.add_argument("--title", default=None, help="timeline event title")
+            group.add_argument("--absolute-date", default="", help="absolute in-world or calendar date")
+            group.add_argument("--relative-date", default="", help="relative date such as before chapter 2")
+            group.add_argument("--story-day", type=int, default=None, help="story day index")
+            group.add_argument("--order", type=int, default=0, help="order within the story day")
+            group.add_argument("--parallel", action="store_true", help="mark as a parallel event")
+            group.add_argument("--character", action="append", default=None, help="character present in the event")
+            group.add_argument("--location", default="", help="event location")
+            group.add_argument("--cause", action="append", default=None, help="causal predecessor event id")
+            group.add_argument("--effect", action="append", default=None, help="causal successor event id")
+            group.add_argument("--chapter", default="", help="chapter id")
+            group.add_argument("--scene", default="", help="scene id")
         if name == "chapter":
             group.add_argument("chapter_ids", nargs="*", help="chapter ids for reorganization")
             group.add_argument("--slug", default=None, help="project slug")
@@ -929,6 +949,87 @@ def _handle_continuity(args: argparse.Namespace) -> int:
     )
     _emit(report, args.format)
     return 0 if result.get("status") == "ok" else 1
+
+
+def _handle_timeline(args: argparse.Namespace) -> int:
+    if args.subcommand not in {"add-event", "check", "view"} or not args.slug:
+        return _emit(_planned_report("timeline", "Run `pf-agent timeline add-event --slug <slug>`"), args.format)
+    from .novel import TimelineEngine
+
+    timeline = TimelineEngine(Path(".pf-agent") / "workspace", slug=args.slug)
+    if args.subcommand == "add-event":
+        if not args.id or not args.title:
+            return _emit(_planned_report("timeline", "Pass --id and --title for timeline add-event"), args.format)
+        event = timeline.add_event(
+            id=args.id,
+            title=args.title,
+            absolute_date=args.absolute_date,
+            relative_date=args.relative_date,
+            story_day=args.story_day,
+            order=args.order,
+            parallel=args.parallel,
+            characters=args.character or [],
+            location=args.location,
+            causes=args.cause or [],
+            effects=args.effect or [],
+            chapter_id=args.chapter,
+            scene_id=args.scene,
+        )
+        report = Report(
+            title="Timeline Event",
+            status="ok",
+            next_action="Run `pf-agent timeline check --slug <slug>` before accepting chronology",
+            sections=[
+                ReportSection(
+                    "Event",
+                    [
+                        f"id={event.id}",
+                        f"title={event.title}",
+                        f"story_day={event.story_day}",
+                        f"order={event.order}",
+                    ],
+                )
+            ],
+            data=event.to_dict(),
+        )
+        return _emit(report, args.format)
+    if args.subcommand == "check":
+        conflicts = timeline.check()
+        report = Report(
+            title="Timeline Check",
+            status="ok" if not conflicts else "degraded",
+            next_action="Resolve location and causal conflicts before drafting dependent scenes",
+            sections=[
+                ReportSection(
+                    "Conflicts",
+                    [
+                        f"{item['id']}: {item['type']} {item.get('character') or item.get('event')}"
+                        for item in conflicts
+                    ]
+                    or ["(none)"],
+                )
+            ],
+            data={"conflicts": conflicts},
+        )
+        return _emit(report, args.format)
+    events = timeline.view()
+    report = Report(
+        title="Timeline View",
+        status="ok",
+        next_action="Use timeline order as context for scene and chapter planning",
+        sections=[
+            ReportSection(
+                "Events",
+                [
+                    f"{event.id}: day={event.story_day} order={event.order} title={event.title}"
+                    for event in events
+                ]
+                or ["(none)"],
+            )
+        ],
+        data={"events": [event.to_dict() for event in events]},
+    )
+    return _emit(report, args.format)
 
 
 def _handle_provider_probe(args: argparse.Namespace) -> int:
@@ -2225,6 +2326,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_bible(args)
     if args.command == "continuity":
         return _handle_continuity(args)
+    if args.command == "timeline":
+        return _handle_timeline(args)
     if args.command == "setup":
         return _handle_setup(args)
     if args.command == "init":

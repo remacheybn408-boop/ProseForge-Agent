@@ -9,11 +9,13 @@ from .manifest import MANIFEST_NAME, NovelProjectManifest, NovelProjectStore
 from .publishing import PUBLISHING_NAME, PublishingMetadata, PublishingMetadataStore
 from .reorganize import ChapterReorganizer
 from .scenes import SceneRecord, SceneWorkflow
+from .timeline import TIMELINE_NAME, TimelineEngine, TimelineEvent
 
 __all__ = [
     "GRAPH_NAME",
     "MANIFEST_NAME",
     "PUBLISHING_NAME",
+    "TIMELINE_NAME",
     "ArtifactGraphStore",
     "ArtifactRecord",
     "BIBLE_SECTIONS",
@@ -33,4 +35,6 @@ __all__ = [
     "RESOLUTION_ACTIONS",
     "SceneRecord",
     "SceneWorkflow",
+    "TimelineEngine",
+    "TimelineEvent",
 ]
