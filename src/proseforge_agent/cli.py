@@ -150,6 +150,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "project slug, thread metadata, current chapter",
         "artifacts": "plot thread store and stale-thread report",
     },
+    "foreshadow": {
+        "help": "Track planted foreshadowing and overdue payoffs",
+        "inputs": "project slug, foreshadowing metadata, current chapter",
+        "artifacts": "foreshadowing store and overdue report",
+    },
     "setup": {
         "help": "Run the guided first-use setup wizard",
         "inputs": "setup mode, provider, repair/reconfigure flags",
@@ -388,6 +393,18 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--linked-character", action="append", default=None, help="character linked to the thread")
             group.add_argument("--current-chapter", type=int, default=None, help="current chapter number for stale checks")
             group.add_argument("--max-gap", type=int, default=3, help="maximum chapters without progress")
+        if name == "foreshadow":
+            group.add_argument("--slug", default=None, help="project slug")
+            group.add_argument("--id", default=None, help="foreshadowing id")
+            group.add_argument("--planted-chapter", default="", help="chapter where the clue was planted")
+            group.add_argument("--expected-payoff-chapter", default="", help="chapter where payoff is expected")
+            group.add_argument("--status", default="planted", help="foreshadowing status")
+            group.add_argument("--importance", default="medium", help="importance level")
+            group.add_argument("--related-character", action="append", default=None, help="related character")
+            group.add_argument("--related-plot-thread", default="", help="related plot thread id")
+            group.add_argument("--current-chapter", type=int, default=None, help="current chapter number for overdue checks")
+            group.add_argument("--max-gap", type=int, default=5, help="maximum chapters without payoff")
+            group.add_argument("--resolved-chapter", default="", help="chapter where the clue was resolved")
         if name == "chapter":
             group.add_argument("chapter_ids", nargs="*", help="chapter ids for reorganization")
             group.add_argument("--slug", default=None, help="project slug")
@@ -1121,6 +1138,91 @@ def _handle_plot_thread(args: argparse.Namespace) -> int:
         data={"threads": stale_threads},
     )
     return _emit(report, args.format)
+
+
+def _handle_foreshadow(args: argparse.Namespace) -> int:
+    if args.subcommand not in {"add", "list", "overdue", "resolve"} or not args.slug:
+        return _emit(_planned_report("foreshadow", "Run `pf-agent foreshadow add --slug <slug>`"), args.format)
+    from .novel import ForeshadowingTracker
+
+    tracker = ForeshadowingTracker(Path(".pf-agent") / "workspace", slug=args.slug)
+    if args.subcommand == "add":
+        if not args.id or not args.planted_chapter:
+            return _emit(_planned_report("foreshadow", "Pass --id and --planted-chapter for foreshadow add"), args.format)
+        record = tracker.add(
+            id=args.id,
+            planted_chapter=args.planted_chapter,
+            expected_payoff_chapter=args.expected_payoff_chapter,
+            status=args.status,
+            importance=args.importance,
+            related_characters=args.related_character or [],
+            related_plot_thread=args.related_plot_thread,
+        )
+        report = Report(
+            title="Foreshadow",
+            status="ok",
+            next_action="Run `pf-agent foreshadow overdue --slug <slug>` during revision",
+            sections=[
+                ReportSection(
+                    "Foreshadow",
+                    [
+                        f"id={record.id}",
+                        f"status={record.status}",
+                        f"importance={record.importance}",
+                        f"expected_payoff={record.expected_payoff_chapter}",
+                    ],
+                )
+            ],
+            data=record.to_dict(),
+        )
+        return _emit(report, args.format)
+    if args.subcommand == "list":
+        records = tracker.list()
+        report = Report(
+            title="Foreshadow List",
+            status="ok",
+            next_action="Keep planted clues tied to payoff chapters",
+            sections=[
+                ReportSection(
+                    "Foreshadowing",
+                    [f"{record.id}: {record.status} -> {record.expected_payoff_chapter}" for record in records]
+                    or ["(none)"],
+                )
+            ],
+            data={"foreshadowing": [record.to_dict() for record in records]},
+        )
+        return _emit(report, args.format)
+    if args.subcommand == "overdue":
+        if args.current_chapter is None:
+            return _emit(_planned_report("foreshadow", "Pass --current-chapter for foreshadow overdue"), args.format)
+        overdue = tracker.overdue(current_chapter=args.current_chapter, max_gap=args.max_gap)
+        report = Report(
+            title="Foreshadow Overdue",
+            status="ok" if not overdue else "degraded",
+            next_action="Resolve, advance, or intentionally defer overdue foreshadowing",
+            sections=[
+                ReportSection(
+                    "Overdue",
+                    [
+                        f"{record['id']}: overdue {record.get('chapters_since_planted')} chapters ({record['reason']})"
+                        for record in overdue
+                    ]
+                    or ["(none)"],
+                )
+            ],
+            data={"foreshadowing": overdue},
+        )
+        return _emit(report, args.format)
+    result = tracker.resolve(args.id or "", resolved_chapter=args.resolved_chapter)
+    report = Report(
+        title="Foreshadow Resolve",
+        status="ok" if result.get("status") == "resolved" else "blocked",
+        next_action="Re-run overdue checks after resolving planted clues",
+        sections=[ReportSection("Resolution", [f"{key}={value}" for key, value in result.items()])],
+        data=result,
+    )
+    _emit(report, args.format)
+    return 0 if result.get("status") == "resolved" else 1
 
 
 def _handle_provider_probe(args: argparse.Namespace) -> int:
@@ -2421,6 +2523,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_timeline(args)
     if args.command == "plot-thread":
         return _handle_plot_thread(args)
+    if args.command == "foreshadow":
+        return _handle_foreshadow(args)
     if args.command == "setup":
         return _handle_setup(args)
     if args.command == "init":

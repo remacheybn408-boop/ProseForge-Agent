@@ -4,6 +4,7 @@ from .artifacts import GRAPH_NAME, ArtifactGraphStore, ArtifactRecord
 from .bible import BIBLE_SECTIONS, CanonBibleManager
 from .continuity import ContinuityConflict, ContinuityResolver, RESOLUTION_ACTIONS
 from .exporter import BookExporter, ExportResult
+from .foreshadowing import FORESHADOWING_NAME, ForeshadowingRecord, ForeshadowingTracker
 from .importer import BulkImporter, ImportedChapter, ImportResult
 from .manifest import MANIFEST_NAME, NovelProjectManifest, NovelProjectStore
 from .plot_threads import PLOT_THREADS_NAME, PlotThread, PlotThreadManager
@@ -27,6 +28,9 @@ __all__ = [
     "ContinuityConflict",
     "ContinuityResolver",
     "ChapterReorganizer",
+    "FORESHADOWING_NAME",
+    "ForeshadowingRecord",
+    "ForeshadowingTracker",
     "ImportedChapter",
     "ImportResult",
     "ExportResult",
