@@ -7,6 +7,7 @@ from .continuity import ContinuityConflict, ContinuityResolver, RESOLUTION_ACTIO
 from .exporter import BookExporter, ExportResult
 from .foreshadowing import FORESHADOWING_NAME, ForeshadowingRecord, ForeshadowingTracker
 from .importer import BulkImporter, ImportedChapter, ImportResult
+from .literary_regression import LITERARY_BASELINE_NAME, LiteraryRegressionSuite, read_golden_samples
 from .manifest import MANIFEST_NAME, NovelProjectManifest, NovelProjectStore
 from .plot_threads import PLOT_THREADS_NAME, PlotThread, PlotThreadManager
 from .publishing import PUBLISHING_NAME, PublishingMetadata, PublishingMetadataStore
@@ -41,6 +42,8 @@ __all__ = [
     "ForeshadowingTracker",
     "ImportedChapter",
     "ImportResult",
+    "LITERARY_BASELINE_NAME",
+    "LiteraryRegressionSuite",
     "ExportResult",
     "NovelProjectManifest",
     "NovelProjectStore",
@@ -68,4 +71,5 @@ __all__ = [
     "WritingRule",
     "WritingQualityGateRunner",
     "WritingRulesStore",
+    "read_golden_samples",
 ]
