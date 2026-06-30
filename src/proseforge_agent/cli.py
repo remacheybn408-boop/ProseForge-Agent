@@ -200,6 +200,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "query, project slug, scope, exact flag",
         "artifacts": "ranked file/chapter/line hits with snippets",
     },
+    "draft": {
+        "help": "Manage chapter draft versions: list, diff, rollback, and branch",
+        "inputs": "project slug, chapter id, version ids, branch name",
+        "artifacts": "versioned drafts with checksum and provider/prompt metadata",
+    },
     "setup": {
         "help": "Run the guided first-use setup wizard",
         "inputs": "setup mode, provider, repair/reconfigure flags",
@@ -510,6 +515,14 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--slug", default=None, help="project slug")
             group.add_argument("--scope", default="manuscript", help="search scope: manuscript or all")
             group.add_argument("--exact", action="store_true", help="match the query as an exact phrase")
+        if name == "draft":
+            group.add_argument("draft_args", nargs="*", help="draft subcommand arguments (e.g. 'list' or two version ids)")
+            group.add_argument("--slug", default=None, help="project slug")
+            group.add_argument("--chapter", default=None, help="chapter id")
+            group.add_argument("--to", default=None, help="target version id for rollback")
+            group.add_argument("--name", default=None, help="branch name")
+            group.add_argument("--from-version", default=None, help="base version id for branch")
+            group.add_argument("--approve", action="store_true", help="approve a rollback")
         if name == "chapter":
             group.add_argument("chapter_ids", nargs="*", help="chapter ids for reorganization")
             group.add_argument("--slug", default=None, help="project slug")
@@ -1830,6 +1843,95 @@ def _handle_search(args: argparse.Namespace) -> int:
         data=result.to_dict(),
     )
     return _emit(report, args.format)
+
+
+def _handle_draft(args: argparse.Namespace) -> int:
+    from .novel import DraftVersionStore
+
+    sub = args.subcommand
+    draft_args = list(getattr(args, "draft_args", []) or [])
+    if not args.slug or sub not in {"version", "diff", "rollback", "branch"}:
+        return _emit(
+            _planned_report("draft", "Run `pf-agent draft version list --slug <slug> --chapter <id>`"),
+            args.format,
+        )
+    store = DraftVersionStore(Path(".pf-agent") / "workspace", slug=args.slug)
+    try:
+        if sub == "version" and draft_args[:1] == ["list"]:
+            if not args.chapter:
+                return _emit(_planned_report("draft", "Pass --chapter for `draft version list`"), args.format)
+            versions = store.list_versions(args.chapter)
+            lines = [
+                f"{version.id} checksum={version.checksum[:12]} provider={version.provider or '-'} prompt={version.prompt or '-'} branch={version.branch}"
+                for version in versions
+            ] or ["no versions"]
+            return _emit(
+                Report(
+                    title="Draft Versions",
+                    status="ok",
+                    next_action="Diff or roll back to one of these versions",
+                    sections=[ReportSection(f"chapter {args.chapter}", lines)],
+                    data={"chapter": args.chapter, "versions": [version.to_dict() for version in versions]},
+                ),
+                args.format,
+            )
+        if sub == "diff":
+            if len(draft_args) < 2:
+                return _emit(_planned_report("draft", "Run `pf-agent draft diff <v1> <v2>`"), args.format)
+            result = store.diff(draft_args[0], draft_args[1])
+            return _emit(
+                Report(
+                    title="Draft Diff",
+                    status="ok" if result.changed else "ok",
+                    next_action="Roll back if the change should be reverted",
+                    sections=[
+                        ReportSection("Versions", [f"a={result.version_a}", f"b={result.version_b}", f"changed={result.changed}"]),
+                        ReportSection("Diff", result.diff.splitlines() or ["(identical)"]),
+                    ],
+                    data=result.to_dict(),
+                ),
+                args.format,
+            )
+        if sub == "rollback":
+            if not args.chapter or not args.to:
+                return _emit(_planned_report("draft", "Pass --chapter and --to for rollback"), args.format)
+            result = store.rollback(args.chapter, to=args.to, approve=args.approve)
+            status = "ok" if result.status == "rolled_back" else "blocked"
+            next_action = "Rollback applied" if result.approved else "Re-run with --approve to roll back"
+            return _emit(
+                Report(
+                    title="Draft Rollback",
+                    status=status,
+                    next_action=next_action,
+                    sections=[ReportSection("Rollback", [f"chapter={result.chapter}", f"to={result.to}", f"status={result.status}", f"approved={result.approved}"])],
+                    data=result.to_dict(),
+                ),
+                args.format,
+            )
+        # branch
+        if not args.chapter or not args.name:
+            return _emit(_planned_report("draft", "Pass --chapter and --name for branch"), args.format)
+        branch = store.branch(args.chapter, name=args.name, from_version=args.from_version)
+        return _emit(
+            Report(
+                title="Draft Branch",
+                status="ok",
+                next_action="Continue editing on the new branch version",
+                sections=[ReportSection("Branch", [f"name={branch.name}", f"chapter={branch.chapter}", f"base={branch.base_version}", f"head={branch.head_version}"])],
+                data=branch.to_dict(),
+            ),
+            args.format,
+        )
+    except ValueError as exc:
+        report = Report(
+            title="Draft",
+            status="blocked",
+            next_action="Use an existing version id and chapter",
+            sections=[ReportSection("Error", [str(exc)])],
+            data={"error": str(exc)},
+        )
+        _emit(report, args.format)
+        return 1
 
 
 def _split_pair(value: str, left_key: str, right_key: str) -> dict[str, str]:
@@ -3164,6 +3266,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_reader_review(args)
     if args.command == "search":
         return _handle_search(args)
+    if args.command == "draft":
+        return _handle_draft(args)
     if args.command == "setup":
         return _handle_setup(args)
     if args.command == "init":

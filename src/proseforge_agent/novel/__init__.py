@@ -4,6 +4,7 @@ from .artifacts import GRAPH_NAME, ArtifactGraphStore, ArtifactRecord
 from .bible import BIBLE_SECTIONS, CanonBibleManager
 from .character_arcs import CHARACTER_ARCS_NAME, CharacterArc, CharacterArcTracker
 from .continuity import ContinuityConflict, ContinuityResolver, RESOLUTION_ACTIONS
+from .draft_versioning import Branch, DiffResult, DraftVersion, DraftVersionStore, RollbackResult
 from .exporter import BookExporter, ExportResult
 from .foreshadowing import FORESHADOWING_NAME, ForeshadowingRecord, ForeshadowingTracker
 from .importer import BulkImporter, ImportedChapter, ImportResult
@@ -48,6 +49,11 @@ __all__ = [
     "ContinuityConflict",
     "ContinuityResolver",
     "ChapterReorganizer",
+    "Branch",
+    "DiffResult",
+    "DraftVersion",
+    "DraftVersionStore",
+    "RollbackResult",
     "FORESHADOWING_NAME",
     "ForeshadowingRecord",
     "ForeshadowingTracker",
