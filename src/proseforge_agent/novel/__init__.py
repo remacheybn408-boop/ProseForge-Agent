@@ -9,6 +9,7 @@ from .foreshadowing import FORESHADOWING_NAME, ForeshadowingRecord, Foreshadowin
 from .importer import BulkImporter, ImportedChapter, ImportResult
 from .literary_regression import LITERARY_BASELINE_NAME, LiteraryRegressionSuite, read_golden_samples
 from .manifest import MANIFEST_NAME, NovelProjectManifest, NovelProjectStore
+from .manuscript_search import SEARCH_SCOPES, ManuscriptSearch, SearchHit, SearchResult
 from .plot_threads import PLOT_THREADS_NAME, PlotThread, PlotThreadManager
 from .publishing import PUBLISHING_NAME, PublishingMetadata, PublishingMetadataStore
 from .reader_review import (
@@ -56,6 +57,10 @@ __all__ = [
     "ExportResult",
     "NovelProjectManifest",
     "NovelProjectStore",
+    "SEARCH_SCOPES",
+    "ManuscriptSearch",
+    "SearchHit",
+    "SearchResult",
     "PlotThread",
     "PlotThreadManager",
     "PublishingMetadata",
