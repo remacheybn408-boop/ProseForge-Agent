@@ -17,6 +17,11 @@ from .permissions import PERMISSION_LEVELS, PermissionDecision, PermissionPolicy
 from .profiles import AgentProfile, AgentProfileRegistry
 from .sandbox import Approval, ExecRequest, ExecResult, Sandbox
 from .subagent import Scope, SubAgentResult, SubAgentRunner
+from .structured_output import (
+    StructuredOutputRepairResult,
+    repair_structured_output,
+    validate_or_repair,
+)
 from .tools import (
     AgentTool,
     ToolContext,
@@ -62,6 +67,7 @@ __all__ = [
     "Scope",
     "SubAgentResult",
     "SubAgentRunner",
+    "StructuredOutputRepairResult",
     "AgentTool",
     "ToolContext",
     "ToolRegistry",
@@ -70,4 +76,6 @@ __all__ = [
     "default_tool_registry",
     "general_tool_registry",
     "register_writing_domain_tools",
+    "repair_structured_output",
+    "validate_or_repair",
 ]
