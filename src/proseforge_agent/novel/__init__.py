@@ -1,5 +1,6 @@
 """Novel project operations."""
 
+from .approval_queue import APPROVALS_DIR, HIGH_RISK_ACTIONS, ApprovalQueue, ApprovalRequest
 from .artifacts import GRAPH_NAME, ArtifactGraphStore, ArtifactRecord
 from .bible import BIBLE_SECTIONS, CanonBibleManager
 from .character_arcs import CHARACTER_ARCS_NAME, CharacterArc, CharacterArcTracker
@@ -40,6 +41,10 @@ from .writing_rules import RULE_LEVELS, WRITING_RULES_NAME, WritingRule, Writing
 from .writing_quality import QUALITY_REPORT_DIR, QualityCheckResult, QualityViolation, WritingQualityGateRunner
 
 __all__ = [
+    "APPROVALS_DIR",
+    "HIGH_RISK_ACTIONS",
+    "ApprovalQueue",
+    "ApprovalRequest",
     "GRAPH_NAME",
     "MANIFEST_NAME",
     "PUBLISHING_NAME",

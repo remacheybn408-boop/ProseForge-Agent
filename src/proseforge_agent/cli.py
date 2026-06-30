@@ -210,6 +210,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "project slug, chapter id, target stage",
         "artifacts": "per-stage editorial artifacts and pipeline state",
     },
+    "approval": {
+        "help": "Review the human approval queue for high-risk actions",
+        "inputs": "project slug, approval id",
+        "artifacts": "approval queue entries with decision status",
+    },
     "setup": {
         "help": "Run the guided first-use setup wizard",
         "inputs": "setup mode, provider, repair/reconfigure flags",
@@ -533,6 +538,9 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--chapter", default=None, help="chapter id")
             group.add_argument("--to", default=None, help="target editorial stage for promote")
             group.add_argument("--approve", action="store_true", help="approve a high-risk promote")
+        if name == "approval":
+            group.add_argument("approval_id", nargs="?", help="approval id for show/approve/reject")
+            group.add_argument("--slug", default=None, help="project slug")
         if name == "chapter":
             group.add_argument("chapter_ids", nargs="*", help="chapter ids for reorganization")
             group.add_argument("--slug", default=None, help="project slug")
@@ -2016,6 +2024,61 @@ def _handle_editorial(args: argparse.Namespace) -> int:
         return 1
 
 
+def _handle_approval(args: argparse.Namespace) -> int:
+    from .novel import ApprovalQueue
+
+    sub = args.subcommand
+    approval_id = getattr(args, "approval_id", None)
+    if not args.slug or sub not in {"list", "show", "approve", "reject"}:
+        return _emit(
+            _planned_report("approval", "Run `pf-agent approval list --slug <slug>`"),
+            args.format,
+        )
+    queue = ApprovalQueue(Path(".pf-agent") / "workspace", slug=args.slug)
+    try:
+        if sub == "list":
+            items = queue.list()
+            lines = [f"{item.id} {item.action} [{item.status}] {item.summary}" for item in items] or ["queue empty"]
+            return _emit(
+                Report(
+                    title="Approval Queue",
+                    status="ok",
+                    next_action="Approve or reject a pending request by id",
+                    sections=[ReportSection("Requests", lines)],
+                    data={"requests": [item.to_dict() for item in items]},
+                ),
+                args.format,
+            )
+        if not approval_id:
+            return _emit(_planned_report("approval", f"Pass an approval id for `approval {sub}`"), args.format)
+        if sub == "show":
+            item = queue.show(approval_id)
+        elif sub == "approve":
+            item = queue.approve(approval_id)
+        else:
+            item = queue.reject(approval_id)
+        return _emit(
+            Report(
+                title="Approval",
+                status="ok",
+                next_action="The high-risk action follows this decision",
+                sections=[ReportSection("Request", [f"id={item.id}", f"action={item.action}", f"status={item.status}", f"summary={item.summary}"])],
+                data=item.to_dict(),
+            ),
+            args.format,
+        )
+    except ValueError as exc:
+        report = Report(
+            title="Approval",
+            status="blocked",
+            next_action="Use an existing pending approval id",
+            sections=[ReportSection("Error", [str(exc)])],
+            data={"error": str(exc)},
+        )
+        _emit(report, args.format)
+        return 1
+
+
 def _split_pair(value: str, left_key: str, right_key: str) -> dict[str, str]:
     left, separator, right = value.partition(":")
     if not separator:
@@ -3352,6 +3415,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_draft(args)
     if args.command == "editorial":
         return _handle_editorial(args)
+    if args.command == "approval":
+        return _handle_approval(args)
     if args.command == "setup":
         return _handle_setup(args)
     if args.command == "init":
