@@ -13,11 +13,15 @@ from .client import (
     StdioMCPTransport,
     default_demo_client,
 )
+from .approval import MCPApprovalGate, MCPApprovalQueue, MCPApprovalRequest
 from .registry import MCPServerConfig, MCPServerRegistry
 from .policy import MCPPolicy, MCPPolicyDecision, MCPPolicyStore
 
 __all__ = [
     "MCPCapabilityReport",
+    "MCPApprovalGate",
+    "MCPApprovalQueue",
+    "MCPApprovalRequest",
     "MCPClient",
     "MCPPrompt",
     "MCPResource",
