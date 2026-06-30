@@ -13,6 +13,7 @@ from .plot_threads import PLOT_THREADS_NAME, PlotThread, PlotThreadManager
 from .publishing import PUBLISHING_NAME, PublishingMetadata, PublishingMetadataStore
 from .relationship_graph import RELATIONSHIP_GRAPH_NAME, RELATION_TYPES, RelationshipEdge, RelationshipGraph
 from .reorganize import ChapterReorganizer
+from .rewrite_strategies import REWRITE_STRATEGIES, RewriteResult, RewriteStrategy, RewriteStrategyLibrary
 from .scenes import SceneRecord, SceneWorkflow
 from .style_profile import STYLE_PROFILE_NAME, StyleProfile, StyleProfileCompiler
 from .timeline import TIMELINE_NAME, TimelineEngine, TimelineEvent
@@ -59,6 +60,10 @@ __all__ = [
     "RELATION_TYPES",
     "RelationshipEdge",
     "RelationshipGraph",
+    "REWRITE_STRATEGIES",
+    "RewriteResult",
+    "RewriteStrategy",
+    "RewriteStrategyLibrary",
     "RULE_LEVELS",
     "SceneRecord",
     "SceneWorkflow",
