@@ -16,6 +16,7 @@ from .scenes import SceneRecord, SceneWorkflow
 from .style_profile import STYLE_PROFILE_NAME, StyleProfile, StyleProfileCompiler
 from .timeline import TIMELINE_NAME, TimelineEngine, TimelineEvent
 from .writing_rules import RULE_LEVELS, WRITING_RULES_NAME, WritingRule, WritingRulesStore
+from .writing_quality import QUALITY_REPORT_DIR, QualityCheckResult, QualityViolation, WritingQualityGateRunner
 
 __all__ = [
     "GRAPH_NAME",
@@ -47,6 +48,9 @@ __all__ = [
     "PlotThreadManager",
     "PublishingMetadata",
     "PublishingMetadataStore",
+    "QUALITY_REPORT_DIR",
+    "QualityCheckResult",
+    "QualityViolation",
     "RESOLUTION_ACTIONS",
     "RELATIONSHIP_GRAPH_NAME",
     "RELATION_TYPES",
@@ -62,5 +66,6 @@ __all__ = [
     "TimelineEvent",
     "WRITING_RULES_NAME",
     "WritingRule",
+    "WritingQualityGateRunner",
     "WritingRulesStore",
 ]
