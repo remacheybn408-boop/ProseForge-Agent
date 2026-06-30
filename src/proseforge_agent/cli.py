@@ -135,6 +135,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "project slug, section, entry fields",
         "artifacts": "bible YAML files and snapshots",
     },
+    "continuity": {
+        "help": "Check and resolve continuity conflicts",
+        "inputs": "project slug, conflict id, resolution action",
+        "artifacts": "continuity conflict report and audit log",
+    },
     "setup": {
         "help": "Run the guided first-use setup wizard",
         "inputs": "setup mode, provider, repair/reconfigure flags",
@@ -342,6 +347,10 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--name", default=None, help="entry display name")
             group.add_argument("--role", default=None, help="character role or entry role")
             group.add_argument("--text", default=None, help="entry text")
+        if name == "continuity":
+            group.add_argument("--slug", default=None, help="project slug")
+            group.add_argument("--conflict", default=None, help="conflict id")
+            group.add_argument("--action", default="defer", help="resolution action")
         if name == "chapter":
             group.add_argument("chapter_ids", nargs="*", help="chapter ids for reorganization")
             group.add_argument("--slug", default=None, help="project slug")
@@ -887,6 +896,39 @@ def _handle_bible(args: argparse.Namespace) -> int:
     )
     _emit(report, args.format)
     return 0 if status == "ok" else 1
+
+
+def _handle_continuity(args: argparse.Namespace) -> int:
+    if args.subcommand not in {"check", "resolve"} or not args.slug:
+        return _emit(_planned_report("continuity", "Run `pf-agent continuity check --slug <slug>`"), args.format)
+    from .novel import ContinuityResolver
+
+    resolver = ContinuityResolver(Path(".pf-agent") / "workspace", slug=args.slug)
+    if args.subcommand == "check":
+        conflicts = resolver.check()
+        report = Report(
+            title="Continuity Check",
+            status="ok" if not conflicts else "degraded",
+            next_action="Resolve or defer every conflict before accepting canon",
+            sections=[
+                ReportSection(
+                    "Conflicts",
+                    [f"{conflict.id}: {conflict.subject}.{conflict.key}" for conflict in conflicts] or ["(none)"],
+                )
+            ],
+            data={"conflicts": [conflict.to_dict() for conflict in conflicts]},
+        )
+        return _emit(report, args.format)
+    result = resolver.resolve(args.conflict or "", action=args.action)
+    report = Report(
+        title="Continuity Resolve",
+        status="ok" if result.get("status") == "ok" else "blocked",
+        next_action="Review continuity audit log after resolution",
+        sections=[ReportSection("Resolution", [f"{key}={value}" for key, value in result.items()])],
+        data=result,
+    )
+    _emit(report, args.format)
+    return 0 if result.get("status") == "ok" else 1
 
 
 def _handle_provider_probe(args: argparse.Namespace) -> int:
@@ -2181,6 +2223,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_publishing(args)
     if args.command == "bible":
         return _handle_bible(args)
+    if args.command == "continuity":
+        return _handle_continuity(args)
     if args.command == "setup":
         return _handle_setup(args)
     if args.command == "init":

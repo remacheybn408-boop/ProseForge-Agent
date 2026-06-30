@@ -2,6 +2,7 @@
 
 from .artifacts import GRAPH_NAME, ArtifactGraphStore, ArtifactRecord
 from .bible import BIBLE_SECTIONS, CanonBibleManager
+from .continuity import ContinuityConflict, ContinuityResolver, RESOLUTION_ACTIONS
 from .exporter import BookExporter, ExportResult
 from .importer import BulkImporter, ImportedChapter, ImportResult
 from .manifest import MANIFEST_NAME, NovelProjectManifest, NovelProjectStore
@@ -19,6 +20,8 @@ __all__ = [
     "BookExporter",
     "BulkImporter",
     "CanonBibleManager",
+    "ContinuityConflict",
+    "ContinuityResolver",
     "ChapterReorganizer",
     "ImportedChapter",
     "ImportResult",
@@ -27,6 +30,7 @@ __all__ = [
     "NovelProjectStore",
     "PublishingMetadata",
     "PublishingMetadataStore",
+    "RESOLUTION_ACTIONS",
     "SceneRecord",
     "SceneWorkflow",
 ]
