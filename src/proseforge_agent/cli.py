@@ -135,6 +135,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "file, image, or folder path and project slug",
         "artifacts": "attachment artifact, searchable text, memory candidate",
     },
+    "debug": {
+        "help": "Inspect and replay agent audit trails",
+        "inputs": "session id and optional step number",
+        "artifacts": "redacted audit trail reports",
+    },
     "scene": {
         "help": "Run scene-level draft, review, rewrite, and merge steps",
         "inputs": "project slug, chapter id, scene id",
@@ -439,6 +444,9 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("path", nargs="?", help="attachment file or folder")
             group.add_argument("--slug", default=None, help="project slug")
             group.add_argument("--provider", default="fake", help="vision provider for images")
+        if name == "debug":
+            group.add_argument("debug_session", nargs="?", help="audit session id")
+            group.add_argument("--step", type=int, default=1, help="audit step number")
         if name == "scene":
             group.add_argument("--slug", default=None, help="project slug")
             group.add_argument("--chapter", default=None, help="chapter id")
@@ -1013,6 +1021,76 @@ def _handle_ingest(args: argparse.Namespace) -> int:
             ReportSection("Warnings", warnings or ["(none)"]),
         ],
         data={"results": [result.to_dict() for result in results]},
+    )
+    return _emit(report, args.format)
+
+
+def _handle_debug(args: argparse.Namespace) -> int:
+    if args.subcommand not in {"session", "step", "replay"} or not args.debug_session:
+        return _emit(_planned_report("debug", "Run `pf-agent debug session <session_id>`"), args.format)
+    from .agent import AuditTrailStore
+
+    store = AuditTrailStore(Path(".pf-agent"))
+    if args.subcommand == "session":
+        steps = store.list_session(args.debug_session)
+        report = Report(
+            title="Audit Session",
+            status="ok",
+            next_action="Use `pf-agent debug step <session_id> --step <n>` for details",
+            sections=[
+                ReportSection(
+                    "Steps",
+                    [
+                        f"{step.step}: intent={step.intent.get('name', '')} "
+                        f"provider={step.provider.get('name', '')} action={step.final_action}"
+                        for step in steps
+                    ]
+                    or ["(none)"],
+                )
+            ],
+            data={"steps": [step.to_dict() for step in steps]},
+        )
+        return _emit(report, args.format)
+    if args.subcommand == "step":
+        step = store.get_step(args.debug_session, args.step)
+        report = Report(
+            title="Audit Step",
+            status="ok",
+            next_action="Use replay to reconstruct ordered decisions",
+            sections=[
+                ReportSection(
+                    "Decision",
+                    [
+                        f"step={step.step}",
+                        f"intent={step.intent.get('name', '')}",
+                        f"tool={step.tool_choice or '(none)'}",
+                        f"provider={step.provider.get('name', '')}",
+                        f"trace={step.trace_id or '(none)'}",
+                    ],
+                ),
+                ReportSection("Input", step.input.splitlines() or ["(empty)"]),
+                ReportSection("Output", step.model_output.splitlines() or ["(empty)"]),
+            ],
+            data=step.to_dict(),
+        )
+        return _emit(report, args.format)
+    replay = store.replay(args.debug_session)
+    report = Report(
+        title="Audit Replay",
+        status="ok",
+        next_action="Replay is read-only; rerun workflows only after explicit approval",
+        sections=[
+            ReportSection(
+                "Replay",
+                [
+                    f"session={replay.session_id}",
+                    f"steps={replay.step_count}",
+                    f"actions={', '.join(replay.actions) or '(none)'}",
+                    f"final_output={replay.final_output or '(empty)'}",
+                ],
+            )
+        ],
+        data=replay.to_dict(),
     )
     return _emit(report, args.format)
 
@@ -2878,6 +2956,29 @@ def _handle_chat(args: argparse.Namespace) -> int:
             permission_level=permission_level,
         )
     )
+    from .agent import AuditTrailStore
+
+    AuditTrailStore(Path(".pf-agent")).record_turn(
+        "cli",
+        {
+            "input": args.message,
+            "intent": result.intent.__dict__,
+            "system_prompt_version": "session_override" if args.system else "chat-prompt-v1",
+            "evidence_pack": [{"id": ref} for ref in result.evidence_refs],
+            "tool_choice": result.tool_calls[0].name if result.tool_calls else "",
+            "tool_args": {},
+            "tool_result": result.tool_calls[0].__dict__ if result.tool_calls else {},
+            "provider": {"name": provider.name, "model": provider.model},
+            "latency_ms": 0,
+            "token_usage": {
+                "prompt_tokens": len(args.message.split()),
+                "completion_tokens": len(result.text.split()),
+            },
+            "model_output": result.text,
+            "final_action": "respond",
+            "trace_id": result.trace_id,
+        },
+    )
     sections = []
     if profile is not None:
         sections.append(
@@ -3792,6 +3893,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_import(args)
     if args.command == "ingest":
         return _handle_ingest(args)
+    if args.command == "debug":
+        return _handle_debug(args)
     if args.command == "scene":
         return _handle_scene(args)
     if args.command == "export":

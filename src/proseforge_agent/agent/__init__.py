@@ -3,6 +3,7 @@
 from .events import BackgroundJobRunner, EventBus, EventRecord, JobResult
 from .eval import EvalHarness, EvalReport, EvalSuite, EvalTaskResult, GoldenTask
 from .attachments import AttachmentIngestResult, AttachmentIngestor
+from .audit import AuditStep, AuditTrailStore, ReplayResult
 from .function_calling import (
     ProviderToolCall,
     StructuredToolAdapter,
@@ -44,6 +45,8 @@ __all__ = [
     "BackgroundJobRunner",
     "AttachmentIngestResult",
     "AttachmentIngestor",
+    "AuditStep",
+    "AuditTrailStore",
     "EvalHarness",
     "EvalReport",
     "EvalSuite",
@@ -76,6 +79,7 @@ __all__ = [
     "PromptTemplateRegistry",
     "PromptTemplateValidation",
     "PromptTemplateValidationError",
+    "ReplayResult",
     "Approval",
     "ExecRequest",
     "ExecResult",
