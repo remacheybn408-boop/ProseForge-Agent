@@ -454,6 +454,7 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--step", type=int, default=1, help="audit step number")
         if name == "mcp":
             group.add_argument("server", nargs="?", help="MCP server id")
+            group.add_argument("mcp_extra", nargs="?", help="extra MCP argument")
             group.add_argument("--display-name", default=None, help="MCP server display name")
             group.add_argument("--transport", default="stdio", help="MCP transport: stdio, http, or sse")
             group.add_argument(
@@ -470,6 +471,13 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--permission-profile", default="read_only", help="permission profile")
             group.add_argument("--timeout", type=int, default=None, help="timeout in milliseconds")
             group.add_argument("--rate-limit", type=int, default=None, help="rate limit per minute")
+            group.add_argument("--filesystem-allow", action="append", default=None, help="allowed filesystem prefix")
+            group.add_argument("--filesystem-deny", action="append", default=None, help="denied filesystem prefix")
+            group.add_argument("--network-allow", action="append", default=None, help="allowed network host")
+            group.add_argument("--command-allow", action="append", default=None, help="allowed command")
+            group.add_argument("--project-scope", default="", help="project scope label")
+            group.add_argument("--write-mode", default="approval_required", help="read_only, approval_required, or allowed")
+            group.add_argument("--allow-secrets", action="store_true", help="allow explicit secret injection")
         if name == "scene":
             group.add_argument("--slug", default=None, help="project slug")
             group.add_argument("--chapter", default=None, help="chapter id")
@@ -1141,11 +1149,74 @@ def _handle_mcp(args: argparse.Namespace) -> int:
         "disable",
         "remove",
         "config",
+        "policy",
     }:
         return _emit(_planned_report("mcp", "Run `pf-agent mcp list`"), args.format)
-    from .mcp import MCPClient, MCPServerConfig, MCPServerRegistry, default_demo_client
+    from .mcp import MCPClient, MCPPolicy, MCPPolicyStore, MCPServerConfig, MCPServerRegistry, default_demo_client
 
     registry = MCPServerRegistry(Path(".pf-agent"))
+
+    if args.subcommand == "policy":
+        policy_store = MCPPolicyStore(Path(".pf-agent"))
+        action = args.server or "list"
+        if action == "list":
+            policies = policy_store.list()
+            report = Report(
+                title="MCP Policy",
+                status="ok",
+                next_action="Run `pf-agent mcp policy show <server>` before enabling tool execution",
+                sections=[
+                    ReportSection(
+                        "Policies",
+                        [f"{policy.server_id} write_mode={policy.write_mode}" for policy in policies] or ["(none)"],
+                    )
+                ],
+                data={"policies": [policy.to_dict() for policy in policies]},
+            )
+            return _emit(report, args.format)
+        if action == "show":
+            if not args.mcp_extra:
+                return _emit(_planned_report("mcp", "Pass a server id to `mcp policy show`"), args.format)
+            policy = policy_store.get(args.mcp_extra)
+        elif action == "set":
+            if not args.mcp_extra:
+                return _emit(_planned_report("mcp", "Pass a server id to `mcp policy set`"), args.format)
+            policy = policy_store.set(
+                MCPPolicy(
+                    server_id=args.mcp_extra,
+                    filesystem_allow=list(args.filesystem_allow or []),
+                    filesystem_deny=list(args.filesystem_deny or []),
+                    network_allow=list(args.network_allow or []),
+                    command_allow=list(args.command_allow or []),
+                    secrets_allowed=bool(args.allow_secrets),
+                    project_scope=args.project_scope or "",
+                    write_mode=args.write_mode,
+                )
+            )
+        else:
+            return _emit(_planned_report("mcp", "Run `pf-agent mcp policy list`"), args.format)
+        report = Report(
+            title="MCP Policy",
+            status="ok",
+            next_action="Dangerous MCP actions must pass policy and approval checks",
+            sections=[
+                ReportSection(
+                    "Policy",
+                    [
+                        f"server={policy.server_id}",
+                        f"filesystem_allow={','.join(policy.filesystem_allow) or '(none)'}",
+                        f"filesystem_deny={','.join(policy.filesystem_deny) or '(none)'}",
+                        f"network_allow={','.join(policy.network_allow) or '(none)'}",
+                        f"command_allow={','.join(policy.command_allow) or '(none)'}",
+                        f"secrets_allowed={policy.secrets_allowed}",
+                        f"project_scope={policy.project_scope or '(none)'}",
+                        f"write_mode={policy.write_mode}",
+                    ],
+                )
+            ],
+            data=policy.to_dict(),
+        )
+        return _emit(report, args.format)
 
     if args.subcommand in {"add", "enable", "disable", "remove", "config"}:
         if not args.server:
