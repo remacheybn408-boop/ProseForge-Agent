@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from ..errors import ConfigurationError
+from .credentials import redact_sensitive
 from .policy import MCPPolicy
 
 
@@ -55,7 +56,8 @@ class MCPApprovalQueue:
         queue = self._load()
         queue["counter"] += 1
         request_id = f"approval_{queue['counter']:03d}"
-        summary = _summary(server_id, tool_name, arguments)
+        safe_arguments = redact_sensitive(arguments)
+        summary = _summary(server_id, tool_name, safe_arguments)
         queue["requests"][request_id] = {
             "action": "mcp_tool_call",
             "status": "pending",
@@ -63,7 +65,7 @@ class MCPApprovalQueue:
             "payload": {
                 "server_id": server_id,
                 "tool_name": tool_name,
-                "arguments": dict(arguments),
+                "arguments": dict(safe_arguments),
             },
             "created_at": datetime.now(UTC).isoformat(),
             "decided_at": "",

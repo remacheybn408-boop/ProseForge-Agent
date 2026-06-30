@@ -467,6 +467,8 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--url", default="", help="HTTP/SSE server URL")
             group.add_argument("--cwd", default="", help="server working directory")
             group.add_argument("--env", action="append", default=None, help="allowed env KEY=VALUE (repeatable)")
+            group.add_argument("--env-allow", action="append", default=None, help="environment variable name to inherit")
+            group.add_argument("--secret-ref", action="append", default=None, help="secret env KEY=secret://ref (repeatable)")
             group.add_argument("--trust-level", default="local", help="server trust level")
             group.add_argument("--permission-profile", default="read_only", help="permission profile")
             group.add_argument("--timeout", type=int, default=None, help="timeout in milliseconds")
@@ -1230,6 +1232,8 @@ def _handle_mcp(args: argparse.Namespace) -> int:
                     command=list(args.mcp_command or []),
                     url=args.url or "",
                     env=_parse_key_values(args.env or []),
+                    env_allow=list(args.env_allow or []),
+                    secret_refs=_parse_key_values(args.secret_ref or []),
                     cwd=args.cwd or "",
                     enabled=True,
                     trust_level=args.trust_level,
@@ -1253,6 +1257,8 @@ def _handle_mcp(args: argparse.Namespace) -> int:
                 url=args.url or None,
                 cwd=args.cwd or None,
                 env=_parse_key_values(args.env or []) if args.env else None,
+                env_allow=list(args.env_allow or []) if args.env_allow else None,
+                secret_refs=_parse_key_values(args.secret_ref or []) if args.secret_ref else None,
                 trust_level=args.trust_level if args.trust_level != "local" else None,
                 permission_profile=args.permission_profile if args.permission_profile != "read_only" else None,
                 timeout_ms=args.timeout,

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +21,8 @@ class MCPServerConfig:
     command: list[str] | None = None
     url: str = ""
     env: dict[str, str] | None = None
+    env_allow: list[str] = field(default_factory=list)
+    secret_refs: dict[str, str] = field(default_factory=dict)
     cwd: str = ""
     enabled: bool = True
     trust_level: str = "local"
@@ -32,6 +34,8 @@ class MCPServerConfig:
         payload = asdict(self)
         payload["command"] = list(self.command or [])
         payload["env"] = dict(self.env or {})
+        payload["env_allow"] = list(self.env_allow or [])
+        payload["secret_refs"] = dict(self.secret_refs or {})
         return payload
 
     def to_spec(self) -> MCPServerSpec:
@@ -53,6 +57,8 @@ class MCPServerConfig:
             command=list(payload.get("command") or []),
             url=str(payload.get("url") or ""),
             env={str(key): str(value) for key, value in dict(payload.get("env") or {}).items()},
+            env_allow=[str(item) for item in list(payload.get("env_allow") or [])],
+            secret_refs={str(key): str(value) for key, value in dict(payload.get("secret_refs") or {}).items()},
             cwd=str(payload.get("cwd") or ""),
             enabled=bool(payload.get("enabled", True)),
             trust_level=str(payload.get("trust_level") or "local"),
