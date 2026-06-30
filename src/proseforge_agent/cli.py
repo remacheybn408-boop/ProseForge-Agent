@@ -115,6 +115,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "manuscript path, project slug",
         "artifacts": "raw import archive, chapters, manifest mappings",
     },
+    "scene": {
+        "help": "Run scene-level draft, review, rewrite, and merge steps",
+        "inputs": "project slug, chapter id, scene id",
+        "artifacts": "scene files, chapter draft, artifact graph records",
+    },
     "setup": {
         "help": "Run the guided first-use setup wizard",
         "inputs": "setup mode, provider, repair/reconfigure flags",
@@ -290,6 +295,15 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "import":
             group.add_argument("path", nargs="?", help="file or folder to import")
             group.add_argument("--slug", default=None, help="project slug")
+        if name == "scene":
+            group.add_argument("--slug", default=None, help="project slug")
+            group.add_argument("--chapter", default=None, help="chapter id")
+            group.add_argument("--scene", default=None, help="scene id")
+            group.add_argument("--goal", default="", help="scene goal")
+            group.add_argument("--location", default="", help="scene location")
+            group.add_argument("--characters", default="", help="comma-separated characters")
+            group.add_argument("--conflict", default="", help="scene conflict")
+            group.add_argument("--tone", default="", help="emotional tone")
         if name == "usage":
             group.add_argument(
                 "--usage-log",
@@ -629,6 +643,51 @@ def _handle_import(args: argparse.Namespace) -> int:
             ReportSection("Warnings", result.warnings),
         ],
         data=result.to_dict(),
+    )
+    return _emit(report, args.format)
+
+
+def _handle_scene(args: argparse.Namespace) -> int:
+    if args.subcommand not in {"draft", "review", "rewrite", "merge"} or not args.slug:
+        return _emit(
+            _planned_report("scene", "Run `pf-agent scene draft --slug <slug> --chapter <id> --scene <id>`"),
+            args.format,
+        )
+    from .novel import SceneWorkflow
+
+    workflow = SceneWorkflow(Path(".pf-agent") / "workspace", slug=args.slug)
+    if args.subcommand == "draft":
+        if not args.chapter or not args.scene:
+            return _emit(_planned_report("scene", "Pass --chapter and --scene for scene draft"), args.format)
+        result = workflow.draft(
+            chapter_id=args.chapter,
+            scene_id=args.scene,
+            goal=args.goal,
+            location=args.location,
+            characters=[item.strip() for item in args.characters.split(",") if item.strip()],
+            conflict=args.conflict,
+            emotional_tone=args.tone,
+        )
+        lines = [f"scene={result.id}", f"status={result.status}", f"file={result.output_file}"]
+        data = result.to_dict()
+    elif args.subcommand == "review":
+        result = workflow.review(scene_id=args.scene or "")
+        lines = [f"scene={result.id}", f"status={result.status}"]
+        data = result.to_dict()
+    elif args.subcommand == "rewrite":
+        result = workflow.rewrite(scene_id=args.scene or "")
+        lines = [f"scene={result.id}", f"status={result.status}"]
+        data = result.to_dict()
+    else:
+        path = workflow.merge(chapter_id=args.chapter or "")
+        lines = [f"chapter={args.chapter}", f"file={path}"]
+        data = {"chapter": args.chapter, "path": str(path)}
+    report = Report(
+        title="Scene Workflow",
+        status="ok",
+        next_action="Review merged chapter draft before export",
+        sections=[ReportSection("Result", lines)],
+        data=data,
     )
     return _emit(report, args.format)
 
@@ -1915,6 +1974,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_artifacts(args)
     if args.command == "import":
         return _handle_import(args)
+    if args.command == "scene":
+        return _handle_scene(args)
     if args.command == "setup":
         return _handle_setup(args)
     if args.command == "init":
