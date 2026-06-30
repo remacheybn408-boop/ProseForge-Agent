@@ -11,6 +11,14 @@ from .literary_regression import LITERARY_BASELINE_NAME, LiteraryRegressionSuite
 from .manifest import MANIFEST_NAME, NovelProjectManifest, NovelProjectStore
 from .plot_threads import PLOT_THREADS_NAME, PlotThread, PlotThreadManager
 from .publishing import PUBLISHING_NAME, PublishingMetadata, PublishingMetadataStore
+from .reader_review import (
+    READER_REPORT_DIR,
+    READER_SIGNAL_NAMES,
+    ReaderExperienceReviewer,
+    ReaderReport,
+    ReaderSignal,
+    ReaderSuggestion,
+)
 from .relationship_graph import RELATIONSHIP_GRAPH_NAME, RELATION_TYPES, RelationshipEdge, RelationshipGraph
 from .reorganize import ChapterReorganizer
 from .rewrite_strategies import REWRITE_STRATEGIES, RewriteResult, RewriteStrategy, RewriteStrategyLibrary
@@ -52,6 +60,12 @@ __all__ = [
     "PlotThreadManager",
     "PublishingMetadata",
     "PublishingMetadataStore",
+    "READER_REPORT_DIR",
+    "READER_SIGNAL_NAMES",
+    "ReaderExperienceReviewer",
+    "ReaderReport",
+    "ReaderSignal",
+    "ReaderSuggestion",
     "QUALITY_REPORT_DIR",
     "QualityCheckResult",
     "QualityViolation",

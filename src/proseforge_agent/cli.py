@@ -190,6 +190,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "project slug, chapter id, strategy",
         "artifacts": "revision artifact per chapter and strategy",
     },
+    "reader-review": {
+        "help": "Run an editorial-grade reader experience review of a chapter or volume",
+        "inputs": "project slug, chapter id or volume id",
+        "artifacts": "structured reader report with actionable suggestions",
+    },
     "setup": {
         "help": "Run the guided first-use setup wizard",
         "inputs": "setup mode, provider, repair/reconfigure flags",
@@ -491,6 +496,10 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--slug", default=None, help="project slug")
             group.add_argument("--strategy", default=None, help="rewrite strategy")
             group.add_argument("--chapter", default=None, help="chapter id")
+        if name == "reader-review":
+            group.add_argument("--slug", default=None, help="project slug")
+            group.add_argument("--chapter", default=None, help="chapter id")
+            group.add_argument("--volume", default=None, help="volume id")
         if name == "chapter":
             group.add_argument("chapter_ids", nargs="*", help="chapter ids for reorganization")
             group.add_argument("--slug", default=None, help="project slug")
@@ -1700,6 +1709,48 @@ def _handle_rewrite(args: argparse.Namespace) -> int:
             )
         ],
         data=result.to_dict(),
+    )
+    return _emit(report, args.format)
+
+
+def _handle_reader_review(args: argparse.Namespace) -> int:
+    from .novel import ReaderExperienceReviewer
+
+    if not args.slug or (bool(args.chapter) == bool(args.volume)):
+        return _emit(
+            _planned_report("reader-review", "Pass --slug and exactly one of --chapter or --volume"),
+            args.format,
+        )
+    reviewer = ReaderExperienceReviewer(Path(".pf-agent") / "workspace", slug=args.slug)
+    try:
+        report_data = reviewer.review(chapter=args.chapter, volume=args.volume)
+    except ValueError as exc:
+        report = Report(
+            title="Reader Experience",
+            status="blocked",
+            next_action="Provide an existing chapter or a volume with chapters",
+            sections=[ReportSection("Error", [str(exc)])],
+            data={"error": str(exc)},
+        )
+        _emit(report, args.format)
+        return 1
+    signal_lines = [
+        f"{signal.name}: {signal.level} ({signal.score:.2f}) — {signal.detail}"
+        for signal in report_data.signals
+    ]
+    suggestion_lines = [f"[{item.signal}] {item.message}" for item in report_data.suggestions] or [
+        "无需改动：各项读者体验信号均健康。"
+    ]
+    report = Report(
+        title="Reader Experience",
+        status=report_data.status,
+        next_action="Apply the suggestions, then re-review the chapter",
+        sections=[
+            ReportSection("Target", [f"target={report_data.target}", f"scope={report_data.scope}", f"path={report_data.path}"]),
+            ReportSection("Signals", signal_lines),
+            ReportSection("Suggestions", suggestion_lines),
+        ],
+        data=report_data.to_dict(),
     )
     return _emit(report, args.format)
 
@@ -3032,6 +3083,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_literary(args)
     if args.command == "rewrite":
         return _handle_rewrite(args)
+    if args.command == "reader-review":
+        return _handle_reader_review(args)
     if args.command == "setup":
         return _handle_setup(args)
     if args.command == "init":
