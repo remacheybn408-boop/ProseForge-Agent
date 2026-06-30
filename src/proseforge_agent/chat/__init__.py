@@ -4,7 +4,7 @@ from .handoff import ChatWorkflowHandoff, HandoffPackage
 from .memory import ChatMemoryExtractor, MemoryCandidate
 from .prompts import ChatPromptBuilder, PromptItem, PromptPack
 from .retrieval import ChatAnswer, ChatCitation, ChatEvidence, ChatRetrievalResponder
-from .session import ChatContext, ChatMessage, ChatSession, ChatSessionStore
+from .session import ChatContext, ChatMessage, ChatSearchResult, ChatSession, ChatSessionStore
 from .system_prompts import (
     ComposedSystemPrompt,
     SessionPromptRecord,
@@ -24,6 +24,7 @@ __all__ = [
     "ChatRetrievalResponder",
     "ChatContext",
     "ChatMessage",
+    "ChatSearchResult",
     "MemoryCandidate",
     "PromptItem",
     "PromptPack",

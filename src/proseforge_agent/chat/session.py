@@ -49,6 +49,21 @@ class ChatContext:
     warnings: list[str] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class ChatSearchResult:
+    """One cross-session search hit."""
+
+    session_id: str
+    kind: str
+    snippet: str
+    project_slug: str | None = None
+    role: str = ""
+    source: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
 class ChatSessionStore:
     """Filesystem-backed chat sessions rooted under an agent workspace directory."""
 
@@ -178,6 +193,64 @@ class ChatSessionStore:
         if limit is not None and limit >= 0:
             messages = messages[-limit:] if limit else []
         return ChatContext(session=session, messages=messages, warnings=warnings)
+
+    def search(self, query: str, *, project_slug: str | None = None) -> list[ChatSearchResult]:
+        """Search messages, tool calls, evidence refs, and decisions across sessions."""
+        needle = query.lower()
+        results: list[ChatSearchResult] = []
+        for session in self.list(project_slug=project_slug, include_deleted=False):
+            context = self.load_context(session.id)
+            for index, message in enumerate(context.messages, start=1):
+                source = f"{session.id}:{index}"
+                if needle in message.content.lower():
+                    results.append(
+                        ChatSearchResult(
+                            session_id=session.id,
+                            project_slug=session.project_slug,
+                            kind="message",
+                            role=message.role,
+                            snippet=_snippet(message.content, query),
+                            source=source,
+                        )
+                    )
+                for call in message.tool_calls:
+                    rendered = json.dumps(call, ensure_ascii=False, sort_keys=True)
+                    if needle in rendered.lower():
+                        results.append(
+                            ChatSearchResult(
+                                session_id=session.id,
+                                project_slug=session.project_slug,
+                                kind="tool_call",
+                                role=message.role,
+                                snippet=_snippet(rendered, query),
+                                source=source,
+                            )
+                        )
+                rendered_evidence = " ".join(message.evidence_refs)
+                if rendered_evidence and needle in rendered_evidence.lower():
+                    results.append(
+                        ChatSearchResult(
+                            session_id=session.id,
+                            project_slug=session.project_slug,
+                            kind="evidence",
+                            role=message.role,
+                            snippet=_snippet(rendered_evidence, query),
+                            source=source,
+                        )
+                    )
+                rendered_metadata = json.dumps(message.provider_metadata, ensure_ascii=False, sort_keys=True)
+                if rendered_metadata != "{}" and needle in rendered_metadata.lower():
+                    results.append(
+                        ChatSearchResult(
+                            session_id=session.id,
+                            project_slug=session.project_slug,
+                            kind="decision",
+                            role=message.role,
+                            snippet=_snippet(rendered_metadata, query),
+                            source=source,
+                        )
+                    )
+        return results
 
     def export_markdown(self, session_id: str) -> str:
         """Export a session transcript as Markdown."""
@@ -317,6 +390,16 @@ def _parse_datetime(value: str) -> datetime | None:
     return parsed
 
 
+def _snippet(text: str, query: str, *, radius: int = 80) -> str:
+    lowered = text.lower()
+    index = lowered.find(query.lower())
+    if index < 0:
+        return text[: radius * 2]
+    start = max(0, index - radius)
+    end = min(len(text), index + len(query) + radius)
+    return text[start:end]
+
+
 def _new_session_id() -> str:
     timestamp = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
     return f"chat_{timestamp}_{uuid4().hex[:8]}"
@@ -331,6 +414,7 @@ def _replace_session(session: ChatSession, **changes: Any) -> ChatSession:
 __all__ = [
     "ChatContext",
     "ChatMessage",
+    "ChatSearchResult",
     "ChatSession",
     "ChatSessionStore",
 ]
