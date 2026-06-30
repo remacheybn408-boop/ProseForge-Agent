@@ -454,6 +454,22 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--step", type=int, default=1, help="audit step number")
         if name == "mcp":
             group.add_argument("server", nargs="?", help="MCP server id")
+            group.add_argument("--display-name", default=None, help="MCP server display name")
+            group.add_argument("--transport", default="stdio", help="MCP transport: stdio, http, or sse")
+            group.add_argument(
+                "--command",
+                dest="mcp_command",
+                action="append",
+                default=None,
+                help="stdio command token (repeatable)",
+            )
+            group.add_argument("--url", default="", help="HTTP/SSE server URL")
+            group.add_argument("--cwd", default="", help="server working directory")
+            group.add_argument("--env", action="append", default=None, help="allowed env KEY=VALUE (repeatable)")
+            group.add_argument("--trust-level", default="local", help="server trust level")
+            group.add_argument("--permission-profile", default="read_only", help="permission profile")
+            group.add_argument("--timeout", type=int, default=None, help="timeout in milliseconds")
+            group.add_argument("--rate-limit", type=int, default=None, help="rate limit per minute")
         if name == "scene":
             group.add_argument("--slug", default=None, help="project slug")
             group.add_argument("--chapter", default=None, help="chapter id")
@@ -1102,24 +1118,126 @@ def _handle_debug(args: argparse.Namespace) -> int:
     return _emit(report, args.format)
 
 
+def _parse_key_values(values: list[str]) -> dict[str, str]:
+    parsed: dict[str, str] = {}
+    for value in values:
+        if "=" not in value:
+            raise SystemExit(f"expected KEY=VALUE, got {value!r}")
+        key, item = value.split("=", 1)
+        parsed[key] = item
+    return parsed
+
+
 def _handle_mcp(args: argparse.Namespace) -> int:
-    if args.subcommand not in {None, "list", "inspect", "tools", "resources", "prompts"}:
+    if args.subcommand not in {
+        None,
+        "list",
+        "inspect",
+        "tools",
+        "resources",
+        "prompts",
+        "add",
+        "enable",
+        "disable",
+        "remove",
+        "config",
+    }:
         return _emit(_planned_report("mcp", "Run `pf-agent mcp list`"), args.format)
-    from .mcp import default_demo_client
+    from .mcp import MCPClient, MCPServerConfig, MCPServerRegistry, default_demo_client
+
+    registry = MCPServerRegistry(Path(".pf-agent"))
+
+    if args.subcommand in {"add", "enable", "disable", "remove", "config"}:
+        if not args.server:
+            return _emit(_planned_report("mcp", "Pass an MCP server id"), args.format)
+        if args.subcommand == "add":
+            config = registry.add(
+                MCPServerConfig(
+                    id=args.server,
+                    display_name=args.display_name or args.server,
+                    transport=args.transport,
+                    command=list(args.mcp_command or []),
+                    url=args.url or "",
+                    env=_parse_key_values(args.env or []),
+                    cwd=args.cwd or "",
+                    enabled=True,
+                    trust_level=args.trust_level,
+                    permission_profile=args.permission_profile,
+                    timeout_ms=args.timeout or 10000,
+                    rate_limit_per_minute=args.rate_limit or 60,
+                )
+            )
+        elif args.subcommand == "enable":
+            config = registry.enable(args.server)
+        elif args.subcommand == "disable":
+            config = registry.disable(args.server)
+        elif args.subcommand == "remove":
+            config = registry.remove(args.server)
+        else:
+            config = registry.configure(
+                args.server,
+                display_name=args.display_name,
+                transport=args.transport if args.transport != "stdio" else None,
+                command=list(args.mcp_command or []) if args.mcp_command else None,
+                url=args.url or None,
+                cwd=args.cwd or None,
+                env=_parse_key_values(args.env or []) if args.env else None,
+                trust_level=args.trust_level if args.trust_level != "local" else None,
+                permission_profile=args.permission_profile if args.permission_profile != "read_only" else None,
+                timeout_ms=args.timeout,
+                rate_limit_per_minute=args.rate_limit,
+            )
+        report = Report(
+            title="MCP Server Config",
+            status="ok",
+            next_action="Inspect configured servers before allowing tool execution",
+            sections=[
+                ReportSection(
+                    "Server",
+                    [
+                        f"id={config.id}",
+                        f"transport={config.transport}",
+                        f"enabled={config.enabled}",
+                        f"trust_level={config.trust_level}",
+                        f"permission_profile={config.permission_profile}",
+                        f"timeout_ms={config.timeout_ms}",
+                        f"rate_limit_per_minute={config.rate_limit_per_minute}",
+                    ],
+                )
+            ],
+            data=config.to_dict(),
+        )
+        return _emit(report, args.format)
 
     if args.subcommand in {None, "list"}:
-        client = default_demo_client()
+        configs = registry.list()
+        if configs:
+            lines = [
+                f"{config.id} ({config.transport}) enabled={config.enabled} "
+                f"trust={config.trust_level} permission={config.permission_profile}"
+                for config in configs
+            ]
+            data = {"servers": [config.to_dict() for config in configs]}
+        else:
+            client = default_demo_client()
+            lines = [f"{client.spec.id} ({client.spec.transport})"]
+            data = {"servers": [client.spec.to_dict()]}
         report = Report(
             title="MCP Servers",
             status="ok",
             next_action="Run `pf-agent mcp inspect <server>` to discover capabilities",
-            sections=[ReportSection("Servers", [f"{client.spec.id} ({client.spec.transport})"])],
-            data={"servers": [client.spec.to_dict()]},
+            sections=[ReportSection("Servers", lines)],
+            data=data,
         )
         return _emit(report, args.format)
 
     server = args.server or "filesystem"
-    client = default_demo_client(server)
+    try:
+        config = registry.get(server)
+    except Exception:
+        client = default_demo_client(server)
+    else:
+        client = MCPClient(config.to_spec())
     client.start()
     try:
         if args.subcommand == "inspect":
