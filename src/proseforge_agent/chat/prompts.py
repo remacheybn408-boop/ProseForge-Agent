@@ -93,13 +93,14 @@ class ChatPromptBuilder:
         mode: str,
         project_slug: str | None = None,
         evidence_pack: dict[str, Any] | None = None,
+        system_override: str | None = None,
     ) -> PromptPack:
         if mode not in CONVERSATION_MODES:
             raise ConfigurationError(f"unknown conversation mode {mode!r}")
         evidence_pack = evidence_pack or {}
         return PromptPack(
             mode=mode,
-            system=_MODE_SYSTEM[mode],
+            system=system_override or _MODE_SYSTEM[mode],
             user=text,
             project_slug=project_slug,
             canon=self._items(evidence_pack.get("canon", []), kind="canon"),
