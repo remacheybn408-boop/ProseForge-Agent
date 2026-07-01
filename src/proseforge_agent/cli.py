@@ -4266,6 +4266,40 @@ def _handle_skills(args: argparse.Namespace) -> int:
             data={"plans": [plan.to_dict() for plan in plans]},
         )
         return _emit(report, args.format)
+    if args.subcommand == "candidates":
+        from .skills import SkillCandidateStore
+
+        store = SkillCandidateStore(Path(".pf-agent") / "skills")
+        action = args.skill_arg or "list"
+        if action == "approve" and args.skill_extra:
+            plan = store.approve(args.skill_extra[0], dry_run=args.dry_run)
+            report = Report(
+                title="Skill Candidate Approval",
+                status=plan.status,
+                next_action="Apply approval only after reviewing the generated install plan",
+                sections=[ReportSection("Plan", [f"skill={plan.skill_id}", f"status={plan.status}"])],
+                data=plan.to_dict(),
+            )
+            return _emit(report, args.format)
+        if action == "reject" and args.skill_extra:
+            candidate = store.reject(args.skill_extra[0])
+            report = Report(
+                title="Skill Candidate Rejection",
+                status="ok",
+                next_action="Rejected candidates remain disabled",
+                sections=[ReportSection("Candidate", [f"{candidate.id}: {candidate.approval_state}"])],
+                data=candidate.to_dict(),
+            )
+            return _emit(report, args.format)
+        candidates = store.list()
+        report = Report(
+            title="Skill Candidates",
+            status="ok",
+            next_action="Approve with --dry-run first; candidates are not enabled automatically",
+            sections=[ReportSection("Candidates", [f"{item.id}: {item.approval_state}" for item in candidates] or ["(none)"])],
+            data={"candidates": [item.to_dict() for item in candidates]},
+        )
+        return _emit(report, args.format)
     if args.subcommand not in {None, "list"}:
         return _emit(_planned_report("skills", "Run `pf-agent skills list`"), args.format)
 
