@@ -1,8 +1,10 @@
 """Execution environment abstractions."""
 
 from .base import ExecutionCapabilities, ExecutionEnvironment, ExecutionResult, FakeExecutionEnvironment
+from .checkpoints import EnvironmentCheckpoint
 from .daytona import DaytonaExecutionBackend
 from .docker import DockerExecutionBackend, DockerPlan
+from .file_sync import FileSyncPlan, FileSyncPlanner
 from .local import LocalExecutionBackend
 from .modal import ModalExecutionBackend
 from .serverless import SERVERLESS_STATES, ServerlessPlan
@@ -13,10 +15,13 @@ __all__ = [
     "DaytonaExecutionBackend",
     "DockerExecutionBackend",
     "DockerPlan",
+    "EnvironmentCheckpoint",
     "ExecutionCapabilities",
     "ExecutionEnvironment",
     "ExecutionResult",
     "FakeExecutionEnvironment",
+    "FileSyncPlan",
+    "FileSyncPlanner",
     "LocalExecutionBackend",
     "ModalExecutionBackend",
     "SSHExecutionBackend",
