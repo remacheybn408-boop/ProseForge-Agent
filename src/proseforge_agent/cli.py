@@ -4389,6 +4389,41 @@ def _handle_gateway(args: argparse.Namespace) -> int:
             data=result.to_dict(),
         )
         return _emit(report, args.format)
+    if args.subcommand in {"whatsapp", "signal", "email"}:
+        from .gateway.platforms import EmailGatewayAdapter, SignalGatewayAdapter, WhatsAppGatewayAdapter
+
+        action = args.gateway_arg or "check"
+        if action != "check":
+            return _emit(_planned_report("gateway", f"Run `pf-agent gateway {args.subcommand} check --dry-run`"), args.format)
+        adapter_map = {
+            "whatsapp": WhatsAppGatewayAdapter,
+            "signal": SignalGatewayAdapter,
+            "email": EmailGatewayAdapter,
+        }
+        adapter = adapter_map[args.subcommand]()
+        result = adapter.check(dry_run=args.dry_run)
+        title = {
+            "whatsapp": "WhatsApp Gateway",
+            "signal": "Signal Gateway",
+            "email": "Email Gateway",
+        }[args.subcommand]
+        report = Report(
+            title=title,
+            status=result.status,
+            next_action="Install optional platform dependencies only when enabling live delivery",
+            sections=[
+                ReportSection(
+                    "Check",
+                    [
+                        f"action={action}",
+                        f"dry_run={str(result.dry_run).lower()}",
+                        f"reason={result.reason}",
+                    ],
+                )
+            ],
+            data=result.to_dict(),
+        )
+        return _emit(report, args.format)
     if args.subcommand == "platforms":
         from .gateway.platforms import FakePlatformAdapter
 
