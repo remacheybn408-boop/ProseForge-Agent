@@ -3996,29 +3996,44 @@ def _handle_jobs(args: argparse.Namespace) -> int:
 def _handle_notifications(args: argparse.Namespace) -> int:
     if args.subcommand not in {"list", "test"}:
         return _emit(_planned_report("notifications", "Run `pf-agent notifications list`"), args.format)
-    from .notifications import NotificationDispatcher, NotificationEvent
+    from .notifications import DesktopNotificationChannel, NotificationDispatcher, NotificationEvent
 
-    dispatcher = NotificationDispatcher(Path(".pf-agent"))
+    channels = [DesktopNotificationChannel(enabled=True)] if getattr(args, "desktop", False) else []
+    dispatcher = NotificationDispatcher(Path(".pf-agent"), channels=channels)
+    channel_results: list[dict] = []
     if args.subcommand == "test":
-        dispatcher.dispatch(
+        result = dispatcher.dispatch(
             NotificationEvent(
                 event_type="notification_test",
                 title="Notification test",
                 message="ProseForge Agent notification center is reachable",
             )
         )
+        channel_results = result.channel_results
     events = dispatcher.list_events()
+    sections = [
+        ReportSection(
+            "Events",
+            [f"{event.event_type}: {event.title}" for event in events] or ["(none)"],
+        )
+    ]
+    if getattr(args, "desktop", False):
+        sections.append(
+            ReportSection(
+                "Desktop",
+                [
+                    f"{result.get('channel', 'desktop')}: {result.get('status')} {result.get('reason', '')}".rstrip()
+                    for result in channel_results
+                ]
+                or ["desktop: not requested"],
+            )
+        )
     report = Report(
         title="Notifications",
         status="ok",
         next_action="Wire background jobs to dispatch notification events",
-        sections=[
-            ReportSection(
-                "Events",
-                [f"{event.event_type}: {event.title}" for event in events] or ["(none)"],
-            )
-        ],
-        data={"events": [event.to_dict() for event in events]},
+        sections=sections,
+        data={"events": [event.to_dict() for event in events], "channels": channel_results},
     )
     return _emit(report, args.format)
 
