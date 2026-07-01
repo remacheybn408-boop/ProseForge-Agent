@@ -120,6 +120,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "environment action, provider, backend",
         "artifacts": "execution environment report",
     },
+    "processes": {
+        "help": "Inspect and manage terminal process lifecycle",
+        "inputs": "process action and process id",
+        "artifacts": "process registry entries",
+    },
     "session": {
         "help": "Manage conversation session lifecycle",
         "inputs": "session id, project filter, cleanup age",
@@ -484,6 +489,8 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--provider", default="fake", help="environment provider")
             group.add_argument("--image", default="python:3.11", help="container image for environment checks")
             group.add_argument("--profile", default="demo", help="remote environment profile")
+        if name == "processes":
+            group.add_argument("process_id", nargs="?", help="process id")
         if name == "session":
             group.add_argument("session_id", nargs="?", help="chat session id")
             group.add_argument("--project", default=None, help="project slug")
@@ -4779,6 +4786,26 @@ def _handle_environments(args: argparse.Namespace) -> int:
     return _emit(report, args.format)
 
 
+def _handle_processes(args: argparse.Namespace) -> int:
+    from .environments import ProcessRegistry
+
+    registry = ProcessRegistry(root=Path(".pf-agent"))
+    entries = registry.list()
+    report = Report(
+        title="Processes",
+        status="ok",
+        next_action="Use typed process ids for read, interrupt, close, and cleanup",
+        sections=[
+            ReportSection(
+                "Processes",
+                [f"{entry.process_id} {entry.status} {entry.command_summary}" for entry in entries] or ["(none)"],
+            )
+        ],
+        data={"processes": [entry.to_dict() for entry in entries]},
+    )
+    return _emit(report, args.format)
+
+
 def _handle_setup(args: argparse.Namespace) -> int:
     from .setup import SetupWizard, mode_from_flags, mode_menu_lines, render_setup_lines
 
@@ -5592,6 +5619,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_gateway(args)
     if args.command == "environments":
         return _handle_environments(args)
+    if args.command == "processes":
+        return _handle_processes(args)
     if args.command == "session":
         return _handle_session(args)
     if args.command == "context":
