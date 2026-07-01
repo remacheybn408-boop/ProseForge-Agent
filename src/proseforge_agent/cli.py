@@ -385,6 +385,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "cron action, schedule, fixture, provider",
         "artifacts": "cron fire verification and lifecycle plan",
     },
+    "telemetry": {
+        "help": "Export observer telemetry events as JSONL",
+        "inputs": "telemetry input path, output path, family filter",
+        "artifacts": "sanitized JSONL telemetry export",
+    },
     "run": {
         "help": "Run an autonomous, goal-directed agent loop",
         "inputs": "goal, provider, iteration budget, show-plan flag",
@@ -431,7 +436,7 @@ def build_parser() -> argparse.ArgumentParser:
     for name, spec in COMMAND_GROUPS.items():
         group = subparsers.add_parser(
             name,
-            parents=[] if name in {"export", "stats"} else [shared],
+            parents=[] if name in {"export", "stats", "telemetry"} else [shared],
             help=spec["help"],
             description=(
                 f"{spec['help']}.\n"
@@ -524,6 +529,13 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--schedule", default="", help="cron schedule expression")
             group.add_argument("--fixture", default=None, help="hosted cron fire fixture")
             group.add_argument("--provider", default="fake", help="cron provider")
+        if name == "telemetry":
+            group.add_argument("--input", dest="telemetry_input", default=None, help="telemetry input JSONL path")
+            group.add_argument("--output", dest="telemetry_output", default=None, help="telemetry export output path")
+            group.add_argument("--format", dest="telemetry_format", default="jsonl", choices=["jsonl"], help="export format")
+            group.add_argument("--redact", action="store_true", help="redact sensitive fields in export")
+            group.add_argument("--family", dest="telemetry_families", action="append", default=None, help="filter by family")
+            group.add_argument("--since", dest="telemetry_since", default=None, help="ISO timestamp lower bound")
         if name == "session":
             group.add_argument("session_id", nargs="?", help="chat session id")
             group.add_argument("--project", default=None, help="project slug")
@@ -5795,6 +5807,37 @@ def _handle_cron(args: argparse.Namespace) -> int:
     )
 
 
+def _handle_telemetry(args: argparse.Namespace) -> int:
+    from .agent.observability import TelemetryStore
+
+    if args.subcommand != "export":
+        print("Telemetry Export")
+        print("Usage: pf-agent telemetry export --input <path> --output <path> --format jsonl --redact")
+        return 0
+
+    input_path = Path(args.telemetry_input) if args.telemetry_input else Path(".pf-agent") / "telemetry.jsonl"
+    output_path = Path(args.telemetry_output) if args.telemetry_output else Path(".pf-agent") / "telemetry-export.jsonl"
+
+    store = TelemetryStore(input_path)
+    if not input_path.exists():
+        print("Telemetry Export")
+        print("no telemetry events (input file does not exist)")
+        return 0
+
+    lines = store.export(
+        output_path,
+        format=args.telemetry_format,
+        redact=bool(args.redact),
+        families=args.telemetry_families,
+        since=args.telemetry_since,
+    )
+    print("Telemetry Export")
+    print(f"exported {lines} event(s) to {output_path}")
+    if lines == 0:
+        print("no telemetry events")
+    return 0
+
+
 def _offline_gate(args: argparse.Namespace) -> int | None:
     if not getattr(args, "offline", False) or args.command == "offline":
         return None
@@ -6088,6 +6131,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_cache(args)
     if args.command == "cron":
         return _handle_cron(args)
+    if args.command == "telemetry":
+        return _handle_telemetry(args)
     if args.command == "scene":
         return _handle_scene(args)
     if args.command == "export":
