@@ -27,6 +27,9 @@ class ChatSession:
     created_at: str = ""
     updated_at: str = ""
     messages_path: str = ""
+    parent_session_id: str | None = None
+    branch_name: str | None = None
+    branched_from_step: int | None = None
 
 
 @dataclass(frozen=True)
@@ -373,6 +376,9 @@ class ChatSessionStore:
             created_at=created_at,
             updated_at=updated_at,
             messages_path=str(Path("chats") / target_id / "messages.jsonl"),
+            parent_session_id=session_payload.get("parent_session_id"),
+            branch_name=session_payload.get("branch_name"),
+            branched_from_step=session_payload.get("branched_from_step"),
         )
         session_dir = self._session_dir(target_id)
         session_dir.mkdir(parents=True, exist_ok=False)
@@ -382,6 +388,53 @@ class ChatSessionStore:
             append_jsonl(self._messages_file(imported), asdict(message))
         self._write_session(imported)
         return imported
+
+    def branch(self, session_id: str, *, from_step: int, name: str) -> ChatSession:
+        """Fork a session transcript through a 1-based message step."""
+        if from_step < 0:
+            raise ConfigurationError("branch step must be zero or greater")
+        branch_name = _clean_branch_name(name)
+        context = self.load_context(session_id)
+        if from_step > len(context.messages):
+            raise ConfigurationError(
+                f"branch step {from_step} is beyond transcript length {len(context.messages)}"
+            )
+        branch_id = self._available_branch_id(f"{context.session.id}_{branch_name}")
+        now = _now()
+        branch = ChatSession(
+            id=branch_id,
+            mode=context.session.mode,
+            project_slug=context.session.project_slug,
+            workflow_run_id=context.session.workflow_run_id,
+            title=branch_name,
+            status="branched",
+            created_at=now,
+            updated_at=now,
+            messages_path=str(Path("chats") / branch_id / "messages.jsonl"),
+            parent_session_id=context.session.id,
+            branch_name=branch_name,
+            branched_from_step=from_step,
+        )
+        self._session_dir(branch_id).mkdir(parents=True, exist_ok=False)
+        self._messages_file(branch).touch()
+        for message in context.messages[:from_step]:
+            append_jsonl(self._messages_file(branch), asdict(message))
+        self._write_session(branch)
+        return branch
+
+    def branches(self, session_id: str) -> list[ChatSession]:
+        """List child branches for a session."""
+        session_id = self._clean_session_id(session_id)
+        branches = [
+            session
+            for session in self.list(include_deleted=True)
+            if session.parent_session_id == session_id and session.status != "deleted"
+        ]
+        return sorted(branches, key=lambda item: (item.created_at, item.id))
+
+    def switch(self, session_id: str) -> ChatSession:
+        """Validate and return the requested session branch target."""
+        return self._load_session(session_id)
 
     def record_event(self, event: dict[str, Any]) -> None:
         """Append a best-effort kernel event record."""
@@ -452,6 +505,17 @@ class ChatSessionStore:
             index += 1
         return candidate
 
+    def _available_branch_id(self, session_id: str) -> str:
+        candidate = self._clean_session_id(session_id)
+        if not self._session_dir(candidate).exists():
+            return candidate
+        base = candidate
+        index = 2
+        while self._session_dir(candidate).exists():
+            candidate = f"{base}_{index}"
+            index += 1
+        return candidate
+
     @staticmethod
     def _clean_session_id(session_id: str | None) -> str:
         if not session_id:
@@ -462,6 +526,7 @@ class ChatSessionStore:
 
     @staticmethod
     def _session_from_dict(payload: dict[str, Any]) -> ChatSession:
+        step = payload.get("branched_from_step")
         return ChatSession(
             id=str(payload["id"]),
             mode=str(payload["mode"]),
@@ -472,6 +537,9 @@ class ChatSessionStore:
             created_at=str(payload.get("created_at", "")),
             updated_at=str(payload.get("updated_at", "")),
             messages_path=str(payload["messages_path"]),
+            parent_session_id=payload.get("parent_session_id"),
+            branch_name=payload.get("branch_name"),
+            branched_from_step=int(step) if step is not None else None,
         )
 
     @staticmethod
@@ -515,6 +583,15 @@ def _snippet(text: str, query: str, *, radius: int = 80) -> str:
 def _new_session_id() -> str:
     timestamp = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
     return f"chat_{timestamp}_{uuid4().hex[:8]}"
+
+
+def _clean_branch_name(name: str | None) -> str:
+    if not name:
+        raise ConfigurationError("branch name is required")
+    cleaned = re.sub(r"[^A-Za-z0-9_.-]+", "-", name.strip()).strip("-")
+    if not cleaned:
+        raise ConfigurationError("branch name must contain a safe character")
+    return cleaned
 
 
 def _replace_session(session: ChatSession, **changes: Any) -> ChatSession:
