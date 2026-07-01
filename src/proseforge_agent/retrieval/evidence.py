@@ -42,6 +42,17 @@ def _estimate_tokens(text: str) -> int:
     return max(1, len(text) // 4)
 
 
+def _dedupe_by_source(items: list[EvidenceItem]) -> list[EvidenceItem]:
+    seen: set[str] = set()
+    deduped: list[EvidenceItem] = []
+    for item in items:
+        if item.source in seen:
+            continue
+        seen.add(item.source)
+        deduped.append(item)
+    return deduped
+
+
 @dataclass
 class EvidencePack:
     """A token-bounded, sectioned, cited bundle of retrieved context."""
@@ -60,9 +71,10 @@ class EvidencePack:
 class EvidencePackBuilder:
     """Build evidence packs from Agent memory for a given intent."""
 
-    def __init__(self, store: MemoryStore, *, router: RetrievalRouter | None = None) -> None:
+    def __init__(self, store: MemoryStore, *, router: RetrievalRouter | None = None, rag_searcher=None) -> None:
         self._store = store
         self._router = router or RetrievalRouter(MemoryIndex(store))
+        self._rag_searcher = rag_searcher
 
     def build(
         self,
@@ -78,6 +90,20 @@ class EvidencePackBuilder:
             token_budget=token_budget,
         )
         candidates = self._router.route(request)
+        if self._rag_searcher is not None:
+            query = self._router.query_for(request)
+            for result in self._rag_searcher.search(query, project_slug=project_slug, top_k=10):
+                source = result.metadata.get("source") or result.id
+                candidates.append(
+                    EvidenceItem(
+                        text=result.text,
+                        source=source,
+                        type="rag_chunk",
+                        score=result.score,
+                        reason_included=f"matched RAG query {query!r} with score {result.score:g}",
+                    )
+                )
+        candidates = _dedupe_by_source(candidates)
 
         sections: dict[str, list[EvidenceItem]] = {key: [] for key in SECTION_KEYS}
         included: list[EvidenceItem] = []
