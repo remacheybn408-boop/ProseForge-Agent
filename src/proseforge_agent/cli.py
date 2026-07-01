@@ -727,6 +727,8 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("plugin_arg", nargs="?", help="plugin id or path")
             group.add_argument("plugin_extra", nargs="*", help="extra plugin command arguments")
             group.add_argument("--registry", default=None, help="plugin registry index JSON")
+            group.add_argument("--with-demo-project", action="store_true", help="run plugin test with a demo project")
+            group.add_argument("--hook", default="on_after_export", help="plugin hook to trigger during `plugin test`")
         if name == "setup":
             group.add_argument("--quick", action="store_true", help="run quick guided setup")
             group.add_argument("--full", action="store_true", help="run full guided setup")
@@ -4103,6 +4105,27 @@ def _handle_notifications(args: argparse.Namespace) -> int:
 
 
 def _handle_plugin(args: argparse.Namespace) -> int:
+    if args.subcommand == "test":
+        if not args.plugin_arg:
+            return _emit(_planned_report("plugin test", "Run `pf-agent plugin test <plugin_path>`"), args.format)
+        from .plugins import PluginTestHarness
+
+        test_report = PluginTestHarness().run(
+            args.plugin_arg,
+            with_demo_project=args.with_demo_project,
+            hook=args.hook,
+        )
+        report = Report(
+            title="Plugin Test Harness",
+            status=test_report.status,
+            next_action="Fix blocked checks before publishing or installing the plugin",
+            sections=[
+                ReportSection("Checks", [f"{name}={status}" for name, status in test_report.checks.items()]),
+                ReportSection("Errors", test_report.errors or ["(none)"]),
+            ],
+            data=test_report.to_dict(),
+        )
+        return _emit(report, args.format)
     if args.subcommand == "deps":
         plugin_args = [args.plugin_arg, *getattr(args, "plugin_extra", [])]
         plugin_args = [item for item in plugin_args if item]

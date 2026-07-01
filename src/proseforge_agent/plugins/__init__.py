@@ -9,6 +9,7 @@ from .hooks import (
     PluginHookRegistry,
     PluginHookResult,
 )
+from .harness import PluginTestHarness, PluginTestReport
 from .manifest import PluginManifest
 from .manager import PluginActionResult, PluginManager
 from .permissions import PLUGIN_PERMISSIONS, PluginPermissionDecision, PluginPermissionPolicy
@@ -25,6 +26,8 @@ __all__ = [
     "PluginHookError",
     "PluginHookRegistry",
     "PluginHookResult",
+    "PluginTestHarness",
+    "PluginTestReport",
     "PluginActionResult",
     "PluginDiscovery",
     "PluginManager",
