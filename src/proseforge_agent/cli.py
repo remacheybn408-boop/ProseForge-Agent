@@ -751,12 +751,14 @@ def build_parser() -> argparse.ArgumentParser:
                 help="filter usage records (e.g. 'today'); shows all when omitted",
             )
         if name == "tools":
+            group.add_argument("tool_arg", nargs="?", help="managed tool action")
             group.add_argument(
                 "--include-permissions",
                 action="store_true",
                 help="include permission levels in the tool list",
             )
             group.add_argument("--domain", default=None, help="filter tools by domain")
+            group.add_argument("--provider", default="fake", help="managed tool provider")
         if name == "jobs":
             group.add_argument("job_name", nargs="?", help="allow-listed background job")
             group.add_argument("--provider", default="fake", help="provider for the job")
@@ -4056,6 +4058,52 @@ def _handle_rag(args: argparse.Namespace) -> int:
 
 
 def _handle_tools(args: argparse.Namespace) -> int:
+    if args.subcommand == "gateway":
+        from .tools import ManagedToolGateway, ManagedToolInvocationContext
+
+        action = args.tool_arg or "check"
+        if action != "check":
+            _emit(
+                Report(
+                    title="Managed Tool Gateway",
+                    status="error",
+                    next_action="Use `pf-agent tools gateway check --provider fake`",
+                    sections=[ReportSection("Error", [f"unsupported gateway action: {action}"])],
+                ),
+                args.format,
+            )
+            return 1
+
+        gateway = ManagedToolGateway.fake()
+        context = ManagedToolInvocationContext(
+            permission_ceiling="read_only",
+            credential_scopes={"web"},
+            provider=args.provider,
+        )
+        probe = gateway.invoke("web.search", {"query": "gateway check"}, context)
+        declarations = gateway.list()
+        report = Report(
+            title="Managed Tool Gateway",
+            status="ok" if probe.status == "ok" else "degraded",
+            next_action="Register managed tools only through declared gateway capabilities",
+            sections=[
+                ReportSection(
+                    "Declarations",
+                    [
+                        f"{tool.name} -> {tool.permission} scope={tool.credential_scope or '-'}"
+                        for tool in declarations
+                    ],
+                ),
+                ReportSection("Probe", [f"{probe.tool}: {probe.status}"]),
+            ],
+            data={
+                "provider": args.provider,
+                "declarations": [tool.to_dict() for tool in declarations],
+                "probe": probe.to_dict(),
+            },
+        )
+        return _emit(report, args.format)
+
     from .agent import default_tool_registry
 
     registry = default_tool_registry()
