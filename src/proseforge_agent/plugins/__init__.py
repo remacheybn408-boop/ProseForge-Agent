@@ -2,6 +2,13 @@
 
 from .dependencies import PluginDependencyIssue, PluginDependencyManager, PluginDependencyReport
 from .discovery import DiscoveredPlugin, PluginDiscovery
+from .hooks import (
+    SUPPORTED_PLUGIN_HOOKS,
+    PluginAPI,
+    PluginHookError,
+    PluginHookRegistry,
+    PluginHookResult,
+)
 from .manifest import PluginManifest
 from .manager import PluginActionResult, PluginManager
 from .permissions import PLUGIN_PERMISSIONS, PluginPermissionDecision, PluginPermissionPolicy
@@ -9,10 +16,15 @@ from .sandbox import PluginSandbox, PluginSandboxAPI, PluginSandboxPolicy, Plugi
 
 __all__ = [
     "PLUGIN_PERMISSIONS",
+    "SUPPORTED_PLUGIN_HOOKS",
     "DiscoveredPlugin",
+    "PluginAPI",
     "PluginDependencyIssue",
     "PluginDependencyManager",
     "PluginDependencyReport",
+    "PluginHookError",
+    "PluginHookRegistry",
+    "PluginHookResult",
     "PluginActionResult",
     "PluginDiscovery",
     "PluginManager",
