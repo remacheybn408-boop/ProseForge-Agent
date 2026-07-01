@@ -105,6 +105,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "message, mode, provider",
         "artifacts": "agent turn report",
     },
+    "tui": {
+        "help": "Run the non-desktop terminal UI",
+        "inputs": "provider, project binding, check flag",
+        "artifacts": "terminal UI state",
+    },
     "session": {
         "help": "Manage conversation session lifecycle",
         "inputs": "session id, project filter, cleanup age",
@@ -451,6 +456,12 @@ def build_parser() -> argparse.ArgumentParser:
             )
             group.add_argument("--profile", default=None, help="agent persona profile")
             group.add_argument("--profiles-file", default=None, help="YAML file with agent profiles")
+        if name == "tui":
+            group.add_argument("--provider", default="fake", help="TUI provider")
+            group.add_argument("--project", default=None, help="project slug")
+            group.add_argument("--no-project", action="store_true", help="start without project binding")
+            group.add_argument("--mode", default="general_chat", help="conversation mode")
+            group.add_argument("--check", action="store_true", help="render deterministic state and exit")
         if name == "session":
             group.add_argument("session_id", nargs="?", help="chat session id")
             group.add_argument("--project", default=None, help="project slug")
@@ -4204,6 +4215,44 @@ def _handle_plugin(args: argparse.Namespace) -> int:
     return _emit(report, args.format)
 
 
+def _handle_tui(args: argparse.Namespace) -> int:
+    from io import StringIO
+
+    from .tui import TerminalApp
+
+    project = None if args.no_project else args.project
+    if args.check:
+        buffer = StringIO()
+        TerminalApp(
+            provider=args.provider,
+            project=project,
+            mode=args.mode,
+            input_stream=StringIO(""),
+            output_stream=buffer,
+        ).start(check=True)
+        lines = [line for line in buffer.getvalue().splitlines() if line]
+        report = Report(
+            title="Terminal UI",
+            status="ok",
+            next_action="Run `pf-agent tui --provider fake --no-project` for an interactive shell",
+            sections=[
+                ReportSection(
+                    "State",
+                    [
+                        f"provider={args.provider}",
+                        f"project={project or '(none)'}",
+                        f"mode={args.mode}",
+                        "status=running",
+                    ],
+                ),
+                ReportSection("Render", lines),
+            ],
+            data={"provider": args.provider, "project": project, "mode": args.mode, "rendered": lines},
+        )
+        return _emit(report, args.format)
+    return TerminalApp(provider=args.provider, project=project, mode=args.mode).start()
+
+
 def _handle_setup(args: argparse.Namespace) -> int:
     from .setup import SetupWizard, mode_from_flags, mode_menu_lines, render_setup_lines
 
@@ -5011,6 +5060,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_usage(args)
     if args.command == "chat":
         return _handle_chat(args)
+    if args.command == "tui":
+        return _handle_tui(args)
     if args.command == "session":
         return _handle_session(args)
     if args.command == "context":
