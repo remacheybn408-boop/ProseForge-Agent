@@ -8,6 +8,7 @@ from typing import Any
 
 from ...agent.permissions import PERMISSION_LEVELS
 from .cloud_browser import BrowserActionResult, BrowserArtifactRef, CloudBrowser, FakeCloudBrowserBackend
+from .media import FakeMediaGateway, MediaArtifactRef, MediaRequest, MediaToolResult
 from .url_safety import UrlSafetyDecision, UrlSafetyPolicy
 from .web_search import FakeWebSearchProvider, WebSearchResponse, WebSearchResult
 
@@ -204,7 +205,11 @@ __all__ = [
     "ManagedToolInvocationContext",
     "ManagedToolResult",
     "FakeCloudBrowserBackend",
+    "FakeMediaGateway",
     "FakeWebSearchProvider",
+    "MediaArtifactRef",
+    "MediaRequest",
+    "MediaToolResult",
     "UrlSafetyDecision",
     "UrlSafetyPolicy",
     "WebSearchResponse",
