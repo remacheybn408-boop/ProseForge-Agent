@@ -4339,6 +4339,30 @@ def _handle_tui(args: argparse.Namespace) -> int:
 
 
 def _handle_gateway(args: argparse.Namespace) -> int:
+    if args.subcommand == "telegram":
+        from .gateway.platforms import TelegramGatewayAdapter
+
+        action = args.gateway_arg or "check"
+        if action not in {"check", "setup"}:
+            return _emit(_planned_report("gateway", "Run `pf-agent gateway telegram check --dry-run`"), args.format)
+        result = TelegramGatewayAdapter().check(dry_run=args.dry_run)
+        report = Report(
+            title="Telegram Gateway",
+            status=result.status,
+            next_action="Provide a token through the secret store before enabling live Telegram delivery",
+            sections=[
+                ReportSection(
+                    "Check",
+                    [
+                        f"action={action}",
+                        f"dry_run={str(result.dry_run).lower()}",
+                        f"reason={result.reason}",
+                    ],
+                )
+            ],
+            data=result.to_dict(),
+        )
+        return _emit(report, args.format)
     if args.subcommand == "platforms":
         from .gateway.platforms import FakePlatformAdapter
 
