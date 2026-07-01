@@ -1,5 +1,6 @@
 """Plugin platform primitives."""
 
+from .dependencies import PluginDependencyIssue, PluginDependencyManager, PluginDependencyReport
 from .discovery import DiscoveredPlugin, PluginDiscovery
 from .manifest import PluginManifest
 from .manager import PluginActionResult, PluginManager
@@ -9,6 +10,9 @@ from .sandbox import PluginSandbox, PluginSandboxAPI, PluginSandboxPolicy, Plugi
 __all__ = [
     "PLUGIN_PERMISSIONS",
     "DiscoveredPlugin",
+    "PluginDependencyIssue",
+    "PluginDependencyManager",
+    "PluginDependencyReport",
     "PluginActionResult",
     "PluginDiscovery",
     "PluginManager",

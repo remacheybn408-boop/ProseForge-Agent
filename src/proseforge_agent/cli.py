@@ -725,6 +725,7 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--webhook", action="store_true", help="send a webhook test notification")
         if name == "plugin":
             group.add_argument("plugin_arg", nargs="?", help="plugin id or path")
+            group.add_argument("plugin_extra", nargs="*", help="extra plugin command arguments")
             group.add_argument("--registry", default=None, help="plugin registry index JSON")
         if name == "setup":
             group.add_argument("--quick", action="store_true", help="run quick guided setup")
@@ -4102,6 +4103,31 @@ def _handle_notifications(args: argparse.Namespace) -> int:
 
 
 def _handle_plugin(args: argparse.Namespace) -> int:
+    if args.subcommand == "deps":
+        plugin_args = [args.plugin_arg, *getattr(args, "plugin_extra", [])]
+        plugin_args = [item for item in plugin_args if item]
+        if plugin_args and plugin_args[0] == "check":
+            plugin_args = plugin_args[1:]
+        if not plugin_args:
+            return _emit(_planned_report("plugin deps", "Run `pf-agent plugin deps check <plugin_id>`"), args.format)
+        from .plugins import PluginDependencyManager
+
+        report_data = PluginDependencyManager(Path(".pf-agent")).check(plugin_args[0])
+        report = Report(
+            title="Plugin Dependencies",
+            status=report_data.status,
+            next_action="Review install commands before changing the Python environment",
+            sections=[
+                ReportSection("Dependencies", report_data.dependencies or ["(none)"]),
+                ReportSection(
+                    "Issues",
+                    [f"{issue.kind}: {issue.dependency} - {issue.message}" for issue in report_data.issues] or ["(none)"],
+                ),
+                ReportSection("Dry Run Install Plan", report_data.install_commands or ["(none)"]),
+            ],
+            data=report_data.to_dict(),
+        )
+        return _emit(report, args.format)
     if args.subcommand in {"install", "update", "remove", "enable", "disable"}:
         if not args.plugin_arg:
             return _emit(_planned_report("plugin", f"Run `pf-agent plugin {args.subcommand} <plugin>`"), args.format)
