@@ -1064,6 +1064,24 @@ def _handle_project(args: argparse.Namespace) -> int:
 
 
 def _handle_artifacts(args: argparse.Namespace) -> int:
+    if args.subcommand == "list" and not args.slug:
+        from .agent.artifacts import ArtifactStore
+
+        store = ArtifactStore(Path(".pf-agent"))
+        refs = store.list()
+        report = Report(
+            title="Tool Artifacts",
+            status="ok",
+            next_action="Pass --slug to inspect novel artifact graph instead",
+            sections=[
+                ReportSection(
+                    "Artifacts",
+                    [f"{ref.id} ({ref.kind}) {ref.path}" for ref in refs] or ["(none)"],
+                )
+            ],
+            data={"artifacts": [ref.to_dict() for ref in refs]},
+        )
+        return _emit(report, args.format)
     if args.subcommand not in {"list", "graph", "trace"} or not args.slug:
         return _emit(
             _planned_report("artifacts", "Run `pf-agent artifacts list --slug <slug>`"),

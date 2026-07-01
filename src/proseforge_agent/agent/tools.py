@@ -18,6 +18,10 @@ class ToolResult:
     output: Any = ""
     error: str = ""
     provenance: str = "internal"
+    summary: str = ""
+    artifact_refs: list[Any] = field(default_factory=list)
+    truncated: bool = False
+    redaction_applied: bool = False
 
 
 @dataclass(frozen=True)
