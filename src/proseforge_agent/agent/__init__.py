@@ -1,6 +1,6 @@
 """Agent runtime interfaces."""
 
-from .events import BackgroundJobRunner, EventBus, EventRecord, JobResult
+from .events import BackgroundJobRunner, EventBus, EventRecord, JobResult, ToolOutputChunk
 from .eval import EvalHarness, EvalReport, EvalSuite, EvalTaskResult, GoldenTask
 from .attachments import AttachmentIngestResult, AttachmentIngestor
 from .audit import AuditStep, AuditTrailStore, ReplayResult
@@ -67,6 +67,7 @@ __all__ = [
     "StructuredToolResult",
     "ToolCallLoop",
     "ToolLoopResult",
+    "ToolOutputChunk",
     "AgentKernel",
     "IntentDecision",
     "IntentRouter",
