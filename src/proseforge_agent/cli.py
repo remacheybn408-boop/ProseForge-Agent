@@ -4289,6 +4289,46 @@ def _handle_skills(args: argparse.Namespace) -> int:
             data=candidate.to_dict(),
         )
         return _emit(report, args.format)
+    if args.subcommand == "usage":
+        from .skills import SkillUsageStore
+
+        summary = SkillUsageStore(Path(".pf-agent") / "skills").summary(args.skill)
+        report = Report(
+            title="Skill Usage",
+            status="ok",
+            next_action="Use usage summaries to propose reviewable skill improvements",
+            sections=[
+                ReportSection(
+                    "Summary",
+                    [f"skill={args.skill or 'all'}", f"total={summary['total']}", f"failures={summary['failures']}"],
+                )
+            ],
+            data=summary,
+        )
+        return _emit(report, args.format)
+    if args.subcommand == "audit":
+        from .skills import SkillRegistry, SkillSafetyAuditor
+
+        records = SkillRegistry.discover([Path(".pf-agent") / "skills"])
+        findings = SkillSafetyAuditor().audit(
+            [
+                {
+                    "name": record.name,
+                    "version": record.version,
+                    "enabled": record.enabled,
+                    "instructions": "",
+                }
+                for record in records
+            ]
+        )
+        report = Report(
+            title="Skill Audit",
+            status="ok" if not findings else "degraded",
+            next_action="Review unsafe or stale skill findings before relying on the skill",
+            sections=[ReportSection("Findings", [f"{item.skill_id}: {item.code}" for item in findings] or ["(none)"])],
+            data={"findings": [item.to_dict() for item in findings]},
+        )
+        return _emit(report, args.format)
     if args.subcommand == "candidates":
         from .skills import SkillCandidateStore
 
