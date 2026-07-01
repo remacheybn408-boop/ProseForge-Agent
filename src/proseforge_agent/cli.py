@@ -115,6 +115,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "platform subcommand, provider, check flag",
         "artifacts": "gateway sessions and delivery queue",
     },
+    "environments": {
+        "help": "Inspect and check execution environments",
+        "inputs": "environment action, provider, backend",
+        "artifacts": "execution environment report",
+    },
     "session": {
         "help": "Manage conversation session lifecycle",
         "inputs": "session id, project filter, cleanup age",
@@ -474,6 +479,9 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--fixture", default=None, help="gateway fixture for inspect commands")
             group.add_argument("--provider", default="fake", help="gateway provider")
             group.add_argument("--check", action="store_true", help="validate gateway readiness and exit")
+        if name == "environments":
+            group.add_argument("environment_arg", nargs="?", help="environment backend or action")
+            group.add_argument("--provider", default="fake", help="environment provider")
         if name == "session":
             group.add_argument("session_id", nargs="?", help="chat session id")
             group.add_argument("--project", default=None, help="project slug")
@@ -4587,6 +4595,34 @@ def _handle_gateway(args: argparse.Namespace) -> int:
     return _emit(report, args.format)
 
 
+def _handle_environments(args: argparse.Namespace) -> int:
+    from .environments import FakeExecutionEnvironment
+
+    if args.subcommand not in {"list", None}:
+        return _emit(_planned_report("environments", "Run `pf-agent environments list --provider fake`"), args.format)
+    fake = FakeExecutionEnvironment()
+    capabilities = fake.capabilities.to_dict()
+    report = Report(
+        title="Execution Environments",
+        status="ok",
+        next_action="Use environment checks before selecting a non-fake backend",
+        sections=[
+            ReportSection(
+                "Environments",
+                [
+                    "fake "
+                    f"filesystem_sync={str(capabilities['filesystem_sync']).lower()} "
+                    f"long_running={str(capabilities['long_running_process']).lower()} "
+                    f"network={str(capabilities['network']).lower()} "
+                    f"gpu={str(capabilities['gpu']).lower()}"
+                ],
+            )
+        ],
+        data={"environments": [{"id": fake.environment_id, "capabilities": capabilities}]},
+    )
+    return _emit(report, args.format)
+
+
 def _handle_setup(args: argparse.Namespace) -> int:
     from .setup import SetupWizard, mode_from_flags, mode_menu_lines, render_setup_lines
 
@@ -5398,6 +5434,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_tui(args)
     if args.command == "gateway":
         return _handle_gateway(args)
+    if args.command == "environments":
+        return _handle_environments(args)
     if args.command == "session":
         return _handle_session(args)
     if args.command == "context":
