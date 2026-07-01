@@ -3811,6 +3811,40 @@ def _handle_context(args: argparse.Namespace) -> int:
 
 
 def _handle_rag(args: argparse.Namespace) -> int:
+    if args.subcommand in {"ingest", "ingest-file", "status"}:
+        if not args.slug:
+            return _emit(_planned_report("rag", "Pass --slug for RAG commands"), args.format)
+        from .retrieval import RagIngestionPipeline
+
+        pipeline = RagIngestionPipeline(Path(".pf-agent") / "workspace")
+        if args.subcommand == "ingest-file":
+            if not args.rag_query:
+                return _emit(_planned_report("rag", "Run `pf-agent rag ingest-file <path> --slug <slug>`"), args.format)
+            report_data = pipeline.ingest_file(args.rag_query, slug=args.slug)
+        elif args.subcommand == "status":
+            report_data = pipeline.status(args.slug)
+        else:
+            report_data = pipeline.ingest_project(args.slug)
+        title = "RAG Status" if args.subcommand == "status" else "RAG Ingestion"
+        report = Report(
+            title=title,
+            status="ok",
+            next_action="Use `pf-agent rag search <query> --slug <slug>` to query indexed chunks",
+            sections=[
+                ReportSection(
+                    "Chunks",
+                    [
+                        f"slug={report_data.slug}",
+                        f"added={report_data.added_count}",
+                        f"updated={report_data.updated_count}",
+                        f"unchanged={report_data.unchanged_count}",
+                        f"total={report_data.total_chunks}",
+                    ],
+                )
+            ],
+            data=report_data.to_dict(),
+        )
+        return _emit(report, args.format)
     if args.subcommand != "search" or not args.rag_query or not args.slug:
         return _emit(_planned_report("rag", "Run `pf-agent rag search <query> --slug <slug>`"), args.format)
     from .retrieval import FakeEmbeddingProvider, HybridRetriever, JsonlVectorStore, load_rag_documents
