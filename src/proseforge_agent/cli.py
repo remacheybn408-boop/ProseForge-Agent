@@ -444,6 +444,8 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--no-tools", action="store_true", help="omit tool calls from session export")
             group.add_argument("--no-evidence", action="store_true", help="omit evidence refs from session export")
             group.add_argument("--no-redact", action="store_true", help="do not redact secrets during export")
+            group.add_argument("--from-step", type=int, default=None, help="message step for session branching")
+            group.add_argument("--name", default=None, help="branch name for session branching")
         if name == "context":
             group.add_argument("--provider", default="fake", help="provider family/name")
             group.add_argument("--session", default=None, help="chat session id")
@@ -3309,6 +3311,70 @@ def _handle_session(args: argparse.Namespace) -> int:
                         f"status={session.status}",
                         f"mode={session.mode}",
                         f"project={session.project_slug or '(none)'}",
+                    ],
+                )
+            ],
+            data=session.__dict__,
+        )
+        return _emit(report, args.format)
+    if subcommand == "branch":
+        if args.from_step is None or not args.name:
+            return _emit(
+                _planned_report("session", "Run `pf-agent session branch <id> --from-step <n> --name <name>`"),
+                args.format,
+            )
+        branch = store.branch(args.session_id, from_step=args.from_step, name=args.name)
+        report = Report(
+            title="Session Branch",
+            status="ok",
+            next_action=f"Continue from `{branch.id}` or switch to it explicitly",
+            sections=[
+                ReportSection(
+                    "Branch",
+                    [
+                        f"id={branch.id}",
+                        f"parent={branch.parent_session_id}",
+                        f"name={branch.branch_name}",
+                        f"from_step={branch.branched_from_step}",
+                    ],
+                )
+            ],
+            data=branch.__dict__,
+        )
+        return _emit(report, args.format)
+    if subcommand == "branches":
+        branches = store.branches(args.session_id)
+        report = Report(
+            title="Session Branches",
+            status="ok",
+            next_action="Switch to a branch id to continue alternate context",
+            sections=[
+                ReportSection(
+                    "Branches",
+                    [
+                        f"{branch.id}: name={branch.branch_name} from_step={branch.branched_from_step}"
+                        for branch in branches
+                    ]
+                    or ["(none)"],
+                )
+            ],
+            data={"branches": [branch.__dict__ for branch in branches]},
+        )
+        return _emit(report, args.format)
+    if subcommand == "switch":
+        session = store.switch(args.session_id)
+        report = Report(
+            title="Session Switch",
+            status="ok",
+            next_action="Use this session id for the next chat turn",
+            sections=[
+                ReportSection(
+                    "Session",
+                    [
+                        f"id={session.id}",
+                        f"status={session.status}",
+                        f"parent={session.parent_session_id or '(none)'}",
+                        f"name={session.branch_name or session.title or '(none)'}",
                     ],
                 )
             ],
