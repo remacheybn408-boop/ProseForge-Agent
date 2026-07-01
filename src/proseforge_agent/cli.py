@@ -60,6 +60,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "project slug, intent, token budget",
         "artifacts": "evidence pack",
     },
+    "rag": {
+        "help": "Search and manage retrieval-augmented generation indexes",
+        "inputs": "query, project slug, RAG chunk index",
+        "artifacts": "hybrid retrieval results",
+    },
     "phase-plan": {
         "help": "Generate a structured phase plan from intake",
         "inputs": "intake file, memory",
@@ -456,6 +461,10 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--max-context", type=int, default=None, help="override provider context window")
             group.add_argument("--reserve", type=int, default=256, help="reserved completion tokens")
             group.add_argument("--keep-last", type=int, default=6, help="messages to keep after compaction")
+        if name == "rag":
+            group.add_argument("rag_query", nargs="?", help="query for rag search")
+            group.add_argument("--slug", default=None, help="project slug")
+            group.add_argument("--top-k", type=int, default=5, help="number of search results")
         if name == "prompt":
             group.add_argument("prompt_arg", nargs="?", help="prompt template id for show")
             group.add_argument("--session", default=None, help="chat session id")
@@ -3801,6 +3810,39 @@ def _handle_context(args: argparse.Namespace) -> int:
     return _emit(report, args.format)
 
 
+def _handle_rag(args: argparse.Namespace) -> int:
+    if args.subcommand != "search" or not args.rag_query or not args.slug:
+        return _emit(_planned_report("rag", "Run `pf-agent rag search <query> --slug <slug>`"), args.format)
+    from .retrieval import FakeEmbeddingProvider, HybridRetriever, JsonlVectorStore, load_rag_documents
+
+    chunks_path = Path(".pf-agent") / "workspace" / args.slug / "rag" / "chunks.jsonl"
+    vector_path = Path(".pf-agent") / "workspace" / args.slug / "rag" / "vectors.jsonl"
+    documents = load_rag_documents(chunks_path)
+    retriever = HybridRetriever(
+        documents,
+        embedding_provider=FakeEmbeddingProvider(),
+        vector_store=JsonlVectorStore(vector_path),
+    )
+    results = retriever.search(args.rag_query, project_slug=args.slug, top_k=args.top_k)
+    report = Report(
+        title="Hybrid RAG Search",
+        status="ok" if results else "degraded",
+        next_action="Run `pf-agent rag ingest --slug <slug>` if no relevant chunks are found",
+        sections=[
+            ReportSection(
+                "Results",
+                [
+                    f"{result.id}: score={result.score:.3f} channels={','.join(result.channels)} source={result.metadata.get('source', '-')}"
+                    for result in results
+                ]
+                or ["(none)"],
+            )
+        ],
+        data={"query": args.rag_query, "slug": args.slug, "results": [result.to_dict() for result in results]},
+    )
+    return _emit(report, args.format)
+
+
 def _handle_tools(args: argparse.Namespace) -> int:
     from .agent import default_tool_registry
 
@@ -4677,6 +4719,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_session(args)
     if args.command == "context":
         return _handle_context(args)
+    if args.command == "rag":
+        return _handle_rag(args)
     if args.command == "prompt":
         return _handle_prompt(args)
     if args.command == "prompt-template":
