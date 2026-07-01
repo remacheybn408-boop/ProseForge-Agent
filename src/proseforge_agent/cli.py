@@ -4340,6 +4340,36 @@ def _handle_tui(args: argparse.Namespace) -> int:
 
 
 def _handle_gateway(args: argparse.Namespace) -> int:
+    if args.subcommand == "delivery":
+        from .gateway import DeliveryManager, OutboundMessage
+        from .gateway.platforms import FakePlatformAdapter
+
+        action = args.gateway_arg or "check"
+        if action != "check":
+            return _emit(_planned_report("gateway", "Run `pf-agent gateway delivery check --provider fake`"), args.format)
+        adapter = FakePlatformAdapter(max_message_size=8)
+        result = DeliveryManager(adapter=adapter).deliver(
+            "delivery-check",
+            OutboundMessage(platform="fake", chat_id="check", thread_id="main", text="fake delivery check"),
+        )
+        report = Report(
+            title="Gateway Delivery",
+            status="ok" if result.delivered else "blocked",
+            next_action="Use delivery manager for all platform adapter sends",
+            sections=[
+                ReportSection(
+                    "Delivery",
+                    [
+                        f"provider={args.provider}",
+                        f"delivered={str(result.delivered).lower()}",
+                        f"chunks={result.chunk_count}",
+                        f"retries={result.retry_count}",
+                    ],
+                )
+            ],
+            data=result.to_dict(),
+        )
+        return _emit(report, args.format)
     if args.subcommand == "pair":
         from .gateway.relay import RelayPairingService
 
