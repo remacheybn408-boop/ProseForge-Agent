@@ -130,6 +130,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "browser action and provider",
         "artifacts": "browser trace and bounded artifact refs",
     },
+    "media": {
+        "help": "Run managed media generation and transcription tools",
+        "inputs": "media action, fixture, prompt, provider",
+        "artifacts": "media artifact references and text candidates",
+    },
     "session": {
         "help": "Manage conversation session lifecycle",
         "inputs": "session id, project filter, cleanup age",
@@ -498,6 +503,10 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("process_id", nargs="?", help="process id")
         if name == "browser":
             group.add_argument("--provider", default="fake", help="browser provider")
+        if name == "media":
+            group.add_argument("--fixture", default="voice-note", help="media fixture")
+            group.add_argument("--prompt", default="", help="media generation prompt")
+            group.add_argument("--provider", default="fake", help="media provider")
         if name == "session":
             group.add_argument("session_id", nargs="?", help="chat session id")
             group.add_argument("--project", default=None, help="project slug")
@@ -4935,6 +4944,33 @@ def _handle_browser(args: argparse.Namespace) -> int:
     return _emit(report, args.format)
 
 
+def _handle_media(args: argparse.Namespace) -> int:
+    if args.subcommand not in {"transcribe", "image"}:
+        return _emit(
+            _planned_report("media", "Run `pf-agent media transcribe --fixture voice-note --provider fake`"),
+            args.format,
+        )
+    from .tools.managed.media import FakeMediaGateway, MediaRequest
+
+    gateway = FakeMediaGateway(provider=args.provider)
+    if args.subcommand == "transcribe":
+        result = gateway.transcribe(MediaRequest(fixture=args.fixture, content_type="audio/wav"))
+    else:
+        prompt = args.prompt or "cover concept"
+        result = gateway.generate_image(prompt, dry_run=args.dry_run)
+    report = Report(
+        title="Managed Media",
+        status=result.status,
+        next_action="Review media artifacts before accepting text or files into project output",
+        sections=[
+            ReportSection("Result", [f"status={result.status}", f"artifact={result.artifact_ref.id}"]),
+            ReportSection("Candidate", [result.text_candidate or "(none)"]),
+        ],
+        data=result.to_dict(),
+    )
+    return _emit(report, args.format)
+
+
 def _handle_setup(args: argparse.Namespace) -> int:
     from .setup import SetupWizard, mode_from_flags, mode_menu_lines, render_setup_lines
 
@@ -5752,6 +5788,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_processes(args)
     if args.command == "browser":
         return _handle_browser(args)
+    if args.command == "media":
+        return _handle_media(args)
     if args.command == "session":
         return _handle_session(args)
     if args.command == "context":
