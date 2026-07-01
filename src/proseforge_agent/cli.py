@@ -4266,6 +4266,29 @@ def _handle_skills(args: argparse.Namespace) -> int:
             data={"plans": [plan.to_dict() for plan in plans]},
         )
         return _emit(report, args.format)
+    if args.subcommand == "improve" and args.skill_arg:
+        from .skills import SkillRevisionStore
+
+        store = SkillRevisionStore(Path(".pf-agent") / "skills")
+        candidate = store.propose(
+            args.skill_arg,
+            "1.0.0",
+            f"Proposed review update for {args.skill_arg}.",
+            ["dry-run"],
+        )
+        report = Report(
+            title="Skill Improvement",
+            status="planned" if candidate.approval_state == "pending" else candidate.approval_state,
+            next_action="Review the revision candidate before applying it to an enabled skill",
+            sections=[
+                ReportSection(
+                    "Candidate",
+                    [f"skill={candidate.skill_id}", f"base={candidate.base_version}", f"proposed={candidate.proposed_version}"],
+                )
+            ],
+            data=candidate.to_dict(),
+        )
+        return _emit(report, args.format)
     if args.subcommand == "candidates":
         from .skills import SkillCandidateStore
 

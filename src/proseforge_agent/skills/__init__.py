@@ -6,6 +6,7 @@ from .registry import SkillRecord, SkillRegistry, SkillValidationError
 from .hub import FakeSkillHubClient, SkillHubPackage
 from .install import SkillInstallPlan, SkillInstaller
 from .creation import SkillCandidate, SkillCandidateStore
+from .improvement import SkillRevisionCandidate, SkillRevisionStore
 
 __all__ = [
     "FakeSkillHubClient",
@@ -15,6 +16,8 @@ __all__ = [
     "SkillInstallPlan",
     "SkillInstaller",
     "SkillRecord",
+    "SkillRevisionCandidate",
+    "SkillRevisionStore",
     "SkillRegistry",
     "SkillValidationError",
 ]
