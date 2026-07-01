@@ -5,5 +5,14 @@ to it through source references. It does not import provider or workflow code.
 """
 
 from .store import MemoryItem, MemoryStore
+from .nudges import MemoryNudge, MemoryNudgeGenerator
+from .user_model import UserModelFact, UserModelStore
 
-__all__ = ["MemoryItem", "MemoryStore"]
+__all__ = [
+    "MemoryItem",
+    "MemoryNudge",
+    "MemoryNudgeGenerator",
+    "MemoryStore",
+    "UserModelFact",
+    "UserModelStore",
+]

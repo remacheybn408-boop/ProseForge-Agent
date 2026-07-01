@@ -441,6 +441,8 @@ def build_parser() -> argparse.ArgumentParser:
             help="group subcommand (e.g. 'command-reference', 'list')",
         )
         group.add_argument("--providers", default=None, help="providers config (YAML)")
+        if name == "memory":
+            group.add_argument("--provider", default="fake", help="memory provider")
         if name == "chat":
             group.add_argument("--message", default=None, help="one-shot chat message")
             group.add_argument("--text", default=None, help="text to classify")
@@ -4383,6 +4385,23 @@ def _handle_skills(args: argparse.Namespace) -> int:
     return _emit(report, args.format)
 
 
+def _handle_memory(args: argparse.Namespace) -> int:
+    if args.subcommand != "nudges":
+        return _emit(_planned_report("memory", "Run `pf-agent memory nudges --provider fake`"), args.format)
+    from .memory import MemoryNudgeGenerator, UserModelStore
+
+    store = UserModelStore(Path(".pf-agent") / "memory")
+    nudges = MemoryNudgeGenerator(store).generate()
+    report = Report(
+        title="Memory Nudges",
+        status="ok",
+        next_action="Review nudges manually; this command does not accept memory automatically",
+        sections=[ReportSection("Nudges", [f"{item.candidate_id}: {item.reason}" for item in nudges] or ["(none)"])],
+        data={"provider": args.provider, "nudges": [item.to_dict() for item in nudges]},
+    )
+    return _emit(report, args.format)
+
+
 def _handle_jobs(args: argparse.Namespace) -> int:
     if args.subcommand in {"list", "status", "logs", "cancel"}:
         from .notifications import JobStatusCenter
@@ -5964,6 +5983,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_provider(args)
     if args.command == "usage":
         return _handle_usage(args)
+    if args.command == "memory":
+        return _handle_memory(args)
     if args.command == "chat":
         return _handle_chat(args)
     if args.command == "tui":
