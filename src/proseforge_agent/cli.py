@@ -483,6 +483,7 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("environment_arg", nargs="?", help="environment backend or action")
             group.add_argument("--provider", default="fake", help="environment provider")
             group.add_argument("--image", default="python:3.11", help="container image for environment checks")
+            group.add_argument("--profile", default="demo", help="remote environment profile")
         if name == "session":
             group.add_argument("session_id", nargs="?", help="chat session id")
             group.add_argument("--project", default=None, help="project slug")
@@ -4629,6 +4630,54 @@ def _handle_environments(args: argparse.Namespace) -> int:
                     title="Docker Environment",
                     status=plan.status,
                     next_action="Install Docker or select local/fake environment when unavailable",
+                    sections=[
+                        ReportSection(
+                            "Plan",
+                            [
+                                f"image={plan.image}",
+                                f"dry_run={str(plan.dry_run).lower()}",
+                                f"status={plan.status}",
+                                f"reason={plan.reason}",
+                            ],
+                        )
+                    ],
+                    data=plan.to_dict(),
+                ),
+                args.format,
+            )
+        if backend == "ssh":
+            from .environments import SSHExecutionBackend
+
+            plan = SSHExecutionBackend(ssh_available=False).check(profile=args.profile, host="demo@example.com", token="demo", dry_run=args.dry_run)
+            return _emit(
+                Report(
+                    title="SSH Environment",
+                    status=plan.status,
+                    next_action="Install SSH or configure a reachable profile before live execution",
+                    sections=[
+                        ReportSection(
+                            "Plan",
+                            [
+                                f"profile={plan.profile}",
+                                f"dry_run={str(plan.dry_run).lower()}",
+                                f"status={plan.status}",
+                                f"reason={plan.reason}",
+                            ],
+                        )
+                    ],
+                    data=plan.to_dict(),
+                ),
+                args.format,
+            )
+        if backend == "singularity":
+            from .environments import SingularityExecutionBackend
+
+            plan = SingularityExecutionBackend(singularity_available=False).check(image=args.image, dry_run=args.dry_run)
+            return _emit(
+                Report(
+                    title="Singularity Environment",
+                    status=plan.status,
+                    next_action="Install Singularity or select another backend before live execution",
                     sections=[
                         ReportSection(
                             "Plan",
