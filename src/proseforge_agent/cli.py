@@ -4598,6 +4598,34 @@ def _handle_gateway(args: argparse.Namespace) -> int:
 
 
 def _handle_environments(args: argparse.Namespace) -> int:
+    if args.subcommand == "sync":
+        from .environments import FileSyncPlanner
+
+        plan = FileSyncPlanner(root=Path(".")).plan(
+            includes=["pyproject.toml", ".env", "../outside.txt"],
+            destination="remote:/workspace",
+            dry_run=args.dry_run,
+        )
+        return _emit(
+            Report(
+                title="Environment Sync",
+                status="ok",
+                next_action="Review sync operations before enabling remote write actions",
+                sections=[
+                    ReportSection(
+                        "Plan",
+                        [
+                            f"dry_run={str(plan.dry_run).lower()}",
+                            f"operations={len(plan.operations)}",
+                            f"excludes={', '.join(plan.excludes) or '(none)'}",
+                            f"redactions={', '.join(plan.redactions) or '(none)'}",
+                        ],
+                    )
+                ],
+                data=plan.to_dict(),
+            ),
+            args.format,
+        )
     if args.subcommand == "check":
         from .environments import DockerExecutionBackend, LocalExecutionBackend
 
