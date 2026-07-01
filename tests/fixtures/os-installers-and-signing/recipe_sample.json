@@ -1,0 +1,5 @@
+{
+  "windows": {"artifact_name": "pf-agent-windows.msi", "packager": "wix", "signer": "signtool"},
+  "macos": {"artifact_name": "pf-agent-macos.dmg", "packager": "hdiutil", "signer": "codesign"},
+  "linux": {"artifact_name": "install.sh", "packager": "script", "signer": "gpg"}
+}
