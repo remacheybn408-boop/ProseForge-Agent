@@ -441,6 +441,9 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--project", default=None, help="project slug")
             group.add_argument("--include-deleted", action="store_true", help="include deleted sessions")
             group.add_argument("--older-than", default="90d", help="cleanup age such as 90d")
+            group.add_argument("--no-tools", action="store_true", help="omit tool calls from session export")
+            group.add_argument("--no-evidence", action="store_true", help="omit evidence refs from session export")
+            group.add_argument("--no-redact", action="store_true", help="do not redact secrets during export")
         if name == "context":
             group.add_argument("--provider", default="fake", help="provider family/name")
             group.add_argument("--session", default=None, help="chat session id")
@@ -3254,6 +3257,64 @@ def _handle_session(args: argparse.Namespace) -> int:
         return _emit(report, args.format)
     if not args.session_id:
         return _emit(_planned_report("session", f"Pass a session id for `session {subcommand}`"), args.format)
+    if subcommand == "export":
+        include_tools = not bool(getattr(args, "no_tools", False))
+        include_evidence = not bool(getattr(args, "no_evidence", False))
+        redact = not bool(getattr(args, "no_redact", False))
+        payload = store.export_bundle(
+            args.session_id,
+            include_tools=include_tools,
+            include_evidence=include_evidence,
+            redact=redact,
+        )
+        markdown = store.export_bundle_markdown(
+            args.session_id,
+            include_tools=include_tools,
+            include_evidence=include_evidence,
+            redact=redact,
+        )
+        report = Report(
+            title="Session Export",
+            status="ok",
+            next_action="Import this bundle with `pf-agent session import <path>` when needed",
+            sections=[
+                ReportSection(
+                    "Bundle",
+                    [
+                        f"id={payload['session']['id']}",
+                        f"messages={len(payload['messages'])}",
+                        f"include_tools={include_tools}",
+                        f"include_evidence={include_evidence}",
+                        f"redacted={redact}",
+                    ],
+                ),
+                ReportSection("Markdown", markdown.splitlines()[:12] if args.format == "markdown" else []),
+            ],
+            data=payload,
+        )
+        return _emit(report, args.format)
+    if subcommand == "import":
+        path = Path(args.session_id)
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        session = store.import_bundle(payload)
+        report = Report(
+            title="Session Import",
+            status="ok",
+            next_action=f"Use `pf-agent session show {session.id}` to inspect the imported session",
+            sections=[
+                ReportSection(
+                    "Imported",
+                    [
+                        f"id={session.id}",
+                        f"status={session.status}",
+                        f"mode={session.mode}",
+                        f"project={session.project_slug or '(none)'}",
+                    ],
+                )
+            ],
+            data=session.__dict__,
+        )
+        return _emit(report, args.format)
     if subcommand == "show":
         context = store.load_context(args.session_id)
         session = context.session
