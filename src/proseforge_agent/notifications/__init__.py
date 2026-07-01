@@ -7,6 +7,7 @@ from .core import (
     NotificationEvent,
 )
 from .desktop import DesktopNotificationChannel
+from .webhook import WebhookNotificationChannel
 
 __all__ = [
     "DesktopNotificationChannel",
@@ -14,4 +15,5 @@ __all__ = [
     "NotificationDispatchResult",
     "NotificationDispatcher",
     "NotificationEvent",
+    "WebhookNotificationChannel",
 ]

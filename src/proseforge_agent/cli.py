@@ -717,6 +717,7 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--provider", default="fake", help="provider for the job")
         if name == "notifications":
             group.add_argument("--desktop", action="store_true", help="send a desktop test notification")
+            group.add_argument("--webhook", action="store_true", help="send a webhook test notification")
         if name == "setup":
             group.add_argument("--quick", action="store_true", help="run quick guided setup")
             group.add_argument("--full", action="store_true", help="run full guided setup")
@@ -3996,9 +3997,11 @@ def _handle_jobs(args: argparse.Namespace) -> int:
 def _handle_notifications(args: argparse.Namespace) -> int:
     if args.subcommand not in {"list", "test"}:
         return _emit(_planned_report("notifications", "Run `pf-agent notifications list`"), args.format)
-    from .notifications import DesktopNotificationChannel, NotificationDispatcher, NotificationEvent
+    from .notifications import DesktopNotificationChannel, NotificationDispatcher, NotificationEvent, WebhookNotificationChannel
 
     channels = [DesktopNotificationChannel(enabled=True)] if getattr(args, "desktop", False) else []
+    if getattr(args, "webhook", False):
+        channels.append(WebhookNotificationChannel(enabled=True))
     dispatcher = NotificationDispatcher(Path(".pf-agent"), channels=channels)
     channel_results: list[dict] = []
     if args.subcommand == "test":
@@ -4026,6 +4029,18 @@ def _handle_notifications(args: argparse.Namespace) -> int:
                     for result in channel_results
                 ]
                 or ["desktop: not requested"],
+            )
+        )
+    if getattr(args, "webhook", False):
+        webhook_results = [result for result in channel_results if result.get("channel") == "webhook"]
+        sections.append(
+            ReportSection(
+                "Webhook",
+                [
+                    f"webhook: {result.get('status')} {result.get('reason', '')}".rstrip()
+                    for result in webhook_results
+                ]
+                or ["webhook: not requested"],
             )
         )
     report = Report(
