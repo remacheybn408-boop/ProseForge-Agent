@@ -7,6 +7,7 @@ from typing import TextIO
 
 from ..agent import AgentKernel, AgentTurnRequest, IntentRouter
 from .session import ChatSessionStore
+from .slash import SlashCommandContext, SlashCommandRegistry
 
 
 class ChatRepl:
@@ -34,6 +35,7 @@ class ChatRepl:
         self.permission_level = permission_level
         self.session_id = session_id
         self.stream = stream
+        self.slash_registry = SlashCommandRegistry.default()
         self.kernel = AgentKernel(
             provider=provider,
             session_store=session_store,
@@ -77,12 +79,20 @@ class ChatRepl:
             print("", file=self.output_stream, flush=True)
 
     def _handle_command(self, line: str) -> bool:
+        action = self.slash_registry.resolve(
+            line,
+            SlashCommandContext(
+                permission_ceiling=self.permission_level,
+                mode=self.mode,
+                project_slug=self.project_slug,
+            ),
+        )
         command, _, argument = line.partition(" ")
         argument = argument.strip()
         if command == "/exit":
             return True
         if command == "/help":
-            self._write("Commands: /exit /help /mode <name> /project <slug|none> /sessions")
+            self._write(action.message if action else self.slash_registry.render_help())
             return False
         if command == "/mode":
             if argument:
@@ -100,7 +110,7 @@ class ChatRepl:
                 suffix = f" ({session.project_slug})" if session.project_slug else ""
                 self._write(f"- {session.id} -> {session.mode}{suffix}")
             return False
-        self._write(f"unknown command: {command}")
+        self._write(action.message if action else f"unknown command: {command}")
         return False
 
     def _write(self, text: str) -> None:

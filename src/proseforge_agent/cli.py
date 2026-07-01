@@ -3542,6 +3542,28 @@ def _handle_chat(args: argparse.Namespace) -> int:
     from .chat import ChatSessionStore
     from .llm import FakeProvider
 
+    if args.message and args.message.strip().startswith("/"):
+        from .chat.slash import SlashCommandContext, SlashCommandRegistry
+
+        project_slug = None if args.no_project else args.project
+        action = SlashCommandRegistry.default().resolve(
+            args.message,
+            SlashCommandContext(
+                permission_ceiling=args.permission_level,
+                mode=args.mode,
+                project_slug=project_slug,
+            ),
+        )
+        if action is not None:
+            report = Report(
+                title="Slash Commands" if action.name == "help" else "Slash Command",
+                status=action.status,
+                next_action="Slash commands are resolved locally without a model call",
+                sections=[ReportSection("Result", action.message.splitlines())],
+                data=action.to_dict(),
+            )
+            return _emit(report, args.format)
+
     if args.provider is None and args.message:
         from .setup.first_run import FirstRunBootstrap
 
