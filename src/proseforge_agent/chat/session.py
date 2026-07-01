@@ -68,6 +68,21 @@ class ChatSearchResult:
         return asdict(self)
 
 
+@dataclass(frozen=True)
+class SessionMergeResult:
+    """Summary of merging branch content into another session."""
+
+    source_session_id: str
+    target_session_id: str
+    merged_count: int
+    skipped_count: int
+    merged_steps: list[int] = field(default_factory=list)
+    skipped_steps: list[int] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
 class ChatSessionStore:
     """Filesystem-backed chat sessions rooted under an agent workspace directory."""
 
@@ -436,6 +451,54 @@ class ChatSessionStore:
         """Validate and return the requested session branch target."""
         return self._load_session(session_id)
 
+    def merge(
+        self,
+        branch_id: str,
+        *,
+        into_id: str,
+        message_steps: list[int] | None = None,
+        only_approved: bool = False,
+    ) -> SessionMergeResult:
+        """Merge selected branch messages into a target session."""
+        branch_context = self.load_context(branch_id)
+        self._load_session(into_id)
+        selected_steps = set(message_steps or [])
+        fork_step = branch_context.session.branched_from_step or 0
+        merged_steps: list[int] = []
+        skipped_steps: list[int] = []
+        for step, message in enumerate(branch_context.messages, start=1):
+            if selected_steps:
+                if step not in selected_steps:
+                    continue
+            elif step <= fork_step:
+                continue
+            if only_approved and not _message_is_approved(message):
+                skipped_steps.append(step)
+                continue
+            metadata = dict(message.provider_metadata)
+            metadata["merge"] = {
+                "source_session_id": branch_context.session.id,
+                "source_step": step,
+                "branch_name": branch_context.session.branch_name or "",
+            }
+            self.append_message(
+                into_id,
+                message.role,
+                message.content,
+                evidence_refs=list(message.evidence_refs),
+                tool_calls=[dict(call) for call in message.tool_calls],
+                provider_metadata=metadata,
+            )
+            merged_steps.append(step)
+        return SessionMergeResult(
+            source_session_id=branch_context.session.id,
+            target_session_id=self._clean_session_id(into_id),
+            merged_count=len(merged_steps),
+            skipped_count=len(skipped_steps),
+            merged_steps=merged_steps,
+            skipped_steps=skipped_steps,
+        )
+
     def record_event(self, event: dict[str, Any]) -> None:
         """Append a best-effort kernel event record."""
         append_jsonl(self.root / "events.jsonl", {"created_at": _now(), **event})
@@ -594,6 +657,20 @@ def _clean_branch_name(name: str | None) -> str:
     return cleaned
 
 
+def _message_is_approved(message: ChatMessage) -> bool:
+    metadata = message.provider_metadata
+    if metadata.get("approved") is True:
+        return True
+    if str(metadata.get("status", "")).lower() in {"approved", "accepted"}:
+        return True
+    for call in message.tool_calls:
+        if call.get("approved") is True:
+            return True
+        if str(call.get("status", "")).lower() in {"approved", "accepted"}:
+            return True
+    return False
+
+
 def _replace_session(session: ChatSession, **changes: Any) -> ChatSession:
     payload = asdict(session)
     payload.update(changes)
@@ -635,4 +712,5 @@ __all__ = [
     "ChatSearchResult",
     "ChatSession",
     "ChatSessionStore",
+    "SessionMergeResult",
 ]

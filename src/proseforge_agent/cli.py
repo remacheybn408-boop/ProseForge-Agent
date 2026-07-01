@@ -446,6 +446,9 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--no-redact", action="store_true", help="do not redact secrets during export")
             group.add_argument("--from-step", type=int, default=None, help="message step for session branching")
             group.add_argument("--name", default=None, help="branch name for session branching")
+            group.add_argument("--into", dest="into_session", default=None, help="target session id for merge")
+            group.add_argument("--only-approved", action="store_true", help="merge only approved branch messages")
+            group.add_argument("--message-step", action="append", type=int, default=None, help="branch message step to merge")
         if name == "context":
             group.add_argument("--provider", default="fake", help="provider family/name")
             group.add_argument("--session", default=None, help="chat session id")
@@ -3379,6 +3382,37 @@ def _handle_session(args: argparse.Namespace) -> int:
                 )
             ],
             data=session.__dict__,
+        )
+        return _emit(report, args.format)
+    if subcommand == "merge":
+        if not args.into_session:
+            return _emit(
+                _planned_report("session", "Run `pf-agent session merge <branch_id> --into <session_id>`"),
+                args.format,
+            )
+        result = store.merge(
+            args.session_id,
+            into_id=args.into_session,
+            message_steps=args.message_step,
+            only_approved=bool(args.only_approved),
+        )
+        report = Report(
+            title="Session Merge",
+            status="ok",
+            next_action="Review the target session before relying on merged branch conclusions",
+            sections=[
+                ReportSection(
+                    "Merge",
+                    [
+                        f"source={result.source_session_id}",
+                        f"target={result.target_session_id}",
+                        f"merged={result.merged_count}",
+                        f"skipped={result.skipped_count}",
+                        f"steps={','.join(str(step) for step in result.merged_steps) or '(none)'}",
+                    ],
+                )
+            ],
+            data=result.to_dict(),
         )
         return _emit(report, args.format)
     if subcommand == "show":
