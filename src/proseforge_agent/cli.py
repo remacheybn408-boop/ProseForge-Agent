@@ -390,6 +390,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "telemetry input path, output path, family filter",
         "artifacts": "sanitized JSONL telemetry export",
     },
+    "trajectories": {
+        "help": "Export research trajectory datasets as JSONL",
+        "inputs": "trajectory input path, output path, kind filter",
+        "artifacts": "redacted JSONL trajectory dataset",
+    },
     "run": {
         "help": "Run an autonomous, goal-directed agent loop",
         "inputs": "goal, provider, iteration budget, show-plan flag",
@@ -436,7 +441,7 @@ def build_parser() -> argparse.ArgumentParser:
     for name, spec in COMMAND_GROUPS.items():
         group = subparsers.add_parser(
             name,
-            parents=[] if name in {"export", "stats", "telemetry"} else [shared],
+            parents=[] if name in {"export", "stats", "telemetry", "trajectories"} else [shared],
             help=spec["help"],
             description=(
                 f"{spec['help']}.\n"
@@ -536,6 +541,14 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--redact", action="store_true", help="redact sensitive fields in export")
             group.add_argument("--family", dest="telemetry_families", action="append", default=None, help="filter by family")
             group.add_argument("--since", dest="telemetry_since", default=None, help="ISO timestamp lower bound")
+        if name == "trajectories":
+            group.add_argument("--input", dest="trajectory_input", default=None, help="trajectory input JSONL path")
+            group.add_argument("--output", dest="trajectory_output", default=None, help="trajectory export output path")
+            group.add_argument("--format", dest="trajectory_format", default="jsonl", choices=["jsonl"], help="export format")
+            group.add_argument("--redact", action="store_true", help="redact sensitive fields in export")
+            group.add_argument("--kind", dest="trajectory_kinds", action="append", default=None, help="filter by step kind")
+            group.add_argument("--redact-text-field", dest="trajectory_text_fields", action="append", default=None, help="text fields to redact")
+            group.add_argument("--compact-field", dest="trajectory_compact_fields", action="append", default=None, help="compact fields in export")
         if name == "session":
             group.add_argument("session_id", nargs="?", help="chat session id")
             group.add_argument("--project", default=None, help="project slug")
@@ -5807,6 +5820,39 @@ def _handle_cron(args: argparse.Namespace) -> int:
     )
 
 
+def _handle_trajectories(args: argparse.Namespace) -> int:
+    from .eval.trajectories import TrajectoryDatasetExporter, TrajectoryStore
+
+    if args.subcommand != "export":
+        print("Trajectory Export")
+        print("Usage: pf-agent trajectories export --input <path> --output <path> --format jsonl --redact")
+        return 0
+
+    input_path = Path(args.trajectory_input) if args.trajectory_input else Path(".pf-agent") / "trajectories.jsonl"
+    output_path = Path(args.trajectory_output) if args.trajectory_output else Path(".pf-agent") / "trajectories-export.jsonl"
+
+    store = TrajectoryStore(input_path)
+    if not input_path.exists():
+        print("Trajectory Export")
+        print("no trajectory steps (input file does not exist)")
+        return 0
+
+    exporter = TrajectoryDatasetExporter(store)
+    written = exporter.export(
+        output_path,
+        format=args.trajectory_format,
+        redact=bool(args.redact),
+        redact_text_fields=args.trajectory_text_fields or (),
+        compact_fields=args.trajectory_compact_fields or (),
+        kinds=args.trajectory_kinds,
+    )
+    print("Trajectory Export")
+    print(f"exported {written} step(s) to {output_path}")
+    if written == 0:
+        print("no trajectory steps")
+    return 0
+
+
 def _handle_telemetry(args: argparse.Namespace) -> int:
     from .agent.observability import TelemetryStore
 
@@ -6133,6 +6179,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_cron(args)
     if args.command == "telemetry":
         return _handle_telemetry(args)
+    if args.command == "trajectories":
+        return _handle_trajectories(args)
     if args.command == "scene":
         return _handle_scene(args)
     if args.command == "export":
