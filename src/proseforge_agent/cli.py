@@ -4339,6 +4339,27 @@ def _handle_tui(args: argparse.Namespace) -> int:
 
 
 def _handle_gateway(args: argparse.Namespace) -> int:
+    if args.subcommand == "platforms":
+        from .gateway.platforms import FakePlatformAdapter
+
+        adapter = FakePlatformAdapter()
+        capabilities = adapter.capabilities.to_dict()
+        report = Report(
+            title="Gateway Platforms",
+            status="ok",
+            next_action="Configure a real adapter only after checking credentials and rate limits",
+            sections=[
+                ReportSection(
+                    "Adapters",
+                    [
+                        f"fake threads={str(capabilities['threads']).lower()} "
+                        f"edits={str(capabilities['edits']).lower()} max={capabilities['max_message_size']}"
+                    ],
+                )
+            ],
+            data={"adapters": [{"platform": "fake", "capabilities": capabilities}]},
+        )
+        return _emit(report, args.format)
     if args.subcommand not in {"run", None}:
         return _emit(_planned_report("gateway", "Run `pf-agent gateway run --provider fake --check`"), args.format)
     from .gateway import GatewayRunner
