@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -283,6 +284,105 @@ class ChatSessionStore:
             "warnings": list(context.warnings),
         }
 
+    def export_bundle(
+        self,
+        session_id: str,
+        *,
+        include_tools: bool = True,
+        include_evidence: bool = True,
+        redact: bool = True,
+    ) -> dict[str, Any]:
+        """Export a portable, redacted session bundle."""
+        context = self.load_context(session_id)
+        messages: list[dict[str, Any]] = []
+        for message in context.messages:
+            payload = asdict(message)
+            if not include_tools:
+                payload["tool_calls"] = []
+            if not include_evidence:
+                payload["evidence_refs"] = []
+            messages.append(payload)
+        bundle: dict[str, Any] = {
+            "format": "proseforge.chat.session",
+            "version": 1,
+            "session": asdict(context.session),
+            "messages": messages,
+            "warnings": list(context.warnings),
+            "export_options": {
+                "include_tools": include_tools,
+                "include_evidence": include_evidence,
+                "redacted": redact,
+            },
+        }
+        return _redact_sensitive(bundle) if redact else bundle
+
+    def export_bundle_markdown(
+        self,
+        session_id: str,
+        *,
+        include_tools: bool = True,
+        include_evidence: bool = True,
+        redact: bool = True,
+    ) -> str:
+        """Export a portable session bundle as Markdown."""
+        bundle = self.export_bundle(
+            session_id,
+            include_tools=include_tools,
+            include_evidence=include_evidence,
+            redact=redact,
+        )
+        session = bundle["session"]
+        lines = [
+            f"# Session Export {session['id']}",
+            "",
+            f"- mode: {session['mode']}",
+            f"- project: {session.get('project_slug') or '(none)'}",
+            f"- status: {session.get('status', 'active')}",
+            "",
+        ]
+        for message in bundle["messages"]:
+            lines.append(f"## {message['role']}")
+            lines.append(str(message.get("content", "")))
+            if include_evidence and message.get("evidence_refs"):
+                lines.append(f"evidence: {', '.join(message['evidence_refs'])}")
+            if include_tools and message.get("tool_calls"):
+                lines.append("tool_calls:")
+                for call in message["tool_calls"]:
+                    lines.append(f"- {json.dumps(call, ensure_ascii=False, sort_keys=True)}")
+            lines.append("")
+        return "\n".join(lines).rstrip() + "\n"
+
+    def import_bundle(self, bundle: dict[str, Any], *, session_id: str | None = None) -> ChatSession:
+        """Import a portable session bundle without overwriting existing sessions."""
+        session_payload = dict(bundle.get("session") or {})
+        requested_id = self._clean_session_id(session_id or str(session_payload.get("id", "")))
+        target_id = self._available_import_id(requested_id)
+        now = _now()
+        created_at = str(session_payload.get("created_at") or now)
+        updated_at = str(session_payload.get("updated_at") or created_at)
+        status = str(session_payload.get("status", "active"))
+        if status not in {"active", "archived", "pinned", "deleted", "branched"}:
+            status = "active"
+        imported = ChatSession(
+            id=target_id,
+            mode=str(session_payload.get("mode") or "general_chat"),
+            project_slug=session_payload.get("project_slug"),
+            workflow_run_id=session_payload.get("workflow_run_id"),
+            title=session_payload.get("title"),
+            status=status,
+            created_at=created_at,
+            updated_at=updated_at,
+            messages_path=str(Path("chats") / target_id / "messages.jsonl"),
+        )
+        session_dir = self._session_dir(target_id)
+        session_dir.mkdir(parents=True, exist_ok=False)
+        self._messages_file(imported).touch()
+        for row in bundle.get("messages") or []:
+            message = self._message_from_dict(dict(row))
+            append_jsonl(self._messages_file(imported), asdict(message))
+        self._write_session(imported)
+        return imported
+
     def record_event(self, event: dict[str, Any]) -> None:
         """Append a best-effort kernel event record."""
         append_jsonl(self.root / "events.jsonl", {"created_at": _now(), **event})
@@ -339,6 +439,18 @@ class ChatSessionStore:
 
     def _session_dir(self, session_id: str) -> Path:
         return self.sessions_dir / self._clean_session_id(session_id)
+
+    def _available_import_id(self, session_id: str) -> str:
+        candidate = self._clean_session_id(session_id)
+        if not self._session_dir(candidate).exists():
+            return candidate
+        base = f"{candidate}_imported"
+        candidate = base
+        index = 2
+        while self._session_dir(candidate).exists():
+            candidate = f"{base}_{index}"
+            index += 1
+        return candidate
 
     @staticmethod
     def _clean_session_id(session_id: str | None) -> str:
@@ -409,6 +521,35 @@ def _replace_session(session: ChatSession, **changes: Any) -> ChatSession:
     payload = asdict(session)
     payload.update(changes)
     return ChatSession(**payload)
+
+
+def _redact_sensitive(value: Any) -> Any:
+    if isinstance(value, dict):
+        redacted: dict[str, Any] = {}
+        for key, item in value.items():
+            redacted[str(key)] = "[REDACTED]" if _is_sensitive_key(str(key)) else _redact_sensitive(item)
+        return redacted
+    if isinstance(value, list):
+        return [_redact_sensitive(item) for item in value]
+    if isinstance(value, str):
+        return _redact_secret_text(value)
+    return value
+
+
+def _is_sensitive_key(key: str) -> bool:
+    normalized = key.lower().replace("-", "_")
+    return normalized in {"api_key", "apikey", "authorization", "password", "secret", "token"} or normalized.endswith(
+        ("_token", "_secret", "_password")
+    )
+
+
+def _redact_secret_text(text: str) -> str:
+    text = re.sub(
+        r"(?i)\b(api[_-]?key|token|secret|password)\s*=\s*[^,\s]+",
+        lambda match: f"{match.group(1)}=[REDACTED]",
+        text,
+    )
+    return re.sub(r"\b(?:sk|tok|key)-[A-Za-z0-9._-]+", "[REDACTED]", text)
 
 
 __all__ = [
