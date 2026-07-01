@@ -4102,6 +4102,30 @@ def _handle_notifications(args: argparse.Namespace) -> int:
 
 
 def _handle_plugin(args: argparse.Namespace) -> int:
+    if args.subcommand in {"install", "update", "remove", "enable", "disable"}:
+        if not args.plugin_arg:
+            return _emit(_planned_report("plugin", f"Run `pf-agent plugin {args.subcommand} <plugin>`"), args.format)
+        from .plugins import PluginManager
+
+        manager = PluginManager(Path(".pf-agent"))
+        if args.subcommand == "install":
+            result = manager.install(args.plugin_arg)
+        elif args.subcommand == "update":
+            result = manager.update(args.plugin_arg)
+        elif args.subcommand == "remove":
+            result = manager.remove(args.plugin_arg)
+        elif args.subcommand == "enable":
+            result = manager.enable(args.plugin_arg)
+        else:
+            result = manager.disable(args.plugin_arg)
+        report = Report(
+            title="Plugin Action",
+            status="ok",
+            next_action="Run `pf-agent plugin list` to inspect installed plugins",
+            sections=[ReportSection("Plugin", [f"id={result.plugin_id}", f"status={result.status}", f"path={result.path or '(none)'}"])],
+            data=result.to_dict(),
+        )
+        return _emit(report, args.format)
     if args.subcommand not in {"list", "discover", "info"}:
         return _emit(_planned_report("plugin", "Run `pf-agent plugin list`"), args.format)
     from .plugins import PluginDiscovery
