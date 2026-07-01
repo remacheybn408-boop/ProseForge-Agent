@@ -7,6 +7,7 @@ read helpers; it does not import workflow or provider implementations.
 
 from .evidence import EvidencePack, EvidencePackBuilder
 from .embeddings import EmbeddingConfig, EmbeddingProvider, FakeEmbeddingProvider, build_embedding_provider
+from .evaluation import RagEvalCase, RagEvalResult, RagEvaluator, default_eval_cases_from_documents, load_eval_cases
 from .hybrid import HybridRetriever, HybridSearchResult, RagDocument, load_rag_documents
 from .ingestion import RagIngestionPipeline, RagIngestionReport
 from .index import MemoryIndex, ScoredItem
@@ -22,6 +23,9 @@ __all__ = [
     "HybridRetriever",
     "HybridSearchResult",
     "MemoryIndex",
+    "RagEvalCase",
+    "RagEvalResult",
+    "RagEvaluator",
     "RagIngestionPipeline",
     "RagIngestionReport",
     "RagDocument",
@@ -35,5 +39,7 @@ __all__ = [
     "VectorStore",
     "build_embedding_provider",
     "build_vector_store",
+    "default_eval_cases_from_documents",
+    "load_eval_cases",
     "load_rag_documents",
 ]

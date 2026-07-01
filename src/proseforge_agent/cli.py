@@ -465,6 +465,7 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("rag_query", nargs="?", help="query for rag search")
             group.add_argument("--slug", default=None, help="project slug")
             group.add_argument("--top-k", type=int, default=5, help="number of search results")
+            group.add_argument("--suite", default=None, help="RAG eval suite YAML or JSON")
         if name == "prompt":
             group.add_argument("prompt_arg", nargs="?", help="prompt template id for show")
             group.add_argument("--session", default=None, help="chat session id")
@@ -3811,6 +3812,49 @@ def _handle_context(args: argparse.Namespace) -> int:
 
 
 def _handle_rag(args: argparse.Namespace) -> int:
+    if args.subcommand == "eval":
+        if not args.slug:
+            return _emit(_planned_report("rag", "Run `pf-agent rag eval --slug <slug>`"), args.format)
+        from .retrieval import (
+            FakeEmbeddingProvider,
+            HybridRetriever,
+            JsonlVectorStore,
+            RagEvaluator,
+            default_eval_cases_from_documents,
+            load_eval_cases,
+            load_rag_documents,
+        )
+
+        chunks_path = Path(".pf-agent") / "workspace" / args.slug / "rag" / "chunks.jsonl"
+        vector_path = Path(".pf-agent") / "workspace" / args.slug / "rag" / "vectors.jsonl"
+        documents = load_rag_documents(chunks_path)
+        searcher = HybridRetriever(
+            documents,
+            embedding_provider=FakeEmbeddingProvider(),
+            vector_store=JsonlVectorStore(vector_path),
+        )
+        cases = load_eval_cases(args.suite) if args.suite else default_eval_cases_from_documents(documents)
+        result = RagEvaluator(searcher).evaluate(cases, project_slug=args.slug)
+        report = Report(
+            title="RAG Evaluation",
+            status="ok" if result.case_count else "degraded",
+            next_action="Add eval cases or ingest chunks before trusting retrieval quality",
+            sections=[
+                ReportSection(
+                    "Metrics",
+                    [
+                        f"cases={result.case_count}",
+                        f"hit@1={result.hit_at_1:.3f}",
+                        f"hit@3={result.hit_at_3:.3f}",
+                        f"hit@5={result.hit_at_5:.3f}",
+                        f"source_recall={result.source_recall:.3f}",
+                        f"irrelevant_rate={result.irrelevant_rate:.3f}",
+                    ],
+                )
+            ],
+            data=result.to_dict(),
+        )
+        return _emit(report, args.format)
     if args.subcommand in {"ingest", "ingest-file", "status"}:
         if not args.slug:
             return _emit(_planned_report("rag", "Pass --slug for RAG commands"), args.format)
