@@ -452,6 +452,7 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "context":
             group.add_argument("--provider", default="fake", help="provider family/name")
             group.add_argument("--session", default=None, help="chat session id")
+            group.add_argument("--project", default=None, help="active project slug")
             group.add_argument("--max-context", type=int, default=None, help="override provider context window")
             group.add_argument("--reserve", type=int, default=256, help="reserved completion tokens")
             group.add_argument("--keep-last", type=int, default=6, help="messages to keep after compaction")
@@ -3706,8 +3707,39 @@ def _handle_chat(args: argparse.Namespace) -> int:
 
 
 def _handle_context(args: argparse.Namespace) -> int:
-    if args.subcommand not in {"status", "compact"}:
+    if args.subcommand not in {"status", "compact", "current", "switch", "pin"}:
         return _emit(_planned_report("context", "Run `pf-agent context status`"), args.format)
+    if args.subcommand in {"current", "switch", "pin"}:
+        from .chat.context import ActiveContextStore
+
+        active_store = ActiveContextStore(Path(".pf-agent"))
+        if args.subcommand == "switch":
+            if not args.project and not args.session:
+                return _emit(_planned_report("context", "Run `pf-agent context switch --project <slug>`"), args.format)
+            context = active_store.switch(project=args.project, session=args.session)
+        elif args.subcommand == "pin":
+            if not args.session:
+                return _emit(_planned_report("context", "Run `pf-agent context pin --session <id>`"), args.format)
+            context = active_store.pin(session=args.session)
+        else:
+            context = active_store.current()
+        report = Report(
+            title="Active Context",
+            status="ok",
+            next_action="Subsequent commands can use this project/session as their default context",
+            sections=[
+                ReportSection(
+                    "Current",
+                    [
+                        f"project={context.project or '(none)'}",
+                        f"session={context.session or '(none)'}",
+                        f"pinned_sessions={', '.join(context.pinned_sessions) or '(none)'}",
+                    ],
+                )
+            ],
+            data={"active_context": context.to_dict()},
+        )
+        return _emit(report, args.format)
     from .agent import ContextWindowManager
     from .chat import ChatSessionStore
     from .llm import Message
