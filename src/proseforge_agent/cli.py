@@ -470,6 +470,7 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--check", action="store_true", help="render deterministic state and exit")
         if name == "gateway":
             group.add_argument("gateway_arg", nargs="?", help="gateway platform or action")
+            group.add_argument("--platform", default="telegram", help="relay pairing platform")
             group.add_argument("--provider", default="fake", help="gateway provider")
             group.add_argument("--check", action="store_true", help="validate gateway readiness and exit")
         if name == "session":
@@ -4339,6 +4340,61 @@ def _handle_tui(args: argparse.Namespace) -> int:
 
 
 def _handle_gateway(args: argparse.Namespace) -> int:
+    if args.subcommand == "pair":
+        from .gateway.relay import RelayPairingService
+
+        token = RelayPairingService(secret="local-dry-run-secret").create_pairing_token(
+            gateway_instance_id="local-gateway",
+            profile="operator",
+            platform=args.platform,
+            ttl_seconds=3600,
+        )
+        report = Report(
+            title="Gateway Pairing",
+            status="ok",
+            next_action="Enroll the redacted pairing token with the external connector",
+            sections=[
+                ReportSection(
+                    "Pairing",
+                    [
+                        f"platform={args.platform}",
+                        f"token={token.redacted()}",
+                        f"expires_at={token.expires_at}",
+                    ],
+                )
+            ],
+            data=token.to_dict(),
+        )
+        return _emit(report, args.format)
+    if args.subcommand == "relay":
+        from .gateway.relay import RelayPairingService
+
+        action = args.gateway_arg or "check"
+        if action != "check":
+            return _emit(_planned_report("gateway", "Run `pf-agent gateway relay check --dry-run`"), args.format)
+        token = RelayPairingService(secret="local-dry-run-secret").create_pairing_token(
+            gateway_instance_id="local-gateway",
+            profile="operator",
+            platform=args.platform,
+            ttl_seconds=60,
+        )
+        report = Report(
+            title="Gateway Relay",
+            status="ok",
+            next_action="Relay tokens are short-lived and scoped to a gateway instance and platform",
+            sections=[
+                ReportSection(
+                    "Check",
+                    [
+                        f"platform={args.platform}",
+                        f"dry_run={str(args.dry_run).lower()}",
+                        f"token={token.redacted()}",
+                    ],
+                )
+            ],
+            data=token.to_dict(),
+        )
+        return _emit(report, args.format)
     if args.subcommand == "telegram":
         from .gateway.platforms import TelegramGatewayAdapter
 
