@@ -160,6 +160,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "tool registry",
         "artifacts": "tool registry report",
     },
+    "skills": {
+        "help": "List and manage local agent skills",
+        "inputs": "skill action and id",
+        "artifacts": "skill registry records and review plans",
+    },
     "jobs": {
         "help": "Run allow-listed background agent jobs",
         "inputs": "job name, provider, dry-run flag",
@@ -777,6 +782,11 @@ def build_parser() -> argparse.ArgumentParser:
             )
             group.add_argument("--domain", default=None, help="filter tools by domain")
             group.add_argument("--provider", default="fake", help="managed tool provider")
+        if name == "skills":
+            group.add_argument("skill_arg", nargs="?", help="skill id or query")
+            group.add_argument("skill_extra", nargs="*", help="extra skill arguments")
+            group.add_argument("--provider", default="fake", help="skill provider")
+            group.add_argument("--skill", default=None, help="skill id for usage reports")
         if name == "jobs":
             group.add_argument("job_name", nargs="?", help="allow-listed background job")
             group.add_argument("--provider", default="fake", help="provider for the job")
@@ -4213,6 +4223,28 @@ def _handle_tools(args: argparse.Namespace) -> int:
     return _emit(report, args.format)
 
 
+def _handle_skills(args: argparse.Namespace) -> int:
+    if args.subcommand not in {None, "list"}:
+        return _emit(_planned_report("skills", "Run `pf-agent skills list`"), args.format)
+    from .skills import SkillRegistry
+
+    records = SkillRegistry.discover([Path(".pf-agent") / "skills"])
+    report = Report(
+        title="Skills",
+        status="ok",
+        next_action="Use dry-run install or approval flows before enabling new skills",
+        sections=[
+            ReportSection(
+                "Skills",
+                [f"{record.name} {record.version} enabled={str(record.enabled).lower()}" for record in records]
+                or ["(none)"],
+            )
+        ],
+        data={"skills": [record.to_dict() for record in records]},
+    )
+    return _emit(report, args.format)
+
+
 def _handle_jobs(args: argparse.Namespace) -> int:
     if args.subcommand in {"list", "status", "logs", "cancel"}:
         from .notifications import JobStatusCenter
@@ -5822,6 +5854,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_chapter(args)
     if args.command == "tools":
         return _handle_tools(args)
+    if args.command == "skills":
+        return _handle_skills(args)
     if args.command == "jobs":
         return _handle_jobs(args)
     if args.command == "notifications":
