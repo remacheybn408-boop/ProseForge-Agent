@@ -3,6 +3,8 @@
 from .base import ExecutionCapabilities, ExecutionEnvironment, ExecutionResult, FakeExecutionEnvironment
 from .docker import DockerExecutionBackend, DockerPlan
 from .local import LocalExecutionBackend
+from .singularity import SingularityExecutionBackend, SingularityPlan
+from .ssh import SSHExecutionBackend, SSHPlan
 
 __all__ = [
     "DockerExecutionBackend",
@@ -12,4 +14,8 @@ __all__ = [
     "ExecutionResult",
     "FakeExecutionEnvironment",
     "LocalExecutionBackend",
+    "SSHExecutionBackend",
+    "SSHPlan",
+    "SingularityExecutionBackend",
+    "SingularityPlan",
 ]
