@@ -1,6 +1,7 @@
 """Chat session, transcript, and conversation helpers."""
 
 from .handoff import ChatWorkflowHandoff, HandoffPackage
+from .context import ActiveContext, ActiveContextStore
 from .memory import ChatMemoryExtractor, MemoryCandidate
 from .prompts import ChatPromptBuilder, PromptItem, PromptPack
 from .retrieval import ChatAnswer, ChatCitation, ChatEvidence, ChatRetrievalResponder
@@ -16,6 +17,8 @@ from .system_prompts import (
 
 __all__ = [
     "ChatAnswer",
+    "ActiveContext",
+    "ActiveContextStore",
     "ChatWorkflowHandoff",
     "ChatMemoryExtractor",
     "ChatCitation",
