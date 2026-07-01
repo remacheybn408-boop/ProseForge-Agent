@@ -95,6 +95,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "extension registry",
         "artifacts": "extension report",
     },
+    "plugin": {
+        "help": "Discover and manage ProseForge Agent plugins",
+        "inputs": "plugin id or local plugin path",
+        "artifacts": "plugin manifest and registry records",
+    },
     "chat": {
         "help": "Run one-shot agent chat and intent classification",
         "inputs": "message, mode, provider",
@@ -718,6 +723,9 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "notifications":
             group.add_argument("--desktop", action="store_true", help="send a desktop test notification")
             group.add_argument("--webhook", action="store_true", help="send a webhook test notification")
+        if name == "plugin":
+            group.add_argument("plugin_arg", nargs="?", help="plugin id or path")
+            group.add_argument("--registry", default=None, help="plugin registry index JSON")
         if name == "setup":
             group.add_argument("--quick", action="store_true", help="run quick guided setup")
             group.add_argument("--full", action="store_true", help="run full guided setup")
@@ -4093,6 +4101,36 @@ def _handle_notifications(args: argparse.Namespace) -> int:
     return _emit(report, args.format)
 
 
+def _handle_plugin(args: argparse.Namespace) -> int:
+    if args.subcommand not in {"list", "discover", "info"}:
+        return _emit(_planned_report("plugin", "Run `pf-agent plugin list`"), args.format)
+    from .plugins import PluginDiscovery
+
+    discovery = PluginDiscovery(
+        local_dirs=[Path(".pf-agent") / "plugins"],
+        registry_index=args.registry,
+    )
+    if args.subcommand == "info":
+        if not args.plugin_arg:
+            return _emit(_planned_report("plugin", "Run `pf-agent plugin info <plugin_id>`"), args.format)
+        plugins = [discovery.info(args.plugin_arg)]
+    else:
+        plugins = discovery.discover()
+    report = Report(
+        title="Plugins",
+        status="ok",
+        next_action="Install or enable a plugin only after reviewing its manifest permissions",
+        sections=[
+            ReportSection(
+                "Plugins",
+                [f"{plugin.id}: {plugin.name} {plugin.version} source={plugin.source}" for plugin in plugins] or ["(none)"],
+            )
+        ],
+        data={"plugins": [plugin.to_dict() for plugin in plugins]},
+    )
+    return _emit(report, args.format)
+
+
 def _handle_setup(args: argparse.Namespace) -> int:
     from .setup import SetupWizard, mode_from_flags, mode_menu_lines, render_setup_lines
 
@@ -4918,6 +4956,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_jobs(args)
     if args.command == "notifications":
         return _handle_notifications(args)
+    if args.command == "plugin":
+        return _handle_plugin(args)
     if args.command == "artifacts":
         return _handle_artifacts(args)
     if args.command == "import":
