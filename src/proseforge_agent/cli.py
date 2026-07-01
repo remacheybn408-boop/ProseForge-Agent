@@ -130,6 +130,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "job name, provider, dry-run flag",
         "artifacts": "event bus records, job report",
     },
+    "notifications": {
+        "help": "List and test user notification events",
+        "inputs": "notification subcommand",
+        "artifacts": "notification center JSONL records",
+    },
     "artifacts": {
         "help": "Inspect novel artifact dependency graphs",
         "inputs": "project slug, artifact id",
@@ -710,6 +715,8 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "jobs":
             group.add_argument("job_name", nargs="?", help="allow-listed background job")
             group.add_argument("--provider", default="fake", help="provider for the job")
+        if name == "notifications":
+            group.add_argument("--desktop", action="store_true", help="send a desktop test notification")
         if name == "setup":
             group.add_argument("--quick", action="store_true", help="run quick guided setup")
             group.add_argument("--full", action="store_true", help="run full guided setup")
@@ -3986,6 +3993,36 @@ def _handle_jobs(args: argparse.Namespace) -> int:
     return _emit(report, args.format)
 
 
+def _handle_notifications(args: argparse.Namespace) -> int:
+    if args.subcommand not in {"list", "test"}:
+        return _emit(_planned_report("notifications", "Run `pf-agent notifications list`"), args.format)
+    from .notifications import NotificationDispatcher, NotificationEvent
+
+    dispatcher = NotificationDispatcher(Path(".pf-agent"))
+    if args.subcommand == "test":
+        dispatcher.dispatch(
+            NotificationEvent(
+                event_type="notification_test",
+                title="Notification test",
+                message="ProseForge Agent notification center is reachable",
+            )
+        )
+    events = dispatcher.list_events()
+    report = Report(
+        title="Notifications",
+        status="ok",
+        next_action="Wire background jobs to dispatch notification events",
+        sections=[
+            ReportSection(
+                "Events",
+                [f"{event.event_type}: {event.title}" for event in events] or ["(none)"],
+            )
+        ],
+        data={"events": [event.to_dict() for event in events]},
+    )
+    return _emit(report, args.format)
+
+
 def _handle_setup(args: argparse.Namespace) -> int:
     from .setup import SetupWizard, mode_from_flags, mode_menu_lines, render_setup_lines
 
@@ -4809,6 +4846,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_tools(args)
     if args.command == "jobs":
         return _handle_jobs(args)
+    if args.command == "notifications":
+        return _handle_notifications(args)
     if args.command == "artifacts":
         return _handle_artifacts(args)
     if args.command == "import":
