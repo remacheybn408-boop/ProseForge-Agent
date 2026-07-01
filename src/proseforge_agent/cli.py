@@ -110,6 +110,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "provider, project binding, check flag",
         "artifacts": "terminal UI state",
     },
+    "gateway": {
+        "help": "Run non-desktop messaging gateway surfaces",
+        "inputs": "platform subcommand, provider, check flag",
+        "artifacts": "gateway sessions and delivery queue",
+    },
     "session": {
         "help": "Manage conversation session lifecycle",
         "inputs": "session id, project filter, cleanup age",
@@ -463,6 +468,10 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--no-project", action="store_true", help="start without project binding")
             group.add_argument("--mode", default="general_chat", help="conversation mode")
             group.add_argument("--check", action="store_true", help="render deterministic state and exit")
+        if name == "gateway":
+            group.add_argument("gateway_arg", nargs="?", help="gateway platform or action")
+            group.add_argument("--provider", default="fake", help="gateway provider")
+            group.add_argument("--check", action="store_true", help="validate gateway readiness and exit")
         if name == "session":
             group.add_argument("session_id", nargs="?", help="chat session id")
             group.add_argument("--project", default=None, help="project slug")
@@ -4329,6 +4338,31 @@ def _handle_tui(args: argparse.Namespace) -> int:
     return TerminalApp(provider=args.provider, project=project, mode=args.mode).start()
 
 
+def _handle_gateway(args: argparse.Namespace) -> int:
+    if args.subcommand not in {"run", None}:
+        return _emit(_planned_report("gateway", "Run `pf-agent gateway run --provider fake --check`"), args.format)
+    from .gateway import GatewayRunner
+
+    result = GatewayRunner(root=Path(".pf-agent"), provider_name=args.provider).start(check=args.check)
+    report = Report(
+        title="Gateway",
+        status=result.status,
+        next_action="Attach a platform adapter before running continuously",
+        sections=[
+            ReportSection(
+                "Status",
+                [
+                    f"provider={args.provider}",
+                    f"check={str(args.check).lower()}",
+                    f"reason={result.reason or '(none)'}",
+                ],
+            )
+        ],
+        data=result.to_dict(),
+    )
+    return _emit(report, args.format)
+
+
 def _handle_setup(args: argparse.Namespace) -> int:
     from .setup import SetupWizard, mode_from_flags, mode_menu_lines, render_setup_lines
 
@@ -5138,6 +5172,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_chat(args)
     if args.command == "tui":
         return _handle_tui(args)
+    if args.command == "gateway":
+        return _handle_gateway(args)
     if args.command == "session":
         return _handle_session(args)
     if args.command == "context":
