@@ -380,6 +380,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "cache subcommand",
         "artifacts": "request cache entries and stats",
     },
+    "cron": {
+        "help": "Plan hosted cron triggers and scale-to-zero lifecycle",
+        "inputs": "cron action, schedule, fixture, provider",
+        "artifacts": "cron fire verification and lifecycle plan",
+    },
     "run": {
         "help": "Run an autonomous, goal-directed agent loop",
         "inputs": "goal, provider, iteration budget, show-plan flag",
@@ -514,6 +519,11 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--fixture", default="voice-note", help="media fixture")
             group.add_argument("--prompt", default="", help="media generation prompt")
             group.add_argument("--provider", default="fake", help="media provider")
+        if name == "cron":
+            group.add_argument("cron_arg", nargs="?", help="cron job name")
+            group.add_argument("--schedule", default="", help="cron schedule expression")
+            group.add_argument("--fixture", default=None, help="hosted cron fire fixture")
+            group.add_argument("--provider", default="fake", help="cron provider")
         if name == "session":
             group.add_argument("session_id", nargs="?", help="chat session id")
             group.add_argument("--project", default=None, help="project slug")
@@ -5744,6 +5754,47 @@ def _handle_cache(args: argparse.Namespace) -> int:
     return _emit(_planned_report("cache", "Run `pf-agent cache stats`"), args.format)
 
 
+def _handle_cron(args: argparse.Namespace) -> int:
+    import time
+
+    from .cron import CronJob, HostedCronVerifier, IdempotencyStore, ScaleToZeroPlanner
+
+    if args.subcommand == "add" and args.cron_arg:
+        job = CronJob(name=args.cron_arg, schedule=args.schedule or "0 9 * * *")
+        plan = ScaleToZeroPlanner().plan(job)
+        report = Report(
+            title="Hosted Cron",
+            status="planned" if args.dry_run else "ok",
+            next_action="Review hosted cron plan before registering it with an external scheduler",
+            sections=[
+                ReportSection("Job", [f"name={job.name}", f"schedule={job.schedule}", f"job_id={job.job_id}"]),
+                ReportSection("Lifecycle", plan.states),
+            ],
+            data={"job": job.to_dict(), "plan": plan.to_dict(), "dry_run": args.dry_run},
+        )
+        return _emit(report, args.format)
+    if args.subcommand == "fire":
+        verifier = HostedCronVerifier(
+            "proseforge-agent",
+            IdempotencyStore(Path(".pf-agent") / "cron"),
+        )
+        nonce = f"{args.fixture or 'demo'}-{int(time.time() * 1000)}"
+        payload = verifier.fixture_payload(job_id="daily-report", nonce=nonce)
+        result = verifier.verify(payload)
+        report = Report(
+            title="Cron Fire",
+            status=result.status,
+            next_action="Accepted fires may wake, run, deliver, then hibernate the agent",
+            sections=[ReportSection("Verification", [f"status={result.status}", result.reason])],
+            data={"provider": args.provider, "fixture": args.fixture, "result": result.to_dict()},
+        )
+        return _emit(report, args.format)
+    return _emit(
+        _planned_report("cron", "Run `pf-agent cron add \"daily report\" --schedule \"0 9 * * *\" --dry-run`"),
+        args.format,
+    )
+
+
 def _offline_gate(args: argparse.Namespace) -> int | None:
     if not getattr(args, "offline", False) or args.command == "offline":
         return None
@@ -6035,6 +6086,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_offline(args)
     if args.command == "cache":
         return _handle_cache(args)
+    if args.command == "cron":
+        return _handle_cron(args)
     if args.command == "scene":
         return _handle_scene(args)
     if args.command == "export":
