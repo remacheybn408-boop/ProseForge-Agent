@@ -704,6 +704,8 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--slug", default=None, help="project slug")
             group.add_argument("--scope", default="manuscript", help="search scope: manuscript or all")
             group.add_argument("--exact", action="store_true", help="match the query as an exact phrase")
+            group.add_argument("--provider", default="fake", help="web search provider when --slug is omitted")
+            group.add_argument("--json", action="store_true", help="emit JSON web search output")
         if name == "draft":
             group.add_argument("draft_args", nargs="*", help="draft subcommand arguments (e.g. 'list' or two version ids)")
             group.add_argument("--slug", default=None, help="project slug")
@@ -2379,14 +2381,51 @@ def _handle_reader_review(args: argparse.Namespace) -> int:
 
 
 def _handle_search(args: argparse.Namespace) -> int:
-    from .novel import ManuscriptSearch
-
     query = args.subcommand
-    if not args.slug or not query:
+    if getattr(args, "json", False):
+        args.format = "json"
+    if not query:
         return _emit(
             _planned_report("search", 'Run `pf-agent search "<query>" --slug <slug>`'),
             args.format,
         )
+    if not args.slug:
+        from .tools.managed.url_safety import UrlSafetyPolicy
+        from .tools.managed.web_search import FakeWebSearchProvider, WebSearchResponse
+
+        if args.provider != "fake":
+            response = WebSearchResponse(
+                query=query,
+                results=[],
+                provider=args.provider,
+                degraded=True,
+                reason=f"provider {args.provider!r} is not configured for managed web search",
+            )
+        else:
+            response = FakeWebSearchProvider().search(query)
+        policy = UrlSafetyPolicy(network_enabled=args.provider == "fake")
+        safety = [policy.check(result.url).to_dict() for result in response.results]
+        report = Report(
+            title="Web Search",
+            status="degraded" if response.degraded else "ok",
+            next_action="Use web results as citation candidates only; do not promote them to canon automatically",
+            sections=[
+                ReportSection("Query", [f"query={response.query}", f"provider={args.provider}"]),
+                ReportSection(
+                    "Citations",
+                    [
+                        f"{citation['id']} {citation['title']} {citation['url']}"
+                        for citation in response.citations
+                    ]
+                    or ["(none)"],
+                ),
+            ],
+            data=response.to_dict() | {"safety": safety},
+        )
+        return _emit(report, args.format)
+
+    from .novel import ManuscriptSearch
+
     searcher = ManuscriptSearch(Path(".pf-agent") / "workspace", slug=args.slug)
     try:
         result = searcher.search(query, scope=args.scope, exact=args.exact)

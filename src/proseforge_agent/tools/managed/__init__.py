@@ -7,6 +7,8 @@ import json
 from typing import Any
 
 from ...agent.permissions import PERMISSION_LEVELS
+from .url_safety import UrlSafetyDecision, UrlSafetyPolicy
+from .web_search import FakeWebSearchProvider, WebSearchResponse, WebSearchResult
 
 
 _PERMISSION_ORDER = {name: index for index, name in enumerate(PERMISSION_LEVELS)}
@@ -197,5 +199,10 @@ __all__ = [
     "ManagedToolGateway",
     "ManagedToolInvocationContext",
     "ManagedToolResult",
+    "FakeWebSearchProvider",
+    "UrlSafetyDecision",
+    "UrlSafetyPolicy",
+    "WebSearchResponse",
+    "WebSearchResult",
     "default_declarations",
 ]
