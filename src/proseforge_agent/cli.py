@@ -4363,6 +4363,32 @@ def _handle_gateway(args: argparse.Namespace) -> int:
             data=result.to_dict(),
         )
         return _emit(report, args.format)
+    if args.subcommand in {"discord", "slack"}:
+        from .gateway.platforms import DiscordGatewayAdapter, SlackGatewayAdapter
+
+        action = args.gateway_arg or "check"
+        if action != "check":
+            return _emit(_planned_report("gateway", f"Run `pf-agent gateway {args.subcommand} check --dry-run`"), args.format)
+        adapter = DiscordGatewayAdapter() if args.subcommand == "discord" else SlackGatewayAdapter()
+        result = adapter.check(dry_run=args.dry_run)
+        title = "Discord Gateway" if args.subcommand == "discord" else "Slack Gateway"
+        report = Report(
+            title=title,
+            status=result.status,
+            next_action="Provide platform credentials through the secret store before live delivery",
+            sections=[
+                ReportSection(
+                    "Check",
+                    [
+                        f"action={action}",
+                        f"dry_run={str(result.dry_run).lower()}",
+                        f"reason={result.reason}",
+                    ],
+                )
+            ],
+            data=result.to_dict(),
+        )
+        return _emit(report, args.format)
     if args.subcommand == "platforms":
         from .gateway.platforms import FakePlatformAdapter
 
