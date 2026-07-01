@@ -3967,6 +3967,46 @@ def _handle_tools(args: argparse.Namespace) -> int:
 
 
 def _handle_jobs(args: argparse.Namespace) -> int:
+    if args.subcommand in {"list", "status", "logs", "cancel"}:
+        from .notifications import JobStatusCenter
+
+        center = JobStatusCenter(Path(".pf-agent"))
+        if args.subcommand == "list":
+            jobs = center.list()
+            report = Report(
+                title="Job Status Center",
+                status="ok",
+                next_action="Use `pf-agent jobs status <job_id>` for details",
+                sections=[ReportSection("Jobs", [f"{job.id}: {job.name} status={job.status}" for job in jobs] or ["(none)"])],
+                data={"jobs": [job.to_dict() for job in jobs]},
+            )
+            return _emit(report, args.format)
+        if not args.job_name:
+            return _emit(_planned_report("jobs", f"Pass a job id for `jobs {args.subcommand}`"), args.format)
+        if args.subcommand == "logs":
+            logs = center.logs(args.job_name)
+            report = Report(
+                title="Job Status Center",
+                status="ok",
+                next_action="Inspect failed job logs before retrying",
+                sections=[ReportSection("Logs", [f"{entry.created_at} {entry.status}: {entry.message}" for entry in logs] or ["(none)"])],
+                data={"logs": [entry.to_dict() for entry in logs]},
+            )
+            return _emit(report, args.format)
+        job = center.cancel(args.job_name) if args.subcommand == "cancel" else center.get(args.job_name)
+        report = Report(
+            title="Job Status Center",
+            status="ok",
+            next_action="Use notifications for long-running job updates",
+            sections=[
+                ReportSection(
+                    "Job",
+                    [f"id={job.id}", f"name={job.name}", f"status={job.status}", f"updated_at={job.updated_at}"],
+                )
+            ],
+            data=job.to_dict(),
+        )
+        return _emit(report, args.format)
     if args.subcommand != "run" or not args.job_name:
         report = _planned_report("jobs", "Use `pf-agent jobs run <job-name> --dry-run`")
         return _emit(report, args.format)
