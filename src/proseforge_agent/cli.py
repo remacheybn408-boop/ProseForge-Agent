@@ -3556,6 +3556,33 @@ def _handle_chat(args: argparse.Namespace) -> int:
             ),
         )
         if action is not None:
+            if action.name == "usage":
+                session_store = ChatSessionStore(Path(".pf-agent"))
+                try:
+                    usage = session_store.usage("cli")
+                except ProseForgeAgentError:
+                    usage = None
+                lines = (
+                    [
+                        f"session={usage.session_id}",
+                        f"messages={usage.message_count}",
+                        f"words={usage.word_count}",
+                        f"tool_calls={usage.tool_call_count}",
+                        f"evidence_refs={usage.evidence_ref_count}",
+                    ]
+                    if usage is not None
+                    else ["session=cli", "messages=0", "words=0", "tool_calls=0", "evidence_refs=0"]
+                )
+                return _emit(
+                    Report(
+                        title="Session Usage",
+                        status="ok",
+                        next_action="Use /compress when context grows too large",
+                        sections=[ReportSection("Usage", lines)],
+                        data=usage.to_dict() if usage is not None else {"session_id": "cli", "message_count": 0},
+                    ),
+                    args.format,
+                )
             report = Report(
                 title="Slash Commands" if action.name == "help" else "Slash Command",
                 status=action.status,
