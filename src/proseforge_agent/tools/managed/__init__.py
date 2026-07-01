@@ -7,6 +7,7 @@ import json
 from typing import Any
 
 from ...agent.permissions import PERMISSION_LEVELS
+from .cloud_browser import BrowserActionResult, BrowserArtifactRef, CloudBrowser, FakeCloudBrowserBackend
 from .url_safety import UrlSafetyDecision, UrlSafetyPolicy
 from .web_search import FakeWebSearchProvider, WebSearchResponse, WebSearchResult
 
@@ -195,10 +196,14 @@ def _bounded_output(output: dict[str, Any], limit: int) -> tuple[dict[str, Any],
 
 
 __all__ = [
+    "BrowserActionResult",
+    "BrowserArtifactRef",
+    "CloudBrowser",
     "ManagedToolDeclaration",
     "ManagedToolGateway",
     "ManagedToolInvocationContext",
     "ManagedToolResult",
+    "FakeCloudBrowserBackend",
     "FakeWebSearchProvider",
     "UrlSafetyDecision",
     "UrlSafetyPolicy",

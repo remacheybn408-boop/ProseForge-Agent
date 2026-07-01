@@ -125,6 +125,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "process action and process id",
         "artifacts": "process registry entries",
     },
+    "browser": {
+        "help": "Run managed cloud browser checks",
+        "inputs": "browser action and provider",
+        "artifacts": "browser trace and bounded artifact refs",
+    },
     "session": {
         "help": "Manage conversation session lifecycle",
         "inputs": "session id, project filter, cleanup age",
@@ -491,6 +496,8 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--profile", default="demo", help="remote environment profile")
         if name == "processes":
             group.add_argument("process_id", nargs="?", help="process id")
+        if name == "browser":
+            group.add_argument("--provider", default="fake", help="browser provider")
         if name == "session":
             group.add_argument("session_id", nargs="?", help="chat session id")
             group.add_argument("--project", default=None, help="project slug")
@@ -4893,6 +4900,41 @@ def _handle_processes(args: argparse.Namespace) -> int:
     return _emit(report, args.format)
 
 
+def _handle_browser(args: argparse.Namespace) -> int:
+    if args.subcommand != "check":
+        return _emit(_planned_report("browser", "Run `pf-agent browser check --provider fake`"), args.format)
+    from .tools.managed.cloud_browser import CloudBrowser, FakeCloudBrowserBackend
+
+    if args.provider != "fake":
+        report = Report(
+            title="Cloud Browser",
+            status="degraded",
+            next_action="Configure a managed cloud browser provider or use --provider fake",
+            sections=[ReportSection("Provider", [f"{args.provider} is not configured"])],
+            data={"provider": args.provider, "actions": []},
+        )
+        return _emit(report, args.format)
+
+    browser = CloudBrowser(backend=FakeCloudBrowserBackend())
+    opened = browser.open("https://example.com/page")
+    snapshot = browser.snapshot()
+    closed = browser.close()
+    report = Report(
+        title="Cloud Browser",
+        status="ok",
+        next_action="Use browser artifacts as bounded evidence, not raw prompt context",
+        sections=[
+            ReportSection("Actions", [f"{result.action}: {result.status}" for result in (opened, snapshot, closed)]),
+            ReportSection("Artifacts", [ref.id for ref in snapshot.artifact_refs] or ["(none)"]),
+        ],
+        data={
+            "provider": args.provider,
+            "actions": [opened.to_dict(), snapshot.to_dict(), closed.to_dict()],
+        },
+    )
+    return _emit(report, args.format)
+
+
 def _handle_setup(args: argparse.Namespace) -> int:
     from .setup import SetupWizard, mode_from_flags, mode_menu_lines, render_setup_lines
 
@@ -5708,6 +5750,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_environments(args)
     if args.command == "processes":
         return _handle_processes(args)
+    if args.command == "browser":
+        return _handle_browser(args)
     if args.command == "session":
         return _handle_session(args)
     if args.command == "context":
