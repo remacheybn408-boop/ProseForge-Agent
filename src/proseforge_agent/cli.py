@@ -787,6 +787,7 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("skill_extra", nargs="*", help="extra skill arguments")
             group.add_argument("--provider", default="fake", help="skill provider")
             group.add_argument("--skill", default=None, help="skill id for usage reports")
+            group.add_argument("--all", action="store_true", help="apply skill command to all skills")
         if name == "jobs":
             group.add_argument("job_name", nargs="?", help="allow-listed background job")
             group.add_argument("--provider", default="fake", help="provider for the job")
@@ -4224,9 +4225,49 @@ def _handle_tools(args: argparse.Namespace) -> int:
 
 
 def _handle_skills(args: argparse.Namespace) -> int:
+    from .skills import FakeSkillHubClient, SkillInstaller, SkillRegistry
+
+    if args.subcommand == "search":
+        results = FakeSkillHubClient().search(args.skill_arg or "")
+        report = Report(
+            title="Skill Hub Search",
+            status="ok",
+            next_action="Inspect permissions before installing any skill package",
+            sections=[ReportSection("Results", [f"{item.skill_id} {item.version}" for item in results] or ["(none)"])],
+            data={"results": [item.to_dict() for item in results]},
+        )
+        return _emit(report, args.format)
+    if args.subcommand == "install" and args.skill_arg:
+        plan = SkillInstaller(Path(".pf-agent") / "skills").install(args.skill_arg, dry_run=args.dry_run)
+        report = Report(
+            title="Skill Install",
+            status=plan.status,
+            next_action="Review checksum, permissions, and rollback plan before installing",
+            sections=[
+                ReportSection(
+                    "Plan",
+                    [
+                        f"skill={plan.skill_id}",
+                        f"checksum={plan.checksum}",
+                        f"permissions={', '.join(plan.requested_permissions)}",
+                    ],
+                )
+            ],
+            data=plan.to_dict(),
+        )
+        return _emit(report, args.format)
+    if args.subcommand == "update" and args.all:
+        plans = SkillInstaller(Path(".pf-agent") / "skills").update_all(dry_run=args.dry_run, use_offline_cache=True)
+        report = Report(
+            title="Skill Update",
+            status="ok",
+            next_action="Review each plan before applying updates",
+            sections=[ReportSection("Plans", [f"{plan.skill_id}: {plan.status}" for plan in plans] or ["(none)"])],
+            data={"plans": [plan.to_dict() for plan in plans]},
+        )
+        return _emit(report, args.format)
     if args.subcommand not in {None, "list"}:
         return _emit(_planned_report("skills", "Run `pf-agent skills list`"), args.format)
-    from .skills import SkillRegistry
 
     records = SkillRegistry.discover([Path(".pf-agent") / "skills"])
     report = Report(
