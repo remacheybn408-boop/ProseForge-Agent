@@ -4693,6 +4693,36 @@ def _handle_environments(args: argparse.Namespace) -> int:
                 ),
                 args.format,
             )
+        if backend in {"modal", "daytona"}:
+            from .environments import DaytonaExecutionBackend, ModalExecutionBackend
+
+            config = {"token": "dry-run-token"} if backend == "modal" else {"api_key": "dry-run-key"}
+            plan = (
+                ModalExecutionBackend(config=config, fake_state="hibernating").check(dry_run=args.dry_run)
+                if backend == "modal"
+                else DaytonaExecutionBackend(config=config, fake_state="hibernating").check(dry_run=args.dry_run)
+            )
+            title = "Modal Environment" if backend == "modal" else "Daytona Environment"
+            return _emit(
+                Report(
+                    title=title,
+                    status=plan.status,
+                    next_action="Configure live credentials only through the secret boundary",
+                    sections=[
+                        ReportSection(
+                            "Plan",
+                            [
+                                f"backend={plan.backend}",
+                                f"state={plan.state}",
+                                f"dry_run={str(plan.dry_run).lower()}",
+                                f"reason={plan.reason}",
+                            ],
+                        )
+                    ],
+                    data=plan.to_dict(),
+                ),
+                args.format,
+            )
         return _emit(_planned_report("environments", "Run `pf-agent environments check local --dry-run`"), args.format)
     from .environments import FakeExecutionEnvironment
 
