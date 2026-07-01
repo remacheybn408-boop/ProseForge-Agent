@@ -6,8 +6,10 @@ from .core import (
     NotificationDispatcher,
     NotificationEvent,
 )
+from .desktop import DesktopNotificationChannel
 
 __all__ = [
+    "DesktopNotificationChannel",
     "NotificationChannel",
     "NotificationDispatchResult",
     "NotificationDispatcher",
