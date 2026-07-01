@@ -110,6 +110,30 @@ class ChatRepl:
                 suffix = f" ({session.project_slug})" if session.project_slug else ""
                 self._write(f"- {session.id} -> {session.mode}{suffix}")
             return False
+        if command == "/undo":
+            result = self.session_store.rewind(self.session_id, reason="undo")
+            self._write(f"undo: soft_deleted_steps={result.soft_deleted_steps}")
+            return False
+        if command == "/retry":
+            result = self.session_store.retry(self.session_id)
+            self._write(f"retry: source_step={result.source_step or '(none)'}")
+            return False
+        if command == "/compress":
+            result = self.session_store.compress(self.session_id)
+            self._write(f"compress: source_steps={result.source_steps}")
+            return False
+        if command == "/usage":
+            usage = self.session_store.usage(self.session_id)
+            self._write(f"usage: messages={usage.message_count} words={usage.word_count}")
+            return False
+        if command == "/resume":
+            if argument:
+                session = self.session_store.resume(argument)
+                self.session_id = session.id
+                self.mode = session.mode
+                self.project_slug = session.project_slug
+            self._write(f"session: {self.session_id}")
+            return False
         self._write(action.message if action else f"unknown command: {command}")
         return False
 

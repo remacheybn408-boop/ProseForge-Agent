@@ -5,7 +5,16 @@ from .context import ActiveContext, ActiveContextStore
 from .memory import ChatMemoryExtractor, MemoryCandidate
 from .prompts import ChatPromptBuilder, PromptItem, PromptPack
 from .retrieval import ChatAnswer, ChatCitation, ChatEvidence, ChatRetrievalResponder
-from .session import ChatContext, ChatMessage, ChatSearchResult, ChatSession, ChatSessionStore
+from .session import (
+    ChatContext,
+    ChatMessage,
+    ChatSearchResult,
+    ChatSession,
+    ChatSessionStore,
+    SessionCompressionResult,
+    SessionRewindResult,
+    SessionUsageReport,
+)
 from .slash import SlashCommandAction, SlashCommandContext, SlashCommandRegistry, SlashCommandSpec
 from .system_prompts import (
     ComposedSystemPrompt,
@@ -38,6 +47,9 @@ __all__ = [
     "SlashCommandSpec",
     "ChatSession",
     "ChatSessionStore",
+    "SessionCompressionResult",
+    "SessionRewindResult",
+    "SessionUsageReport",
     "ComposedSystemPrompt",
     "HandoffPackage",
     "SessionPromptRecord",

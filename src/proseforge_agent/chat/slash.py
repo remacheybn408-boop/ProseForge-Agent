@@ -117,6 +117,7 @@ def _default_commands() -> list[SlashCommandSpec]:
         SlashCommandSpec("mode", "switch_mode", "Switch conversation mode."),
         SlashCommandSpec("project", "switch_project", "Switch project binding."),
         SlashCommandSpec("skills", "list_skills", "List available local skills."),
+        SlashCommandSpec("resume", "resume_session", "Resume a session by id."),
         SlashCommandSpec("help", "show_help", "Show slash command help.", aliases=("h", "?")),
     ]
 

@@ -83,6 +83,47 @@ class SessionMergeResult:
         return asdict(self)
 
 
+@dataclass(frozen=True)
+class SessionRewindResult:
+    """Audit result for undo/retry transcript operations."""
+
+    session_id: str
+    operation: str
+    soft_deleted_steps: list[int] = field(default_factory=list)
+    source_step: int | None = None
+    marker_step: int = 0
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class SessionCompressionResult:
+    """Summary of an append-only context compression marker."""
+
+    session_id: str
+    source_steps: list[int]
+    marker_step: int
+    summary: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class SessionUsageReport:
+    """Read-only transcript usage summary."""
+
+    session_id: str
+    message_count: int
+    word_count: int
+    tool_call_count: int
+    evidence_ref_count: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
 class ChatSessionStore:
     """Filesystem-backed chat sessions rooted under an agent workspace directory."""
 
@@ -499,6 +540,96 @@ class ChatSessionStore:
             skipped_steps=skipped_steps,
         )
 
+    def rewind(self, session_id: str, *, steps: int = 1, reason: str = "undo") -> SessionRewindResult:
+        """Record a reversible soft-delete marker for recent transcript turns."""
+        context = self.load_context(session_id)
+        eligible_steps = [
+            step
+            for step, message in enumerate(context.messages, start=1)
+            if message.provider_metadata.get("operation") not in {"rewind", "retry", "compress"}
+        ]
+        soft_deleted_steps = eligible_steps[-max(0, steps) :] if steps else []
+        marker = self.append_message(
+            session_id,
+            "system",
+            f"Session rewind ({reason}): soft-deleted steps {', '.join(map(str, soft_deleted_steps)) or '(none)'}.",
+            provider_metadata={
+                "operation": "rewind",
+                "reason": reason,
+                "soft_deleted_steps": soft_deleted_steps,
+                "reversible": True,
+            },
+        )
+        return SessionRewindResult(
+            session_id=self._clean_session_id(session_id),
+            operation="rewind",
+            soft_deleted_steps=soft_deleted_steps,
+            marker_step=len(context.messages) + 1,
+        )
+
+    def retry(self, session_id: str) -> SessionRewindResult:
+        """Record that the last assistant turn should be retried."""
+        context = self.load_context(session_id)
+        source_step = None
+        for step, message in reversed(list(enumerate(context.messages, start=1))):
+            if message.role == "assistant" and message.provider_metadata.get("operation") is None:
+                source_step = step
+                break
+        self.append_message(
+            session_id,
+            "system",
+            f"Retry requested for assistant step {source_step or '(none)'}.",
+            provider_metadata={"operation": "retry", "source_step": source_step, "reversible": True},
+        )
+        return SessionRewindResult(
+            session_id=self._clean_session_id(session_id),
+            operation="retry",
+            source_step=source_step,
+            marker_step=len(context.messages) + 1,
+        )
+
+    def compress(
+        self,
+        session_id: str,
+        *,
+        upto_step: int | None = None,
+        summary: str | None = None,
+    ) -> SessionCompressionResult:
+        """Append a summary message with source-step evidence references."""
+        context = self.load_context(session_id)
+        max_step = min(upto_step or len(context.messages), len(context.messages))
+        source_steps = list(range(1, max(0, max_step) + 1))
+        rendered_summary = summary or f"Summary of transcript steps {', '.join(map(str, source_steps)) or '(none)'}."
+        evidence_refs = [f"session:{context.session.id}:step:{step}" for step in source_steps]
+        self.append_message(
+            session_id,
+            "system",
+            rendered_summary,
+            evidence_refs=evidence_refs,
+            provider_metadata={"operation": "compress", "source_steps": source_steps},
+        )
+        return SessionCompressionResult(
+            session_id=context.session.id,
+            source_steps=source_steps,
+            marker_step=len(context.messages) + 1,
+            summary=rendered_summary,
+        )
+
+    def usage(self, session_id: str) -> SessionUsageReport:
+        """Return transcript usage counts without provider calls."""
+        context = self.load_context(session_id)
+        return SessionUsageReport(
+            session_id=context.session.id,
+            message_count=len(context.messages),
+            word_count=sum(len(message.content.split()) for message in context.messages),
+            tool_call_count=sum(len(message.tool_calls) for message in context.messages),
+            evidence_ref_count=sum(len(message.evidence_refs) for message in context.messages),
+        )
+
+    def resume(self, session_id: str) -> ChatSession:
+        """Validate and return a session for terminal resume."""
+        return self._load_session(session_id)
+
     def record_event(self, event: dict[str, Any]) -> None:
         """Append a best-effort kernel event record."""
         append_jsonl(self.root / "events.jsonl", {"created_at": _now(), **event})
@@ -712,5 +843,8 @@ __all__ = [
     "ChatSearchResult",
     "ChatSession",
     "ChatSessionStore",
+    "SessionCompressionResult",
     "SessionMergeResult",
+    "SessionRewindResult",
+    "SessionUsageReport",
 ]
