@@ -9,6 +9,7 @@ from .evidence import EvidencePack, EvidencePackBuilder
 from .embeddings import EmbeddingConfig, EmbeddingProvider, FakeEmbeddingProvider, build_embedding_provider
 from .index import MemoryIndex, ScoredItem
 from .router import EvidenceItem, RetrievalRequest, RetrievalRouter
+from .vector_store import JsonlVectorStore, SqliteVectorStore, VectorSearchResult, VectorStore, build_vector_store
 
 __all__ = [
     "EvidencePack",
@@ -21,5 +22,10 @@ __all__ = [
     "EvidenceItem",
     "RetrievalRequest",
     "RetrievalRouter",
+    "JsonlVectorStore",
+    "SqliteVectorStore",
+    "VectorSearchResult",
+    "VectorStore",
     "build_embedding_provider",
+    "build_vector_store",
 ]
