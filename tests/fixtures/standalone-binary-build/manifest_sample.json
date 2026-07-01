@@ -1,0 +1,7 @@
+{
+  "platform": "windows",
+  "arch": "x64",
+  "entry_point": "proseforge_agent.cli:main",
+  "smoke_command": ["pf-agent", "--version"],
+  "bundled_files": ["LICENSE", "pyproject.toml"]
+}
