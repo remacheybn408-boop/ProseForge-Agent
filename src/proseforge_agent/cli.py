@@ -471,6 +471,7 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "gateway":
             group.add_argument("gateway_arg", nargs="?", help="gateway platform or action")
             group.add_argument("--platform", default="telegram", help="relay pairing platform")
+            group.add_argument("--fixture", default=None, help="gateway fixture for inspect commands")
             group.add_argument("--provider", default="fake", help="gateway provider")
             group.add_argument("--check", action="store_true", help="validate gateway readiness and exit")
         if name == "session":
@@ -4340,6 +4341,37 @@ def _handle_tui(args: argparse.Namespace) -> int:
 
 
 def _handle_gateway(args: argparse.Namespace) -> int:
+    if args.subcommand == "media":
+        from .gateway import MediaIngestion
+
+        action = args.gateway_arg or "inspect"
+        if action != "inspect":
+            return _emit(_planned_report("gateway", "Run `pf-agent gateway media inspect --fixture voice-note`"), args.format)
+        fixtures = {
+            "voice-note": {"type": "voice", "filename": "voice-note.ogg", "content": b"voice bytes", "mime_type": "audio/ogg"},
+            "image": {"type": "image", "filename": "image.png", "content": b"png", "width": 1, "height": 1},
+        }
+        attachment = fixtures.get(args.fixture or "voice-note", fixtures["voice-note"])
+        record = MediaIngestion(provider=args.provider).ingest(attachment)
+        report = Report(
+            title="Gateway Media",
+            status=record.status,
+            next_action="Promote attachment records into retrieval only after review",
+            sections=[
+                ReportSection(
+                    "Attachment",
+                    [
+                        f"kind={record.kind}",
+                        f"filename={record.filename}",
+                        f"status={record.status}",
+                        f"content_ref={record.content_ref}",
+                        f"transcription={record.transcription_candidate or '(none)'}",
+                    ],
+                )
+            ],
+            data=record.to_dict(),
+        )
+        return _emit(report, args.format)
     if args.subcommand == "delivery":
         from .gateway import DeliveryManager, OutboundMessage
         from .gateway.platforms import FakePlatformAdapter

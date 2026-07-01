@@ -2,11 +2,13 @@
 
 from .core import DeliveryJob, GatewayResult, GatewayRunner, MessageEvent
 from .delivery import DeliveryManager, DeliveryResult
+from .media import AttachmentRecord, MediaIngestion
 from .platforms import AdapterCapabilities, FakePlatformAdapter, OutboundMessage, PlatformAdapter, SendResult
 from .relay import PairingToken, RelayAuthDecision, RelayAuthenticator, RelayPairingService
 
 __all__ = [
     "AdapterCapabilities",
+    "AttachmentRecord",
     "DeliveryManager",
     "DeliveryResult",
     "DeliveryJob",
@@ -14,6 +16,7 @@ __all__ = [
     "GatewayResult",
     "GatewayRunner",
     "MessageEvent",
+    "MediaIngestion",
     "OutboundMessage",
     "PairingToken",
     "PlatformAdapter",
