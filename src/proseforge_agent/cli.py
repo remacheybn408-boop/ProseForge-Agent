@@ -482,6 +482,7 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "environments":
             group.add_argument("environment_arg", nargs="?", help="environment backend or action")
             group.add_argument("--provider", default="fake", help="environment provider")
+            group.add_argument("--image", default="python:3.11", help="container image for environment checks")
         if name == "session":
             group.add_argument("session_id", nargs="?", help="chat session id")
             group.add_argument("--project", default=None, help="project slug")
@@ -4596,6 +4597,54 @@ def _handle_gateway(args: argparse.Namespace) -> int:
 
 
 def _handle_environments(args: argparse.Namespace) -> int:
+    if args.subcommand == "check":
+        from .environments import DockerExecutionBackend, LocalExecutionBackend
+
+        backend = args.environment_arg or "local"
+        if backend == "local":
+            class _Runner:
+                def run(self, command, *, cwd=None, env=None, timeout=None):
+                    return {"stdout": "local check", "stderr": "", "exit_code": 0}
+
+            result = LocalExecutionBackend(process_runner=_Runner(), workspace_root=Path(".")).run(
+                ["check"], cwd=".", env={}, timeout=1
+            )
+            return _emit(
+                Report(
+                    title="Local Environment",
+                    status="ok",
+                    next_action="Route commands through permission policy before local execution",
+                    sections=[ReportSection("Check", [f"exit_code={result.exit_code}", f"stdout={result.stdout}"])],
+                    data=result.to_dict(),
+                ),
+                args.format,
+            )
+        if backend == "docker":
+            plan = DockerExecutionBackend(workspace_root=Path("."), docker_available=False).check(
+                image=args.image,
+                dry_run=args.dry_run,
+            )
+            return _emit(
+                Report(
+                    title="Docker Environment",
+                    status=plan.status,
+                    next_action="Install Docker or select local/fake environment when unavailable",
+                    sections=[
+                        ReportSection(
+                            "Plan",
+                            [
+                                f"image={plan.image}",
+                                f"dry_run={str(plan.dry_run).lower()}",
+                                f"status={plan.status}",
+                                f"reason={plan.reason}",
+                            ],
+                        )
+                    ],
+                    data=plan.to_dict(),
+                ),
+                args.format,
+            )
+        return _emit(_planned_report("environments", "Run `pf-agent environments check local --dry-run`"), args.format)
     from .environments import FakeExecutionEnvironment
 
     if args.subcommand not in {"list", None}:
