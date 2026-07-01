@@ -454,6 +454,7 @@ def build_parser() -> argparse.ArgumentParser:
                 action="store_true",
                 help="stream the response incrementally as it is generated",
             )
+            group.add_argument("--show-events", action="store_true", help="show fake streaming tool output events")
             group.add_argument("--profile", default=None, help="agent persona profile")
             group.add_argument("--profiles-file", default=None, help="YAML file with agent profiles")
         if name == "tui":
@@ -3648,6 +3649,32 @@ def _handle_chat(args: argparse.Namespace) -> int:
                 ReportSection("Citations", rendered.splitlines()),
             ],
             data=answer.to_dict(),
+        )
+        return _emit(report, args.format)
+    if getattr(args, "show_events", False):
+        from .agent import EventBus
+        from .tui.streaming import ToolOutputStreamer
+
+        event_bus = EventBus(Path(".pf-agent") / "events.jsonl")
+        chunks = ToolOutputStreamer(
+            tool_call_id="call_fake",
+            event_bus=event_bus,
+            chunk_char_limit=16,
+        ).stream_text("fake tool output")
+        report = Report(
+            title="Tool Output Events",
+            status="ok",
+            next_action="Use the event bus to subscribe terminal or gateway surfaces to chunks",
+            sections=[
+                ReportSection(
+                    "Chunks",
+                    [
+                        f"tool_call_id={chunk.tool_call_id} sequence={chunk.sequence} final={str(chunk.is_final).lower()} text={chunk.text}"
+                        for chunk in chunks
+                    ],
+                )
+            ],
+            data={"chunks": [chunk.to_dict() for chunk in chunks]},
         )
         return _emit(report, args.format)
     if not args.message:

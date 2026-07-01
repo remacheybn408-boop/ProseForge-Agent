@@ -27,6 +27,21 @@ class EventRecord:
         return asdict(self)
 
 
+@dataclass(frozen=True)
+class ToolOutputChunk:
+    """One bounded observable chunk from a running tool."""
+
+    tool_call_id: str
+    sequence: int
+    text: str
+    is_final: bool = False
+    redacted: bool = False
+    cancelled: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
 class EventBus:
     """Append-only JSONL event bus with payload redaction."""
 
@@ -144,4 +159,4 @@ def _redact(value: Any) -> Any:
     return value
 
 
-__all__ = ["BackgroundJobRunner", "EventBus", "EventRecord", "JobResult"]
+__all__ = ["BackgroundJobRunner", "EventBus", "EventRecord", "JobResult", "ToolOutputChunk"]
