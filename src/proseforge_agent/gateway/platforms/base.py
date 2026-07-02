@@ -49,6 +49,23 @@ class SendResult:
         return asdict(self)
 
 
+def fake_transport_refusal(platform: str, allow_fake_transport: bool) -> "SendResult | None":
+    """Return a refusal SendResult unless fake delivery is explicitly allowed.
+
+    Named platform adapters ship a fake transport: without a real client they
+    cannot actually deliver, so returning ``delivered=True`` silently lies
+    (finding 4.2). Callers must opt in with ``allow_fake_transport=True`` (tests,
+    local demos) or wire a real client.
+    """
+    if allow_fake_transport:
+        return None
+    return SendResult(
+        delivered=False,
+        retryable=False,
+        reason=f"{platform} adapter uses a fake transport; construct with allow_fake_transport=True or wire a real client",
+    )
+
+
 class PlatformAdapter(Protocol):
     platform: str
     capabilities: AdapterCapabilities
@@ -137,4 +154,11 @@ def _redact(value: Any) -> Any:
     return value
 
 
-__all__ = ["AdapterCapabilities", "FakePlatformAdapter", "OutboundMessage", "PlatformAdapter", "SendResult"]
+__all__ = [
+    "AdapterCapabilities",
+    "FakePlatformAdapter",
+    "OutboundMessage",
+    "PlatformAdapter",
+    "SendResult",
+    "fake_transport_refusal",
+]

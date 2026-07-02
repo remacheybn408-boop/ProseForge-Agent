@@ -29,7 +29,7 @@ def test_telegram_update_maps_to_message_event():
 
 
 def test_telegram_send_chunks_and_redacts_token():
-    adapter = TelegramGatewayAdapter(token="secret-token", max_message_size=5)
+    adapter = TelegramGatewayAdapter(token="secret-token", max_message_size=5, allow_fake_transport=True)
 
     result = adapter.send(OutboundMessage(platform="telegram", chat_id="12345", thread_id="7", text="hello world"))
 

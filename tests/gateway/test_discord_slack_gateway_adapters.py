@@ -35,8 +35,8 @@ def test_discord_and_slack_events_share_contract():
 
 
 def test_discord_and_slack_send_redacts_auth_and_reports_capabilities():
-    discord = DiscordGatewayAdapter(token="discord-secret")
-    slack = SlackGatewayAdapter(token="slack-secret")
+    discord = DiscordGatewayAdapter(token="discord-secret", allow_fake_transport=True)
+    slack = SlackGatewayAdapter(token="slack-secret", allow_fake_transport=True)
 
     discord_result = discord.send(OutboundMessage(platform="discord", chat_id="chan-1", thread_id="thread-1", text="reply"))
     slack_result = slack.send(OutboundMessage(platform="slack", chat_id="chan-2", thread_id="thread-2", text="reply"))

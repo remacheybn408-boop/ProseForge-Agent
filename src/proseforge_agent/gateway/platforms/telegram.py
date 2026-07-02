@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Iterable
 
 from ..core import MessageEvent
-from .base import AdapterCapabilities, OutboundMessage, SendResult
+from .base import AdapterCapabilities, OutboundMessage, SendResult, fake_transport_refusal
 
 
 @dataclass(frozen=True)
@@ -24,8 +24,9 @@ class TelegramGatewayAdapter:
 
     platform = "telegram"
 
-    def __init__(self, *, token: str = "", max_message_size: int = 4096) -> None:
+    def __init__(self, *, token: str = "", max_message_size: int = 4096, allow_fake_transport: bool = False) -> None:
         self.token = token
+        self.allow_fake_transport = allow_fake_transport
         self.capabilities = AdapterCapabilities(
             threads=True,
             edits=True,
@@ -57,6 +58,9 @@ class TelegramGatewayAdapter:
         )
 
     def send(self, message: OutboundMessage) -> SendResult:
+        refusal = fake_transport_refusal(self.platform, self.allow_fake_transport)
+        if refusal is not None:
+            return refusal
         chunks = _chunk_text(message.text, self.capabilities.max_message_size)
         message_ids = [f"telegram-{index + 1}" for index, _ in enumerate(chunks)]
         return SendResult(
@@ -68,6 +72,9 @@ class TelegramGatewayAdapter:
         )
 
     def edit(self, message: OutboundMessage) -> SendResult:
+        refusal = fake_transport_refusal(self.platform, self.allow_fake_transport)
+        if refusal is not None:
+            return refusal
         if not message.message_id:
             return SendResult(delivered=False, retryable=False, reason="message_id is required for edit")
         return SendResult(
