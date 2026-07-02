@@ -289,6 +289,25 @@ These cards own the **actual shipping** that the 1–60 packaging cards delibera
 184. [Standalone Binary Build / 真实二进制构建](184-standalone-binary-build.md) — execute after Task 48 (binary manifest); runs a real PyInstaller build against the `BinaryManifest` contract and the `pf-agent --version` smoke command.
 185. [OS Installers And Signing / 安装包与签名](185-os-installers-and-signing.md) — execute after Tasks 49–51 and 184; reuses Task 43 `AppDirs` to produce and sign `.msi` / `.dmg` / `install.sh` artifacts.
 
+## User-Onboarding And Distribution Cards (186–195)
+
+These cards close the "last-mile" gap between a working codebase and a
+double-clickable product for non-developer users. They depend on the core
+runtime being complete and are executed strictly in the recommended order
+because 186→188 build one composite onboarding path and 190→191 both wire
+into the same early bootstrap.
+
+186. [Default Chat REPL On Bare Command / 无参启动即进对话](186-default-chat-repl-on-bare-command.md) — bare `pf-agent` launches the chat REPL when the machine is configured, else the first-run wizard. Preserves `--help` and adds `--no-default` opt-out.
+187. [Managed Install Scripts / 一键安装脚本](187-managed-install-scripts.md) — `curl … | bash` and `iex (irm …)` install scripts driven by a `ManagedInstallPlanner`; uv-preferred with pipx fallback; refuses install inside an active venv.
+188. [First-Run Bootstrap Auto-Trigger / 首次运行自动引导](188-first-run-bootstrap-auto-trigger.md) — auto-runs the existing `FirstRunWizard` on fresh machines via a new `AutoBootstrap.decide()` detector; consent marker gates future runs.
+189. [PyPI First Publish And Version Bump Discipline / 首次发布 PyPI + 版本纪律](189-pypi-first-publish-and-version-bump.md) — first real TestPyPI/PyPI publish via Task 183 runner; `VersionPolicy` + `pf-agent release bump` / `release publish`; refuses duplicate versions.
+190. [Windows UTF-8 Early Bootstrap / Windows UTF-8 早期引导](190-windows-utf8-early-bootstrap.md) — new `_bootstrap.py` sets `PYTHONUTF8=1`, reconfigures I/O streams, hardens `sys.path`; imported first from every entry point. Idempotent, never raises.
+191. [.env Support And .env.example / .env 支持与示例](191-dotenv-support-and-example.md) — stdlib-only `.env` loader wired into `_bootstrap`; `.env.local` > `.env` > machine env; `.env.example` documents every recognized key with a coverage test.
+192. [Docker And Compose Distribution / Docker 与 Compose 分发](192-docker-and-compose-distribution.md) — production Dockerfile on `python:3.11-slim` + `docker-compose.yml` + `docker-compose.windows.yml`; non-root `pfagent` user; `/data` volume and configurable service port.
+193. [Chinese README And Locale Plumbing / 中文 README 与 locale 基座](193-chinese-readme-and-locale-plumbing.md) — full `README.zh-CN.md` translation, language switcher header on both READMEs, `docs/i18n/glossary.md`, drift test blocks silent divergence.
+194. [Community And Agent Docs / 社区与代理文档](194-community-and-agent-docs.md) — `CONTRIBUTING.md`, `SECURITY.md`, `AGENTS.md`, and a `docs/security/threat-model.md`; required-section tests block regressions.
+195. [CLI Config YAML Example Seed / CLI 配置样板](195-cli-config-yaml-example-seed.md) — master `configs/pf-agent.example.yaml` covering every knob; `pf-agent init --config` copies it to the resolved config path with env-var substitution; golden test enforces coverage.
+
 ## Execution Rule
 
 Execute one card at a time. Run the card's verification commands before starting the next card. If verification fails, stop and fix the current card instead of carrying broken assumptions forward.
