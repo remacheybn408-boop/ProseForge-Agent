@@ -114,6 +114,90 @@ class SetupConfigGenerator:
         return "\n".join(lines) + "\n"
 
 
+def known_config_keys() -> tuple[str, ...]:
+    """Dotted paths the product config recognizes.
+
+    Used by `pf-agent init --config` and by the example-seed coverage test so
+    the annotated `configs/pf-agent.example.yaml` cannot silently drift from the
+    keys the generator actually produces.
+    """
+    return (
+        "setup.completed",
+        "setup.mode",
+        "agent.profile",
+        "agent.language",
+        "agent.system_prompt_template",
+        "llm.default_provider",
+        "llm.fallback_provider",
+        "llm.providers",
+        "paths.workspace_root",
+        "engine.enabled",
+    )
+
+
+def example_config_text() -> str:
+    """Return the annotated example config seed (source of truth).
+
+    The committed `configs/pf-agent.example.yaml` is byte-identical to this;
+    `pf-agent init --config` writes this text. No real secrets — provider keys
+    are referenced indirectly via `api_key_ref` and resolved from the
+    environment or the OS keyring at runtime.
+    """
+    return _EXAMPLE_CONFIG_TEXT
+
+
+_EXAMPLE_CONFIG_TEXT = """\
+# ProseForge Agent — example configuration (Task 195).
+# Copy to `.pf-agent/config.yaml` (or generate with `pf-agent init --config`)
+# and edit. Secrets are NOT stored here: providers reference a key by name via
+# `api_key_ref`, resolved from the environment (.env) or the OS keyring.
+
+setup:
+  # Whether guided setup finished. `pf-agent setup` flips this to true.
+  completed: false
+  # Onboarding depth: minimal | standard | full.
+  mode: minimal
+
+agent:
+  # Named behavior profile.
+  profile: default
+  # UI / drafting language (e.g. zh-CN, en-US).
+  language: zh-CN
+  # System-prompt template id from the prompt registry.
+  system_prompt_template: professional_novel_editor
+
+llm:
+  # Provider used by default when a command does not name one.
+  default_provider: fake
+  # Provider used when the primary is unavailable (keep offline-safe).
+  fallback_provider: fake
+  # Provider registry. `fake` is deterministic and needs no key.
+  providers:
+    fake:
+      enabled: true
+      configured: true
+      kind: fake
+      model: fake
+      status: ok
+    openai:
+      enabled: false
+      configured: false
+      kind: llm
+      model: gpt-4o-mini
+      status: unconfigured
+      # Name of the env var / keyring entry holding the key (never the key).
+      api_key_ref: OPENAI_API_KEY
+
+paths:
+  # Portable workspace root the agent owns.
+  workspace_root: .pf-agent
+
+engine:
+  # Enable the authoritative ProseForge engine boundary ($PROSEFORGE_ROOT).
+  enabled: false
+"""
+
+
 def load_existing(path: str | Path) -> dict[str, Any]:
     config_path = Path(path)
     if not config_path.exists():
@@ -179,6 +263,8 @@ def _workspace_text(path: str | Path) -> str:
 
 __all__ = [
     "SetupConfigGenerator",
+    "example_config_text",
+    "known_config_keys",
     "load_existing",
     "provider_entry",
     "redact_config_text",
