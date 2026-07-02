@@ -4,9 +4,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import os
+import threading
 from pathlib import Path
 import time
 from typing import Any
+
+from ..concurrency import FileLock
 
 
 @dataclass(frozen=True)
@@ -68,19 +72,33 @@ class IdempotencyStore:
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
         self.path = self.root / "cron_nonces.json"
+        self._lock = FileLock(str(self.path) + ".lock")
+        self._thread_lock = threading.Lock()
 
     def seen(self, nonce: str) -> bool:
         return nonce in self._load()
 
     def remember(self, nonce: str) -> None:
-        nonces = self._load()
-        nonces.add(nonce)
-        self.path.write_text(json.dumps({"nonces": sorted(nonces)}, indent=2), encoding="utf-8")
+        # Lock the whole read-modify-write so concurrent fires never lose a
+        # nonce, then commit atomically via os.replace (finding 2.2). The
+        # thread lock serializes in-process threads (the FileLock is reentrant
+        # per instance); the FileLock serializes across processes.
+        with self._thread_lock, self._lock:
+            nonces = self._load()
+            nonces.add(nonce)
+            tmp = self.path.with_suffix(".json.tmp")
+            tmp.write_text(json.dumps({"nonces": sorted(nonces)}, indent=2), encoding="utf-8")
+            os.replace(tmp, self.path)
 
     def _load(self) -> set[str]:
         if not self.path.exists():
             return set()
-        payload = json.loads(self.path.read_text(encoding="utf-8"))
+        try:
+            payload = json.loads(self.path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            # A truncated/corrupt file (e.g. crash mid-write before this fix)
+            # must not poison every future verify(); treat it as "no nonces".
+            return set()
         return {str(item) for item in payload.get("nonces", [])}
 
 
