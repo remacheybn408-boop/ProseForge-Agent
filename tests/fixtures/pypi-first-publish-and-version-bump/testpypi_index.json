@@ -1,0 +1,7 @@
+{
+  "info": {"name": "proseforge-agent", "version": "0.1.0"},
+  "releases": {
+    "0.1.0": [{"filename": "proseforge_agent-0.1.0-py3-none-any.whl"}],
+    "0.0.9": [{"filename": "proseforge_agent-0.0.9-py3-none-any.whl"}]
+  }
+}
