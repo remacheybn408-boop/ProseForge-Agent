@@ -320,6 +320,11 @@ COMMAND_GROUPS: dict[str, dict] = {
         "inputs": "portable/native mode, ProseForge root",
         "artifacts": "agent config, workspace, provider stub, doctor report",
     },
+    "install": {
+        "help": "Emit managed install scripts and plans",
+        "inputs": "install subcommand, emit format",
+        "artifacts": "install.sh / install.ps1 script text",
+    },
     "doctor": {
         "help": "Run read-only installation diagnostics",
         "inputs": "optional diagnostic section",
@@ -539,6 +544,11 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--schedule", default="", help="cron schedule expression")
             group.add_argument("--fixture", default=None, help="hosted cron fire fixture")
             group.add_argument("--provider", default="fake", help="cron provider")
+        if name == "install":
+            group.add_argument("--emit", dest="install_emit", default="sh", choices=["sh", "ps1"], help="which script to emit")
+            group.add_argument("--os", dest="install_os", default=None, help="target OS for the plan (windows/macos/linux)")
+            group.add_argument("--arch", dest="install_arch", default="x64", help="target arch for the plan")
+            group.add_argument("--git", dest="install_git", default=None, help="install from a git ref instead of PyPI")
         if name == "telemetry":
             group.add_argument("--input", dest="telemetry_input", default=None, help="telemetry input JSONL path")
             group.add_argument("--output", dest="telemetry_output", default=None, help="telemetry export output path")
@@ -6234,6 +6244,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _handle_setup(args)
     if args.command == "init":
         return _handle_init(args)
+    if args.command == "install":
+        return _handle_install(args)
     if args.command == "doctor":
         return _handle_doctor(args)
     if args.command == "completions":
@@ -6257,6 +6269,39 @@ def _dispatch(args: argparse.Namespace) -> int:
     if args.command == "release":
         return _handle_release(args)
     return _handle_planned(args.command)(args)
+
+
+def _handle_install(args: argparse.Namespace) -> int:
+    from .install.installer_scripts import ManagedInstallPlanner
+
+    emit = getattr(args, "install_emit", "sh")
+    script_name = "install.ps1" if emit == "ps1" else "install.sh"
+    script_path = Path(__file__).resolve().parents[2] / "scripts" / script_name
+
+    if args.subcommand == "script":
+        if script_path.exists():
+            print(script_path.read_text(encoding="utf-8"))
+            return 0
+        # Fall back to a plan dump if the checked-in script is unavailable.
+        print(f"# {script_name} not found; showing planned phases for proseforge-agent")
+
+    os_name = getattr(args, "install_os", None) or ("windows" if emit == "ps1" else "linux")
+    planner = ManagedInstallPlanner(os_name, getattr(args, "install_arch", "x64"), {})
+    plan = planner.plan(ref=getattr(args, "install_git", None))
+    report = Report(
+        title="Managed Install Plan",
+        status="refused" if plan.refused else "ok",
+        next_action="Run scripts/install.sh (POSIX) or scripts/install.ps1 (Windows)",
+        sections=[
+            ReportSection(
+                "Phases",
+                [f"{phase.name}: {' '.join(phase.command)}" for phase in plan.phases]
+                or [plan.refusal_reason],
+            )
+        ],
+        data=plan.to_dict(),
+    )
+    return _emit(report, args.format)
 
 
 def _dispatch_bare_command(args: argparse.Namespace) -> int:
