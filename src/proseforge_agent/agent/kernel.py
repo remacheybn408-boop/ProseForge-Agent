@@ -8,11 +8,19 @@ workflow or tool implementations.
 from __future__ import annotations
 
 from collections.abc import Iterator
+from dataclasses import replace
 from typing import Any
 from uuid import uuid4
 
 from ..llm import Message, ProviderRequest, StreamChunk
 from ..llm.streaming import iter_stream
+from .middleware import (
+    LLMExecutionContext,
+    LLMRequest,
+    MiddlewareRegistry,
+    ToolExecutionContext,
+    ToolRequest,
+)
 from .types import AgentIntent, AgentTurnRequest, AgentTurnResult, ToolCallResult
 
 
@@ -37,6 +45,7 @@ class AgentKernel:
         retrieval=None,
         intent_router=None,
         safety=None,
+        middleware: MiddlewareRegistry | None = None,
     ) -> None:
         self._provider = provider
         self._tools = tools
@@ -44,6 +53,7 @@ class AgentKernel:
         self._retrieval = retrieval
         self._intent_router = intent_router
         self._safety = safety
+        self._middleware = middleware
 
     def run_turn(self, request: AgentTurnRequest) -> AgentTurnResult:
         trace_id = f"trace-{uuid4().hex[:12]}"
@@ -294,17 +304,31 @@ class AgentKernel:
         permission_level: str | None = None,
     ) -> AgentTurnResult:
         permission_level = permission_level or request.permission_level
-        required = self._tool_permission(intent.target_tool) or intent.required_permission
+
+        # Tool-request middleware may rewrite the tool name/arguments before the
+        # request is authorized. The rewritten request is then re-authorized so
+        # an escalation (e.g. draft.note -> chapter.accept) cannot bypass the
+        # session ceiling. See finding 1.5 / core-review-2026-07-01.md.
+        tool_name = intent.target_tool
+        arguments: dict[str, Any] = {"text": request.text}
+        if self._middleware is not None:
+            rewritten = self._middleware.apply_tool_request(
+                ToolRequest(tool_name=tool_name or "", arguments=arguments)
+            )
+            tool_name = rewritten.tool_name or tool_name
+            arguments = dict(rewritten.arguments)
+
+        required = self._tool_permission(tool_name) or intent.required_permission
         if not self._permission_allows(permission_level, required):
             events.append(
                 {
                     "type": "permission_denied",
                     "trace_id": trace_id,
-                    "tool": intent.target_tool,
+                    "tool": tool_name,
                     "required_permission": required,
                 }
             )
-            text = f"Permission denied for {intent.target_tool}; requires {required}. Trace {trace_id}."
+            text = f"Permission denied for {tool_name}; requires {required}. Trace {trace_id}."
             self._append_message(request.session_id, "assistant", text)
             self._record_events(events)
             return AgentTurnResult(
@@ -316,17 +340,23 @@ class AgentKernel:
                 trace_id=trace_id,
             )
         try:
-            output = self._tools.execute(intent.target_tool, {"text": request.text})
+            if self._middleware is not None:
+                output = self._middleware.apply_tool_execution(
+                    ToolExecutionContext(tool_name=tool_name or "", arguments=arguments),
+                    lambda ctx: self._tools.execute(ctx.tool_name, ctx.arguments),
+                )
+            else:
+                output = self._tools.execute(tool_name, arguments)
         except Exception as exc:  # noqa: BLE001 - turn should recover with trace id
             events.append(
                 {
                     "type": "tool_error",
                     "trace_id": trace_id,
-                    "tool": intent.target_tool,
+                    "tool": tool_name,
                     "error": str(exc),
                 }
             )
-            text = f"Tool {intent.target_tool} failed. Trace {trace_id}."
+            text = f"Tool {tool_name} failed. Trace {trace_id}."
             self._append_message(request.session_id, "assistant", text)
             self._record_events(events)
             return AgentTurnResult(
@@ -334,7 +364,7 @@ class AgentKernel:
                 intent=intent,
                 tool_calls=[
                     ToolCallResult(
-                        name=intent.target_tool or "",
+                        name=tool_name or "",
                         status="failed",
                         error=str(exc),
                     )
@@ -344,8 +374,8 @@ class AgentKernel:
                 events=events,
                 trace_id=trace_id,
             )
-        events.append({"type": "tool_call", "trace_id": trace_id, "tool": intent.target_tool})
-        text = f"Tool {intent.target_tool} completed. Trace {trace_id}."
+        events.append({"type": "tool_call", "trace_id": trace_id, "tool": tool_name})
+        text = f"Tool {tool_name} completed. Trace {trace_id}."
         self._append_message(request.session_id, "assistant", text)
         self._record_events(events)
         return AgentTurnResult(
@@ -353,7 +383,7 @@ class AgentKernel:
             intent=intent,
             tool_calls=[
                 ToolCallResult(
-                    name=intent.target_tool or "",
+                    name=tool_name or "",
                     status="ok",
                     output=output,
                 )
@@ -379,8 +409,38 @@ class AgentKernel:
             role="planner" if intent.name == "retrieve_context" else "drafter",
             messages=[Message(role="user", content=content)],
         )
+
+        # LLM-request middleware may rewrite messages/parameters before the
+        # provider call; llm-execution middleware wraps the call itself.
+        llm_request: LLMRequest | None = None
+        if self._middleware is not None:
+            llm_request = self._middleware.apply_llm_request(
+                LLMRequest(
+                    model=getattr(self._provider, "model", ""),
+                    messages=[{"role": m.role, "content": m.content} for m in provider_request.messages],
+                    parameters={
+                        "temperature": provider_request.temperature,
+                        "max_tokens": provider_request.max_tokens,
+                    },
+                )
+            )
+            provider_request = replace(
+                provider_request,
+                messages=[
+                    Message(role=str(m.get("role", "user")), content=str(m.get("content", "")))
+                    for m in llm_request.messages
+                ],
+                temperature=float(llm_request.parameters.get("temperature", provider_request.temperature)),
+                max_tokens=llm_request.parameters.get("max_tokens", provider_request.max_tokens),
+            )
         try:
-            result = self._provider.generate(provider_request)
+            if self._middleware is not None and llm_request is not None:
+                result = self._middleware.apply_llm_execution(
+                    LLMExecutionContext(request=llm_request),
+                    lambda ctx: self._provider.generate(provider_request),
+                )
+            else:
+                result = self._provider.generate(provider_request)
         except Exception as exc:  # noqa: BLE001 - preserve turn with trace id
             events.append(
                 {
