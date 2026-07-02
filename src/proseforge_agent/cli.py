@@ -908,6 +908,9 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "release":
             group.add_argument("--complete-agent", action="store_true", help="run the complete agent release gate")
             group.add_argument("--write-report", action="store_true", help="write release report to reports/")
+            group.add_argument("--kind", dest="release_kind", default="patch", choices=["patch", "minor", "major", "prerelease"], help="version bump kind")
+            group.add_argument("--pre-id", dest="release_pre_id", default="rc", help="prerelease identifier")
+            group.add_argument("--repository", dest="release_repository", default="testpypi", choices=["testpypi", "pypi"], help="publish target repository")
         if name == "eval":
             group.add_argument("--provider", default="fake", help="provider for deterministic eval")
             group.add_argument("--suite", default=None, help="path to a golden task suite JSON file")
@@ -5994,7 +5997,108 @@ def _handle_qa_ci(args: argparse.Namespace, matrix) -> int:
     return 0 if status == "ok" else 1
 
 
+class _TwineRunner:
+    """Real command runner for `python -m build` / `twine upload` (Task 189).
+
+    Merges provided credentials into the child environment so tokens are never
+    embedded in argv. Returns the process exit code.
+    """
+
+    def run(self, argv: list[str], *, env: dict[str, str] | None = None) -> int:
+        import subprocess
+
+        child_env = dict(os.environ)
+        if env:
+            child_env.update({k: v for k, v in env.items() if v})
+        completed = subprocess.run(argv, env=child_env)  # noqa: S603 - argv is fixed publish command
+        return completed.returncode
+
+
+def _read_pyproject_version(path: Path) -> str:
+    import tomllib
+
+    data = tomllib.loads(path.read_text(encoding="utf-8"))
+    version = data.get("project", {}).get("version")
+    if not version:
+        raise ProseForgeAgentError("project.version not found in pyproject.toml")
+    return str(version)
+
+
+def _write_pyproject_version(path: Path, new_version: str) -> None:
+    import re as _re
+
+    text = path.read_text(encoding="utf-8")
+    updated, count = _re.subn(
+        r'(?m)^(version\s*=\s*)"[^"]*"',
+        rf'\g<1>"{new_version}"',
+        text,
+        count=1,
+    )
+    if count == 0:
+        raise ProseForgeAgentError("could not locate version line in pyproject.toml")
+    path.write_text(updated, encoding="utf-8")
+
+
 def _handle_release(args: argparse.Namespace) -> int:
+    if args.subcommand == "bump":
+        from .release.version_policy import VersionPolicy
+
+        pyproject = Path("pyproject.toml")
+        current = _read_pyproject_version(pyproject)
+        nxt = VersionPolicy(current).next(args.release_kind, pre_id=args.release_pre_id)
+        wrote = False
+        if getattr(args, "write", False) and not args.dry_run:
+            _write_pyproject_version(pyproject, nxt)
+            wrote = True
+        report = Report(
+            title="Version Bump",
+            status="ok",
+            next_action="Commit the version bump, then `pf-agent release publish`",
+            sections=[ReportSection("Version", [f"current: {current}", f"next: {nxt}", f"written: {wrote}"])],
+            data={"current": current, "next": nxt, "kind": args.release_kind, "written": wrote},
+        )
+        return _emit(report, args.format)
+
+    if args.subcommand == "publish":
+        from .install.package_checks import PackageChecker
+        from .release.publish import PyPIPublisher
+        from .release.version_policy import PyPIPublishedVersions, VersionPolicy
+
+        repository = args.release_repository
+        version = _read_pyproject_version(Path("pyproject.toml"))
+        published = PyPIPublishedVersions().for_repository(repository)
+        try:
+            VersionPolicy(version).refuse_duplicate(version, published)
+        except ProseForgeAgentError as exc:
+            report = Report(
+                title="PyPI Publish",
+                status="refused",
+                next_action="Bump the version with `pf-agent release bump` before publishing",
+                sections=[ReportSection("Refused", [str(exc)])],
+                data={"repository": repository, "version": version, "refused": True},
+            )
+            return _emit(report, args.format)
+
+        credentials = {
+            "TWINE_USERNAME": os.environ.get("TWINE_USERNAME", "__token__"),
+            "TWINE_PASSWORD": os.environ.get("TWINE_PASSWORD", ""),
+        }
+        publisher = PyPIPublisher(
+            runner=_TwineRunner(),
+            checker=PackageChecker(),
+            version_reader=lambda: version,
+            published_versions_lookup=lambda repo: published,
+        )
+        publish_report = publisher.publish(repository, dry_run=args.dry_run, credentials=credentials)
+        report = Report(
+            title="PyPI Publish",
+            status="ok" if publish_report.passed else "fail",
+            next_action=f"Verify at https://{'test.' if repository == 'testpypi' else ''}pypi.org/project/proseforge-agent/",
+            sections=[ReportSection("Steps", list(publish_report.steps) or [publish_report.summary])],
+            data=publish_report.to_dict(),
+        )
+        return _emit(report, args.format)
+
     if args.subcommand != "check" or not args.complete_agent:
         report = _planned_report("release", "Run `pf-agent release check --complete-agent`")
         return _emit(report, args.format)
