@@ -23,8 +23,12 @@ class DockerPlan:
         return asdict(self)
 
 
-class DockerExecutionBackend:
-    """Dry-run Docker backend with deterministic unavailable mode."""
+class DockerBackendPlanner:
+    """Planner only: emits a :class:`DockerPlan` and never runs ``docker``.
+
+    ``check()`` describes what a real Docker execution *would* do; wire a real
+    command runner elsewhere to actually execute.
+    """
 
     def __init__(self, *, workspace_root: str | Path, docker_available: bool = False) -> None:
         self.environment_id = "docker"
@@ -57,4 +61,4 @@ class DockerExecutionBackend:
         )
 
 
-__all__ = ["DockerExecutionBackend", "DockerPlan"]
+__all__ = ["DockerBackendPlanner", "DockerPlan"]

@@ -22,8 +22,8 @@ class SSHPlan:
         return asdict(self)
 
 
-class SSHExecutionBackend:
-    """Dry-run SSH backend that never opens a network connection in tests."""
+class SSHBackendPlanner:
+    """Planner only: emits an :class:`SSHPlan` and never opens a connection."""
 
     def __init__(self, *, ssh_available: bool = False) -> None:
         self.environment_id = "ssh"
@@ -44,4 +44,4 @@ class SSHExecutionBackend:
         )
 
 
-__all__ = ["SSHExecutionBackend", "SSHPlan"]
+__all__ = ["SSHBackendPlanner", "SSHPlan"]

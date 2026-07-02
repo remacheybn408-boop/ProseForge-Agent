@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from proseforge_agent.cli import main
-from proseforge_agent.environments import SSHExecutionBackend, SingularityExecutionBackend
+from proseforge_agent.environments import SSHBackendPlanner, SingularityBackendPlanner
 
 
 def test_ssh_backend_redacts_connection_plan():
-    backend = SSHExecutionBackend(ssh_available=False)
+    backend = SSHBackendPlanner(ssh_available=False)
 
     plan = backend.check(profile="demo", host="writer@example.com", token="secret-token", dry_run=True)
 
@@ -20,7 +20,7 @@ def test_ssh_backend_redacts_connection_plan():
 
 
 def test_singularity_backend_reports_image_plan_without_runtime():
-    backend = SingularityExecutionBackend(singularity_available=False)
+    backend = SingularityBackendPlanner(singularity_available=False)
 
     plan = backend.check(image="demo.sif", dry_run=True)
 
