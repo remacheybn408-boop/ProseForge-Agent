@@ -14,6 +14,8 @@ card establishes the entry points, shared flags, and report rendering.
 
 from __future__ import annotations
 
+from . import _bootstrap  # noqa: F401  # UTF-8 + path hardening, must run early
+
 import argparse
 import json
 import os

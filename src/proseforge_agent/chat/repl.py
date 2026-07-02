@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from .. import _bootstrap  # noqa: F401  # UTF-8 + path hardening, must run early
+
 import sys
 from typing import TextIO
 
