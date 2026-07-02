@@ -24,7 +24,10 @@ def test_bare_command_launches_chat_repl_when_provider_is_configured(monkeypatch
     assert called["provider"] == "fake"
 
 
-def test_bare_command_routes_to_first_run_when_not_configured(monkeypatch, capsys):
+def test_bare_command_auto_bootstraps_then_launches_repl_when_unconfigured(tmp_path, monkeypatch):
+    # Task 188 supersedes the Task 186 stopgap: an unconfigured machine now
+    # auto-runs the non-destructive first-run bootstrap, then enters the REPL.
+    monkeypatch.chdir(tmp_path)
     called = {}
 
     def fake_run_repl(argv=None, *, provider="fake", **kwargs):
@@ -32,17 +35,12 @@ def test_bare_command_routes_to_first_run_when_not_configured(monkeypatch, capsy
         return 0
 
     monkeypatch.setattr("proseforge_agent.chat.repl.run_repl", fake_run_repl)
-    monkeypatch.setattr(
-        "proseforge_agent.setup.first_run.FirstRunBootstrap.check",
-        lambda self: _not_ready_verdict(),
-    )
 
     exit_code = main([])
 
-    assert exit_code == 2
-    assert "ran" not in called  # REPL must not launch on an unconfigured machine
-    out = capsys.readouterr().out
-    assert out.strip()  # setup guidance is printed
+    assert exit_code == 0
+    assert called.get("ran") is True
+    assert (tmp_path / ".pf-agent" / ".first-run-completed.json").exists()
 
 
 def test_no_default_flag_prints_help_and_exits_zero(capsys):

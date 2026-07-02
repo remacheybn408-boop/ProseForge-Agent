@@ -6312,16 +6312,22 @@ def _dispatch_bare_command(args: argparse.Namespace) -> int:
     reported as a one-line message, never a Python traceback.
     """
     try:
-        from .setup.first_run import FirstRunBootstrap
+        from .install.auto_trigger import SKIP, AutoBootstrap, complete_first_run
 
-        verdict = FirstRunBootstrap(Path(".pf-agent")).check()
-        if not verdict.ready:
-            print(verdict.guidance)
-            return 2
+        root = Path(".pf-agent")
+        decision = AutoBootstrap(root=root).decide()
+        if decision.verdict != SKIP:
+            # Auto-run the non-destructive first-run bootstrap, then stamp the
+            # consent marker so subsequent invocations skip straight to chat.
+            from .install.first_run import FirstRunWizard
+
+            print(f"First run: {decision.reason}. Setting up your workspace...")
+            FirstRunWizard(root).run({})
+            complete_first_run(root)
 
         from .chat import repl as chat_repl
 
-        return chat_repl.run_repl(provider="fake")
+        return chat_repl.run_repl(provider="fake", root=str(root))
     except ProseForgeAgentError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
