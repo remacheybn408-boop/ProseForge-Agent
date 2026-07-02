@@ -40,6 +40,31 @@ def test_plugin_dependency_management_contract(tmp_path):
     assert report.isolated_venv_supported is False
 
 
+def test_plugin_dependency_mixed_version_parts_report_conflict(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "plugin.yaml").write_text(
+        """
+plugin:
+  id: dependency-plugin
+  name: Dependency Plugin
+  version: 0.1.0
+  description: Plugin with mixed version dependency
+  entrypoint: plugin.main:register
+  dependencies:
+    python:
+      - demo-lib>=1.0
+""".strip(),
+        encoding="utf-8",
+    )
+    manager = PluginDependencyManager(tmp_path / "agent", installed_versions={"demo-lib": "1.a"})
+
+    report = manager.check(source)
+
+    assert report.status == "blocked"
+    assert any(issue.kind == "version_conflict" for issue in report.issues)
+
+
 def test_plugin_deps_cli_reports_install_suggestion(capsys, tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     source = _plugin_source(tmp_path / "source")

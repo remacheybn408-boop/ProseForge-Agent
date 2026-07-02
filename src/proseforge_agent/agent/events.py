@@ -28,15 +28,21 @@ _SENSITIVE_KEY_PARTS = (
     "credential",
     "private_key",
 )
-_ASSIGNMENT_RE = re.compile(r"(?i)\b(api[_-]?key|token|secret|password|authorization)=\S+")
+_ASSIGNMENT_RE = re.compile(
+    r"(?i)\b(api[_-]?key|x-api-key|access_token|refresh_token|token|secret|password|authorization)\s*[:=]\s*\S+"
+)
 _BEARER_RE = re.compile(r"(?i)\b(bearer)\s+[A-Za-z0-9._~+/=-]+")
-_SECRET_TOKEN_RE = re.compile(r"\b(?:sk|tok)-[A-Za-z0-9_-]+")
+_SECRET_TOKEN_RE = re.compile(r"\b(?:sk|tok|key)-[A-Za-z0-9._-]+")
+_JWT_RE = re.compile(r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9._-]+\b")
+_BARE_TOKEN_RE = re.compile(r"\b[A-Za-z0-9_-]{40,}\b")
 
 
 def _redact_text(text: str) -> str:
     text = _ASSIGNMENT_RE.sub(lambda match: f"{match.group(1)}=[redacted]", text)
     text = _BEARER_RE.sub(lambda match: f"{match.group(1)} [redacted]", text)
-    return _SECRET_TOKEN_RE.sub("[redacted]", text)
+    text = _JWT_RE.sub("[redacted]", text)
+    text = _SECRET_TOKEN_RE.sub("[redacted]", text)
+    return _BARE_TOKEN_RE.sub("[redacted]", text)
 
 
 @dataclass(frozen=True)
@@ -186,4 +192,16 @@ def _redact(value: Any) -> Any:
     return value
 
 
-__all__ = ["BackgroundJobRunner", "EventBus", "EventRecord", "JobResult", "ToolOutputChunk"]
+def redact_sensitive(value: Any) -> Any:
+    """Redact secret-looking keys and values for public exports."""
+    return _redact(value)
+
+
+__all__ = [
+    "BackgroundJobRunner",
+    "EventBus",
+    "EventRecord",
+    "JobResult",
+    "ToolOutputChunk",
+    "redact_sensitive",
+]

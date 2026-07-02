@@ -19,6 +19,13 @@ class RecordingChannel:
         return {"channel": self.name, "status": "sent"}
 
 
+class FailingChannel:
+    name = "failing"
+
+    def send(self, event: NotificationEvent):
+        raise RuntimeError("boom")
+
+
 def test_notification_dispatcher_writes_events_and_notifies_channels(tmp_path):
     channel = RecordingChannel()
     dispatcher = NotificationDispatcher(tmp_path, channels=[channel])
@@ -32,6 +39,20 @@ def test_notification_dispatcher_writes_events_and_notifies_channels(tmp_path):
     rows = [json.loads(line) for line in (tmp_path / "notifications" / "events.jsonl").read_text(encoding="utf-8").splitlines()]
     assert rows[0]["event_type"] == "job_completed"
     assert dispatcher.list_events()[0].title == "Job done"
+
+
+def test_notification_dispatcher_isolates_channel_failures(tmp_path):
+    channel = RecordingChannel()
+    dispatcher = NotificationDispatcher(tmp_path, channels=[FailingChannel(), channel])
+    event = NotificationEvent(event_type="job_completed", title="Job done", message="done")
+
+    result = dispatcher.dispatch(event)
+
+    assert result.channel_results[0]["channel"] == "failing"
+    assert result.channel_results[0]["status"] == "failed"
+    assert "boom" in result.channel_results[0]["error"]
+    assert result.channel_results[1] == {"channel": "recording", "status": "sent"}
+    assert channel.events == [event]
 
 
 def test_notifications_cli_list_and_test(capsys, tmp_path, monkeypatch):

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
-import sys
+import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from types import ModuleType
@@ -14,6 +14,8 @@ from .hooks import PluginAPI, PluginHookRegistry, PluginHookResult
 from .manifest import PluginManifest
 from .permissions import PLUGIN_PERMISSIONS
 from .sandbox import PluginSandbox, PluginSandboxPolicy
+
+_MODULE_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$")
 
 
 @dataclass(frozen=True)
@@ -122,26 +124,26 @@ class PluginTestHarness:
         if ":" not in entrypoint:
             raise ValueError("plugin entrypoint must be '<module>:<callable>'")
         module_name, callable_name = entrypoint.split(":", 1)
-        module_path = plugin_path / (module_name.replace(".", "/") + ".py")
+        if not _MODULE_NAME_RE.fullmatch(module_name):
+            raise ValueError(f"unsafe plugin entrypoint module: {module_name}")
+        root = plugin_path.resolve()
+        module_path = (plugin_path / (module_name.replace(".", "/") + ".py")).resolve()
         if not module_path.exists():
-            package_path = plugin_path / module_name.replace(".", "/") / "__init__.py"
+            package_path = (plugin_path / module_name.replace(".", "/") / "__init__.py").resolve()
             module_path = package_path
         if not module_path.exists():
             raise FileNotFoundError(f"plugin entrypoint module not found: {module_name}")
+        try:
+            module_path.relative_to(root)
+        except ValueError as exc:
+            raise ValueError(f"unsafe plugin entrypoint module: {module_name}") from exc
 
         unique_name = f"_pf_plugin_{abs(hash((str(module_path), entrypoint)))}"
         spec = importlib.util.spec_from_file_location(unique_name, module_path)
         if spec is None or spec.loader is None:
             raise ImportError(f"cannot load plugin module: {module_name}")
         module = importlib.util.module_from_spec(spec)
-        sys.path.insert(0, str(plugin_path))
-        try:
-            spec.loader.exec_module(module)
-        finally:
-            try:
-                sys.path.remove(str(plugin_path))
-            except ValueError:
-                pass
+        spec.loader.exec_module(module)
         register = getattr(module, callable_name)
         return module, register
 

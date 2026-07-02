@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from ..errors import ConfigurationError
 from .transcript import append_jsonl
+
+_SAFE_PROJECT_SLUG_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 
 
 @dataclass(frozen=True)
@@ -76,8 +80,23 @@ class ChatMemoryExtractor:
     def _queue_path(root: Path, candidate: MemoryCandidate) -> Path:
         base = root / "memory_candidates"
         if candidate.scope == "project" and candidate.project_slug:
-            return base / "projects" / f"{candidate.project_slug}.jsonl"
+            slug = _safe_project_slug(candidate.project_slug)
+            return base / "projects" / f"{slug}.jsonl"
         return base / "global.jsonl"
+
+
+def _safe_project_slug(slug: str) -> str:
+    value = str(slug).strip()
+    if (
+        not value
+        or not _SAFE_PROJECT_SLUG_RE.fullmatch(value)
+        or ".." in value
+        or "/" in value
+        or "\\" in value
+        or ":" in value
+    ):
+        raise ConfigurationError(f"unsafe project slug: {slug}")
+    return value
 
 
 def render_memory_candidates(candidates: list[MemoryCandidate]) -> list[str]:

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+
 import pytest
 
 from proseforge_agent.errors import ConfigurationError
@@ -24,6 +26,19 @@ def test_jsonl_vector_store_upsert_search_and_delete(tmp_path):
     assert [result.id for result in store.search(embedder.embed_text("hero memory"), top_k=5)] == ["villain"]
 
 
+def test_jsonl_vector_store_skips_corrupt_rows(tmp_path):
+    embedder = FakeEmbeddingProvider(dimension=8)
+    path = tmp_path / "vectors.jsonl"
+    path.write_text(
+        '{"id":"hero","vector":[1,0,0,0,0,0,0,0],"metadata":{"text":"hero"}}\n'
+        "{not json}\n",
+        encoding="utf-8",
+    )
+    store = JsonlVectorStore(path)
+
+    assert store.search(embedder.embed_text("hero"), top_k=5)
+
+
 def test_sqlite_vector_store_matches_vector_store_contract(tmp_path):
     embedder = FakeEmbeddingProvider(dimension=6)
     store = SqliteVectorStore(tmp_path / "vectors.sqlite")
@@ -33,6 +48,19 @@ def test_sqlite_vector_store_matches_vector_store_contract(tmp_path):
 
     assert result.id == "chapter-1"
     assert result.metadata["project_slug"] == "demo"
+
+
+def test_sqlite_vector_store_allows_threaded_access(tmp_path):
+    embedder = FakeEmbeddingProvider(dimension=6)
+    store = SqliteVectorStore(tmp_path / "vectors.sqlite")
+
+    def upsert(index: int) -> None:
+        store.upsert(f"chapter-{index}", embedder.embed_text(f"chapter {index}"), {"index": index})
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        list(pool.map(upsert, range(12)))
+
+    assert len(store.search(embedder.embed_text("chapter 1"), top_k=12)) == 12
 
 
 def test_vector_store_factory_supports_local_and_rejects_reserved_adapters(tmp_path):

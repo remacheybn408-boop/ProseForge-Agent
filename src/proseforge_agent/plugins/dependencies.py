@@ -130,10 +130,13 @@ class PluginDependencyManager:
         return True
 
     @staticmethod
-    def _version_tuple(version: str) -> tuple[int | str, ...]:
-        parts: list[int | str] = []
+    def _version_tuple(version: str) -> tuple[tuple[int, int | str], ...]:
+        parts: list[tuple[int, int | str]] = []
         for part in version.replace("-", ".").split("."):
-            parts.append(int(part) if part.isdigit() else part)
+            normalized = part.strip().lower()
+            if not normalized:
+                continue
+            parts.append((1, int(normalized)) if normalized.isdigit() else (0, normalized))
         return tuple(parts)
 
 

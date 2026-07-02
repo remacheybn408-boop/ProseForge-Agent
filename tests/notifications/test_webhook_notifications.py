@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import hmac
+import hashlib
 
 from proseforge_agent.notifications import NotificationEvent, WebhookNotificationChannel
 from proseforge_agent.cli import main
@@ -11,8 +13,8 @@ from proseforge_agent.cli import main
 def test_webhook_channel_retries_and_does_not_persist_plaintext_url(tmp_path):
     attempts: list[dict] = []
 
-    def transport(url, payload, headers, timeout):
-        attempts.append({"url": url, "payload": payload, "headers": headers, "timeout": timeout})
+    def transport(url, body, headers, timeout):
+        attempts.append({"url": url, "body": body, "headers": headers, "timeout": timeout})
         return {"ok": len(attempts) == 2, "status_code": 200 if len(attempts) == 2 else 500}
 
     channel = WebhookNotificationChannel(
@@ -32,9 +34,30 @@ def test_webhook_channel_retries_and_does_not_persist_plaintext_url(tmp_path):
     assert result["status"] == "sent"
     assert result["attempts"] == 2
     assert attempts[0]["headers"]["X-ProseForge-Agent-Signature"]
+    assert isinstance(attempts[0]["body"], bytes)
     retry_log = (tmp_path / "webhook-retries.jsonl").read_text(encoding="utf-8")
     assert "https://hooks.example/secret-token" not in retry_log
     assert "secret://webhook" in retry_log
+
+
+def test_webhook_signature_matches_sent_body_bytes():
+    attempts: list[dict] = []
+
+    def transport(url, body, headers, timeout):
+        attempts.append({"body": body, "headers": headers})
+        return {"ok": True, "status_code": 200}
+
+    channel = WebhookNotificationChannel(
+        enabled=True,
+        url_ref="secret://webhook",
+        url_resolver=lambda ref: "https://hooks.example/redacted",
+        transport=transport,
+        signing_secret="signing-secret",
+    )
+
+    assert channel.send(NotificationEvent("job_failed", "Job failed", "rag ingest failed"))["status"] == "sent"
+    expected = hmac.new(b"signing-secret", attempts[0]["body"], hashlib.sha256).hexdigest()
+    assert attempts[0]["headers"]["X-ProseForge-Agent-Signature"] == expected
 
 
 def test_webhook_channel_skips_unsubscribed_events(tmp_path):

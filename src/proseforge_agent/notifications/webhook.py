@@ -10,7 +10,7 @@ from typing import Callable
 
 from .core import NotificationEvent
 
-WebhookTransport = Callable[[str, dict, dict, int], dict]
+WebhookTransport = Callable[[str, bytes, dict, int], dict]
 UrlResolver = Callable[[str], str]
 
 
@@ -51,10 +51,11 @@ class WebhookNotificationChannel:
             return {"channel": self.name, "status": "unsupported", "reason": "webhook transport or URL resolver is not configured"}
         url = self.url_resolver(self.url_ref)
         payload = event.to_dict()
-        headers = self._headers(payload)
+        body = _canonical_body(payload)
+        headers = self._headers(body)
         last_response: dict = {}
         for attempt in range(1, self.retry_count + 2):
-            response = self.transport(url, payload, headers, self.timeout_seconds)
+            response = self.transport(url, body, headers, self.timeout_seconds)
             last_response = response
             if response.get("ok"):
                 return {"channel": self.name, "status": "sent", "attempts": attempt, "url_ref": self.url_ref}
@@ -67,10 +68,9 @@ class WebhookNotificationChannel:
             "last_status": last_response.get("status_code"),
         }
 
-    def _headers(self, payload: dict) -> dict:
+    def _headers(self, body: bytes) -> dict:
         headers = {"Content-Type": "application/json"}
         if self.signing_secret:
-            body = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
             signature = hmac.new(self.signing_secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
             headers["X-ProseForge-Agent-Signature"] = signature
         return headers
@@ -88,6 +88,10 @@ class WebhookNotificationChannel:
         }
         with self.log_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+
+
+def _canonical_body(payload: dict) -> bytes:
+    return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
 __all__ = ["WebhookNotificationChannel"]

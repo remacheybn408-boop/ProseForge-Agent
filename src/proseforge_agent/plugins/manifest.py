@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -10,6 +11,7 @@ import yaml
 from ..errors import ConfigurationError
 
 _REQUIRED_FIELDS = ("id", "name", "version", "description", "entrypoint")
+_PLUGIN_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 
 
 @dataclass(frozen=True)
@@ -35,8 +37,9 @@ class PluginManifest:
         if missing:
             raise ConfigurationError(f"missing required plugin field: {', '.join(missing)}")
         dependencies = plugin.get("dependencies") or {}
+        plugin_id = validate_plugin_id(str(plugin["id"]))
         return cls(
-            id=str(plugin["id"]),
+            id=plugin_id,
             name=str(plugin["name"]),
             version=str(plugin["version"]),
             description=str(plugin["description"]),
@@ -51,4 +54,19 @@ class PluginManifest:
         return asdict(self)
 
 
-__all__ = ["PluginManifest"]
+def validate_plugin_id(plugin_id: str) -> str:
+    """Return a path-safe plugin id or raise a configuration error."""
+    value = str(plugin_id).strip()
+    if (
+        not value
+        or not _PLUGIN_ID_RE.fullmatch(value)
+        or ".." in value
+        or "/" in value
+        or "\\" in value
+        or ":" in value
+    ):
+        raise ConfigurationError(f"unsafe plugin id: {plugin_id}")
+    return value
+
+
+__all__ = ["PluginManifest", "validate_plugin_id"]

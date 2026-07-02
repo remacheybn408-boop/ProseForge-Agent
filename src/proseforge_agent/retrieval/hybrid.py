@@ -7,7 +7,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from .embeddings import EmbeddingProvider, FakeEmbeddingProvider
-from .vector_store import JsonlVectorStore, VectorStore
+from .vector_store import InMemoryVectorStore, VectorStore
 
 
 @dataclass(frozen=True)
@@ -62,7 +62,7 @@ class HybridRetriever:
     ) -> None:
         self.documents = list(documents)
         self.embedding_provider = embedding_provider or FakeEmbeddingProvider()
-        self.vector_store = vector_store or JsonlVectorStore(Path(":memory-vector-store.jsonl"))
+        self.vector_store = vector_store or InMemoryVectorStore()
         for document in self.documents:
             self.vector_store.upsert(
                 document.id,
@@ -119,14 +119,23 @@ def load_rag_documents(path: str | Path) -> list[RagDocument]:
         return []
     documents: list[RagDocument] = []
     for line in file_path.read_text(encoding="utf-8-sig").splitlines():
-        if line.strip():
-            documents.append(RagDocument.from_dict(json.loads(line)))
+        if not line.strip():
+            continue
+        try:
+            payload = json.loads(line)
+            documents.append(RagDocument.from_dict(payload))
+        except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+            continue
     return documents
 
 
 def _keyword_score(query: str, text: str, metadata: dict) -> float:
     haystack = " ".join([text, *[str(value) for value in metadata.values()]]).casefold()
-    return float(sum(1 for term in query.casefold().split() if term and term in haystack))
+    terms = {term for term in query.casefold().split() if term}
+    if not terms:
+        return 0.0
+    matches = sum(1 for term in terms if term in haystack)
+    return matches / len(terms)
 
 
 __all__ = ["HybridRetriever", "HybridSearchResult", "RagDocument", "load_rag_documents"]

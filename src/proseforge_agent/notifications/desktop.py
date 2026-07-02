@@ -35,16 +35,21 @@ class DesktopNotificationChannel:
         if self.platform.startswith("linux"):
             return ["notify-send", event.title, event.message]
         if self.platform.startswith("darwin") or self.platform.startswith("mac"):
-            script = f'display notification "{_escape(event.message)}" with title "{_escape(event.title)}"'
+            script = f"display notification {_applescript_quote(event.message)} with title {_applescript_quote(event.title)}"
             return ["osascript", "-e", script]
         if self.platform.startswith("win"):
-            script = f'New-BurntToastNotification -Text "{_escape(event.title)}", "{_escape(event.message)}"'
+            script = f"New-BurntToastNotification -Text {_powershell_quote(event.title)}, {_powershell_quote(event.message)}"
             return ["powershell", "-NoProfile", "-Command", script]
         return None
 
 
-def _escape(value: str) -> str:
-    return value.replace('"', '\\"')
+def _powershell_quote(value: str) -> str:
+    return "'" + value.replace("'", "''") + "'"
+
+
+def _applescript_quote(value: str) -> str:
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
 
 
 __all__ = ["DesktopNotificationChannel"]

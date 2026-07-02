@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from proseforge_agent.agent.events import BackgroundJobRunner, EventBus
+from proseforge_agent.agent.events import BackgroundJobRunner, EventBus, redact_sensitive
 from proseforge_agent.cli import main
 
 
@@ -63,6 +63,20 @@ def test_background_job_runner_rejects_unknown_job(tmp_path):
 def test_events_fixture_is_redacted_jsonl():
     rows = [json.loads(line) for line in FIXTURE.read_text(encoding="utf-8").splitlines()]
     assert rows[0]["payload"]["api_key"] == "[redacted]"
+
+
+def test_redact_sensitive_covers_common_token_variants():
+    payload = {
+        "access_token": "a" * 40,
+        "refresh_token": "b" * 40,
+        "message": "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMifQ.signature x-api-key: sk-secret",
+    }
+    serialized = json.dumps(redact_sensitive(payload), ensure_ascii=False)
+
+    assert "a" * 40 not in serialized
+    assert "b" * 40 not in serialized
+    assert "eyJhbGci" not in serialized
+    assert "sk-secret" not in serialized
 
 
 def test_jobs_run_cli_dry_run(capsys):

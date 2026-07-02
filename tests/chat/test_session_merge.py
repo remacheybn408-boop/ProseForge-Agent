@@ -45,6 +45,23 @@ def test_session_merge_can_select_message_steps(tmp_path):
     assert [message.content for message in store.load_context(target.id).messages] == ["base", "first branch"]
 
 
+def test_session_merge_is_idempotent_and_skips_hidden_branch_messages(tmp_path):
+    store = ChatSessionStore(tmp_path)
+    target = store.create(mode="general_chat", session_id="session_001")
+    store.append_message(target.id, "user", "base")
+    branch = store.branch(target.id, from_step=1, name="alt")
+    store.append_message(branch.id, "assistant", "keep me", provider_metadata={"approved": True})
+    store.append_message(branch.id, "assistant", "hide me", provider_metadata={"approved": True})
+    store.rewind(branch.id, steps=1, reason="bad branch")
+
+    first = store.merge(branch.id, into_id=target.id, only_approved=True)
+    second = store.merge(branch.id, into_id=target.id, only_approved=True)
+
+    assert first.merged_steps == [2]
+    assert second.merged_count == 0
+    assert [message.content for message in store.load_context(target.id).messages] == ["base", "keep me"]
+
+
 def test_session_merge_cli(capsys, tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     store = ChatSessionStore(".pf-agent")
