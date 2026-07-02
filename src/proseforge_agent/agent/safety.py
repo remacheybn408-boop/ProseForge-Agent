@@ -53,8 +53,10 @@ _TOOL_INVOCATION_PATTERNS: tuple[re.Pattern, ...] = (
     # imperative verb + dotted tool name, e.g. "execute workflow.start"
     re.compile(r"\b(run|execute|invoke|call|trigger|start)\s+[a-z_]+\.[a-z_]+", re.I),
     re.compile(r"(执行|运行|调用|启动|触发)\s*[a-z_]+\.[a-z_]+", re.I),
-    # imperative verb + dotted tool name where the verb precedes in Chinese with no space
-    re.compile(r"(现在)?(执行|运行|调用|启动)"),
+    # NOTE: a bare "(现在)?(执行|运行|调用|启动)" pattern was removed here — it
+    # matched ordinary novel prose ("主角执行了命令", "计划启动了") and forced
+    # untrusted content down to read_only. The dotted-tool-token pattern above
+    # already catches real invocations. See finding 1.2 / core-review-2026-07-01.
     re.compile(r"\baccept\s+all\s+chapters?\b", re.I),
     re.compile(r"接受所有章节"),
     re.compile(r"\b(workflow\.start|chapter\.accept|draft\.note)\b", re.I),
