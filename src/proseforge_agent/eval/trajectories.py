@@ -117,12 +117,19 @@ class TrajectoryDatasetExporter:
 
 def _redact_with_text(payload: dict[str, Any], text_fields: set[str]) -> dict[str, Any]:
     redacted = _redact(payload)
-    if not isinstance(redacted, dict):
-        return redacted
-    for field_name in text_fields:
-        if field_name in redacted:
-            redacted[field_name] = "[redacted]"
-    return redacted
+    return _mask_text_fields(redacted, text_fields)
+
+
+def _mask_text_fields(value: Any, text_fields: set[str]) -> Any:
+    """Replace `text_fields` matches at every depth (finding 3.2)."""
+    if isinstance(value, dict):
+        return {
+            key: "[redacted]" if key in text_fields else _mask_text_fields(item, text_fields)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_mask_text_fields(item, text_fields) for item in value]
+    return value
 
 
 __all__ = [

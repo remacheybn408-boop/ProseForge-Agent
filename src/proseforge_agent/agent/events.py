@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
@@ -11,7 +12,31 @@ from typing import Any
 from uuid import uuid4
 
 
-_SENSITIVE_KEY_PARTS = ("api_key", "token", "secret", "password", "authorization")
+# Canonical secret-redaction primitives for the whole codebase. `_redact` is the
+# single source of truth (mcp/credentials.redact_sensitive delegates here) so
+# every observability / trajectory / event-bus export scans BOTH keys and
+# string VALUES. See findings 1.8 / 3.1 in core-review-2026-07-01.md.
+_SENSITIVE_KEY_PARTS = (
+    "api_key",
+    "apikey",
+    "token",
+    "secret",
+    "password",
+    "authorization",
+    "bearer",
+    "cookie",
+    "credential",
+    "private_key",
+)
+_ASSIGNMENT_RE = re.compile(r"(?i)\b(api[_-]?key|token|secret|password|authorization)=\S+")
+_BEARER_RE = re.compile(r"(?i)\b(bearer)\s+[A-Za-z0-9._~+/=-]+")
+_SECRET_TOKEN_RE = re.compile(r"\b(?:sk|tok)-[A-Za-z0-9_-]+")
+
+
+def _redact_text(text: str) -> str:
+    text = _ASSIGNMENT_RE.sub(lambda match: f"{match.group(1)}=[redacted]", text)
+    text = _BEARER_RE.sub(lambda match: f"{match.group(1)} [redacted]", text)
+    return _SECRET_TOKEN_RE.sub("[redacted]", text)
 
 
 @dataclass(frozen=True)
@@ -156,6 +181,8 @@ def _redact(value: Any) -> Any:
         return redacted
     if isinstance(value, list):
         return [_redact(item) for item in value]
+    if isinstance(value, str):
+        return _redact_text(value)
     return value
 
 
