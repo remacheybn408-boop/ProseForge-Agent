@@ -47,9 +47,9 @@ def test_mobile_email_adapters_normalize_events():
 
 def test_mobile_email_send_redacts_addresses_and_tokens():
     adapters = [
-        WhatsAppGatewayAdapter(api_key="wa-secret"),
-        SignalGatewayAdapter(api_key="sig-secret"),
-        EmailGatewayAdapter(api_key="mail-secret"),
+        WhatsAppGatewayAdapter(api_key="wa-secret", allow_fake_transport=True),
+        SignalGatewayAdapter(api_key="sig-secret", allow_fake_transport=True),
+        EmailGatewayAdapter(api_key="mail-secret", allow_fake_transport=True),
     ]
 
     for adapter in adapters:

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from .base import AdapterCapabilities, OutboundMessage, SendResult
+from .base import AdapterCapabilities, OutboundMessage, SendResult, fake_transport_refusal
 
 
 @dataclass(frozen=True)
@@ -21,8 +21,9 @@ class GatewayAdapterCheck:
 class OptionalGatewayAdapter:
     platform = "optional"
 
-    def __init__(self, *, api_key: str = "", max_message_size: int = 4000) -> None:
+    def __init__(self, *, api_key: str = "", max_message_size: int = 4000, allow_fake_transport: bool = False) -> None:
         self.api_key = api_key
+        self.allow_fake_transport = allow_fake_transport
         self.capabilities = AdapterCapabilities(
             threads=True,
             edits=False,
@@ -32,6 +33,9 @@ class OptionalGatewayAdapter:
         )
 
     def send(self, message: OutboundMessage) -> SendResult:
+        refusal = fake_transport_refusal(self.platform, self.allow_fake_transport)
+        if refusal is not None:
+            return refusal
         if len(message.text) > self.capabilities.max_message_size:
             return SendResult(delivered=False, retryable=True, reason="message exceeds adapter limit")
         return SendResult(

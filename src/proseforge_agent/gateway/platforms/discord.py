@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Iterable
 
 from ..core import MessageEvent
-from .base import AdapterCapabilities, OutboundMessage, SendResult
+from .base import AdapterCapabilities, OutboundMessage, SendResult, fake_transport_refusal
 
 
 @dataclass(frozen=True)
@@ -22,8 +22,9 @@ class DiscordCheckResult:
 class DiscordGatewayAdapter:
     platform = "discord"
 
-    def __init__(self, *, token: str = "", max_message_size: int = 2000) -> None:
+    def __init__(self, *, token: str = "", max_message_size: int = 2000, allow_fake_transport: bool = False) -> None:
         self.token = token
+        self.allow_fake_transport = allow_fake_transport
         self.capabilities = AdapterCapabilities(
             threads=True,
             edits=True,
@@ -50,6 +51,9 @@ class DiscordGatewayAdapter:
         )
 
     def send(self, message: OutboundMessage) -> SendResult:
+        refusal = fake_transport_refusal(self.platform, self.allow_fake_transport)
+        if refusal is not None:
+            return refusal
         if len(message.text) > self.capabilities.max_message_size:
             return SendResult(delivered=False, retryable=True, reason="discord rate/size limit requires retry or chunking")
         return SendResult(
@@ -60,6 +64,9 @@ class DiscordGatewayAdapter:
         )
 
     def edit(self, message: OutboundMessage) -> SendResult:
+        refusal = fake_transport_refusal(self.platform, self.allow_fake_transport)
+        if refusal is not None:
+            return refusal
         return SendResult(delivered=bool(message.message_id), message_ids=[message.message_id] if message.message_id else [], reason="" if message.message_id else "message_id is required")
 
     def ack(self, event: MessageEvent) -> SendResult:
