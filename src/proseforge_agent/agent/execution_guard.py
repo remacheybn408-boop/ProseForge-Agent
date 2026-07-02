@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import threading
 import time
 from collections import defaultdict, deque
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from typing import Any
+
+
+class _GuardTimeout(Exception):
+    """Raised internally when a guarded call exceeds its wall-clock timeout."""
 
 
 @dataclass(frozen=True)
@@ -46,10 +51,13 @@ class ExecutionGuard:
         *,
         time_fn: Callable[[], float] | None = None,
         sleep_fn: Callable[[float], None] | None = None,
+        timeout_runner: Callable[[Callable[[], Any], float], Any] | None = None,
     ) -> None:
         self.policy = policy or ExecutionPolicy()
         self._time = time_fn or time.monotonic
         self._sleep = sleep_fn or time.sleep
+        # Seam so callers/tests can substitute the enforcing-timeout mechanism.
+        self._timeout_runner = timeout_runner or _thread_timeout_runner
         self._rate_events: dict[str, deque[float]] = defaultdict(deque)
         self._failures: dict[str, int] = defaultdict(int)
         self._opened_at: dict[str, float] = {}
@@ -74,7 +82,26 @@ class ExecutionGuard:
             attempts += 1
             start = self._time()
             try:
-                output = func()
+                # Enforcing timeout: a blocked/hung func is abandoned at the
+                # deadline so it cannot hang the runtime (finding 1.1). The
+                # orphaned worker runs on a daemon thread and dies with the
+                # process — it cannot be force-killed (documented limitation).
+                output = self._timeout_runner(func, self.policy.timeout_seconds)
+            except _GuardTimeout:
+                last_error = f"timeout after {self.policy.timeout_seconds:.3f}s"
+                elapsed = self._time() - start
+                if attempts < max_attempts:
+                    self._sleep(self.policy.backoff_seconds)
+                    continue
+                self._record_failure(key)
+                return ExecutionGuardResult(
+                    ok=False,
+                    status="timeout",
+                    error=last_error,
+                    attempts=attempts,
+                    elapsed_seconds=elapsed,
+                    recovery="increase timeout or narrow the call",
+                )
             except Exception as exc:  # noqa: BLE001 - guard returns structured errors
                 last_error = str(exc)
                 elapsed = self._time() - start
@@ -157,6 +184,36 @@ class ExecutionGuard:
     def _record_success(self, key: str) -> None:
         self._failures[key] = 0
         self._opened_at.pop(key, None)
+
+
+def _thread_timeout_runner(func: Callable[[], Any], timeout: float) -> Any:
+    """Run ``func`` on a daemon thread; raise :class:`_GuardTimeout` at deadline.
+
+    A daemon thread is used so an abandoned (hung) call cannot block interpreter
+    exit. The worker keeps running until it finishes on its own, but control
+    returns to the caller at the timeout. Timeouts <= 0 mean "no enforced
+    deadline" and run synchronously (preserves fake-clock timeout tests).
+    """
+    if timeout is None or timeout <= 0:
+        return func()
+
+    box: dict[str, Any] = {}
+    done = threading.Event()
+
+    def worker() -> None:
+        try:
+            box["value"] = func()
+        except BaseException as exc:  # noqa: BLE001 - re-raised in the caller thread
+            box["error"] = exc
+        finally:
+            done.set()
+
+    threading.Thread(target=worker, daemon=True).start()
+    if not done.wait(timeout):
+        raise _GuardTimeout(f"timeout after {timeout:.3f}s")
+    if "error" in box:
+        raise box["error"]
+    return box.get("value")
 
 
 __all__ = ["ExecutionGuard", "ExecutionGuardResult", "ExecutionPolicy"]
