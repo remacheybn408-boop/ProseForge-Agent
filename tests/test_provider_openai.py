@@ -29,6 +29,18 @@ def _request(content="one line"):
     return ProviderRequest(role="drafter", messages=[Message(role="user", content=content)])
 
 
+class CountingStreamTransport(FakeHttpTransport):
+    def __init__(self, stream_lines: list[str]):
+        super().__init__(stream_lines=stream_lines)
+        self.consumed = 0
+
+    def post_json_stream(self, request):
+        self.requests.append(request)
+        for line in self.stream_lines:
+            self.consumed += 1
+            yield line
+
+
 @pytest.fixture
 def fake_http():
     return FakeHttpTransport(responses=[HttpResponse(status_code=200, text=SUCCESS)])
@@ -43,6 +55,26 @@ def test_openai_request_shape_uses_profile_config(fake_http, monkeypatch):
     )
     assert fake_http.requests[0].json["model"] == profile.model
     assert "test-key" not in repr(fake_http.requests[0])
+
+
+def test_openai_request_forwards_tools(fake_http):
+    tool = {
+        "type": "function",
+        "function": {
+            "name": "lookup",
+            "description": "Lookup canon",
+            "parameters": {"type": "object", "properties": {"query": {"type": "string"}}},
+        },
+    }
+    provider = build_provider(_profile(), http=fake_http)
+    provider.generate(
+        ProviderRequest(
+            role="drafter",
+            messages=[Message(role="user", content="one line")],
+            tools=[tool],
+        )
+    )
+    assert fake_http.requests[0].json["tools"] == [tool]
 
 
 def test_openai_parses_success_response_into_provider_result(fake_http):
@@ -74,6 +106,21 @@ def test_openai_parses_stream_events_into_normalized_chunks():
     chunks = list(build_provider(_profile(), http=http).generate_stream(_request()))
     assert "".join(c.text for c in chunks) == "Hello from OpenAI"
     assert chunks[-1].done is True
+
+
+def test_openai_stream_yields_before_transport_is_exhausted():
+    lines = [
+        'data: {"choices":[{"delta":{"content":"Hello"}}]}',
+        'data: {"choices":[{"delta":{"content":" world"}}]}',
+        "data: [DONE]",
+    ]
+    http = CountingStreamTransport(lines)
+    stream = build_provider(_profile(), http=http).generate_stream(_request())
+
+    first = next(stream)
+
+    assert first.text == "Hello"
+    assert http.consumed == 1
 
 
 def test_openai_maps_auth_rate_limit_timeout_and_invalid_response_errors():

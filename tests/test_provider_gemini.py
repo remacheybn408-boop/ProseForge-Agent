@@ -29,6 +29,18 @@ def _request(content="one line"):
     return ProviderRequest(role="drafter", messages=[Message(role="user", content=content)])
 
 
+class CountingStreamTransport(FakeHttpTransport):
+    def __init__(self, stream_lines: list[str]):
+        super().__init__(stream_lines=stream_lines)
+        self.consumed = 0
+
+    def post_json_stream(self, request):
+        self.requests.append(request)
+        for line in self.stream_lines:
+            self.consumed += 1
+            yield line
+
+
 @pytest.fixture
 def fake_http():
     return FakeHttpTransport(responses=[HttpResponse(status_code=200, text=SUCCESS)])
@@ -55,11 +67,55 @@ def test_gemini_parses_success_response_into_provider_result(fake_http):
     assert candidate["safetyRatings"]
 
 
+def test_gemini_native_request_converts_function_declarations(fake_http):
+    tool = {
+        "function_declarations": [
+            {
+                "name": "lookup",
+                "description": "Lookup canon",
+                "parameters": {"type": "object", "properties": {"query": {"type": "string"}}},
+            }
+        ]
+    }
+    build_provider(_profile(), http=fake_http).generate(
+        ProviderRequest(role="drafter", messages=[Message(role="user", content="one line")], tools=[tool])
+    )
+    assert fake_http.requests[0].json["tools"] == [
+        {
+            "functionDeclarations": [
+                {
+                    "name": "lookup",
+                    "description": "Lookup canon",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"query": {"type": "string"}},
+                    },
+                }
+            ]
+        }
+    ]
+
+
 def test_gemini_parses_stream_events_into_normalized_chunks():
     http = FakeHttpTransport(stream_lines=STREAM)
     chunks = list(build_provider(_profile(), http=http).generate_stream(_request()))
     assert "".join(c.text for c in chunks) == "Hello from Gemini"
     assert chunks[-1].done is True
+
+
+def test_gemini_stream_yields_before_transport_is_exhausted():
+    lines = [
+        'data: {"candidates":[{"content":{"parts":[{"text":"Hello"}]}}]}',
+        'data: {"candidates":[{"content":{"parts":[{"text":" Gemini"}]}}]}',
+        "data: [DONE]",
+    ]
+    http = CountingStreamTransport(lines)
+    stream = build_provider(_profile(), http=http).generate_stream(_request())
+
+    first = next(stream)
+
+    assert first.text == "Hello"
+    assert http.consumed == 1
 
 
 def test_gemini_maps_auth_rate_limit_timeout_and_invalid_response_errors():
@@ -122,6 +178,27 @@ def test_gemini_openai_profile_parses_chat_completion(monkeypatch):
     assert result.usage.total_tokens == 10
     assert "test-key" not in repr(http.requests[0])
     assert http.requests[0].url.endswith("/chat/completions")
+
+
+def test_gemini_openai_profile_forwards_tools(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    payload = json.dumps(
+        {
+            "model": "gemini-2.0-flash",
+            "choices": [{"message": {"role": "assistant", "content": "Bridge reply."}}],
+            "usage": {"prompt_tokens": 4, "completion_tokens": 6},
+        }
+    )
+    http = FakeHttpTransport(responses=[HttpResponse(status_code=200, text=payload)])
+    tool = {
+        "type": "function",
+        "function": {"name": "lookup", "description": "Lookup", "parameters": {"type": "object"}},
+    }
+    provider = build_provider(_profile("gemini_openai"), http=http)
+    provider.generate(
+        ProviderRequest(role="drafter", messages=[Message(role="user", content="one line")], tools=[tool])
+    )
+    assert http.requests[0].json["tools"] == [tool]
 
 
 def test_registry_resolves_gemini_aliases(fake_http):

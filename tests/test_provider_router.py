@@ -2,6 +2,7 @@ from pathlib import Path
 
 import yaml
 
+from proseforge_agent.llm.policies import is_retryable_error
 from proseforge_agent.llm.router import ProviderRouter, RouteDecision
 
 
@@ -66,6 +67,18 @@ def test_retryable_error_falls_back_to_next_candidate(monkeypatch):
         failed_provider="cloud_writer",
         error_kind="timeout",
     )
+    assert decision.selected.name == "domestic_writer"
+    assert any(skip.provider == "cloud_writer" and skip.reason == "retryable_failure" for skip in decision.skipped)
+
+
+def test_invalid_response_error_falls_back_to_next_candidate(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "present")
+    decision = ProviderRouter(_route_matrix()).fallback_after(
+        role="drafter",
+        failed_provider="cloud_writer",
+        error_kind="invalid_response",
+    )
+    assert is_retryable_error("invalid_response") is True
     assert decision.selected.name == "domestic_writer"
     assert any(skip.provider == "cloud_writer" and skip.reason == "retryable_failure" for skip in decision.skipped)
 

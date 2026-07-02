@@ -45,6 +45,17 @@ def test_qwen_request_shape_uses_profile_config(fake_http, monkeypatch):
     assert "test-key" not in repr(fake_http.requests[0])
 
 
+def test_qwen_request_forwards_tools(fake_http):
+    tool = {
+        "type": "function",
+        "function": {"name": "lookup", "description": "Lookup", "parameters": {"type": "object"}},
+    }
+    build_provider(_profile(), http=fake_http).generate(
+        ProviderRequest(role="drafter", messages=[Message(role="user", content="one line")], tools=[tool])
+    )
+    assert fake_http.requests[0].json["tools"] == [tool]
+
+
 def test_qwen_parses_success_response_into_provider_result(fake_http):
     result = build_provider(_profile(), http=fake_http).generate(_request())
     assert result.text == "A single quiet line."

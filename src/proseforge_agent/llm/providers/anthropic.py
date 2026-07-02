@@ -18,6 +18,7 @@ from ...errors import ProviderError
 from ..base import Message, ProviderRequest, ProviderResult, StreamChunk, Usage
 from ..http import HttpRequest, HttpTimeout, HttpTransport, UrllibTransport
 from ..profiles import ProviderProfile
+from ._openai_shape import anthropic_tools, stream_anthropic_sse_lines
 
 ANTHROPIC_ALIASES: tuple[str, ...] = ("anthropic", "claude")
 CERT_LEVELS: tuple[str, ...] = (
@@ -92,6 +93,8 @@ class AnthropicProvider:
             "messages": [{"role": m.role, "content": m.content} for m in request.messages],
             "temperature": request.temperature,
         }
+        if request.tools:
+            body["tools"] = anthropic_tools(request.tools)
         if stream:
             body["stream"] = True
         return body
@@ -134,31 +137,10 @@ class AnthropicProvider:
 
     def generate_stream(self, request: ProviderRequest) -> Iterator[StreamChunk]:
         try:
-            lines = list(self._http.post_json_stream(self._http_request(request, stream=True)))
+            lines = self._http.post_json_stream(self._http_request(request, stream=True))
+            yield from stream_anthropic_sse_lines(lines, provider_name=self.name)
         except HttpTimeout as exc:
             raise _provider_error(f"provider {self.name!r} timed out", "timeout") from exc
-
-        deltas: list[str] = []
-        for line in lines:
-            if not line.startswith("data:"):
-                continue
-            data = line[len("data:") :].strip()
-            try:
-                obj = json.loads(data)
-            except json.JSONDecodeError as exc:
-                raise _provider_error(
-                    f"provider {self.name!r} returned an unparseable stream chunk",
-                    "invalid_response",
-                ) from exc
-            if obj.get("type") == "message_stop":
-                break
-            if obj.get("type") == "content_block_delta":
-                delta = obj.get("delta", {})
-                if delta.get("type") == "text_delta" and delta.get("text"):
-                    deltas.append(delta["text"])
-
-        for index, piece in enumerate(deltas):
-            yield StreamChunk(text=piece, done=index == len(deltas) - 1)
 
     # -- normalization ---------------------------------------------------
 
