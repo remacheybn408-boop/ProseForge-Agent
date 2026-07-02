@@ -435,6 +435,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--version", action="version", version=f"%(prog)s {__version__}"
     )
     parser.add_argument("--offline", action="store_true", help="disable remote/network-dependent actions")
+    parser.add_argument(
+        "--no-default",
+        action="store_true",
+        help="with no command, print help instead of launching the default chat REPL",
+    )
 
     shared = _output_parser()
     subparsers = parser.add_subparsers(dest="command", metavar="<group>")
@@ -6254,6 +6259,32 @@ def _dispatch(args: argparse.Namespace) -> int:
     return _handle_planned(args.command)(args)
 
 
+def _dispatch_bare_command(args: argparse.Namespace) -> int:
+    """Dispatch bare ``pf-agent`` (no subcommand).
+
+    When the workspace is already configured, launch the interactive chat
+    REPL. Otherwise route to first-run guidance. Any runtime failure is
+    reported as a one-line message, never a Python traceback.
+    """
+    try:
+        from .setup.first_run import FirstRunBootstrap
+
+        verdict = FirstRunBootstrap(Path(".pf-agent")).check()
+        if not verdict.ready:
+            print(verdict.guidance)
+            return 2
+
+        from .chat import repl as chat_repl
+
+        return chat_repl.run_repl(provider="fake")
+    except ProseForgeAgentError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    except Exception as exc:  # noqa: BLE001 - never leak a traceback to the terminal
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+
+
 def main(argv: list[str] | None = None) -> int:
     """Run the CLI, returning a process exit code.
 
@@ -6268,8 +6299,10 @@ def main(argv: list[str] | None = None) -> int:
         return int(exc.code or 0)
 
     if not getattr(args, "command", None):
-        parser.print_help()
-        return 0
+        if getattr(args, "no_default", False):
+            parser.print_help()
+            return 0
+        return _dispatch_bare_command(args)
 
     try:
         return _dispatch(args)
