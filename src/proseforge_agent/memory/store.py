@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from contextlib import nullcontext
+import threading
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -58,17 +59,30 @@ class MemoryStore:
     """SQLite-backed memory store."""
 
     def __init__(self, db_path: str | Path) -> None:
-        self._conn = sqlite3.connect(str(db_path))
+        # check_same_thread=False lets background jobs, the chat REPL, and the
+        # local API share this store; writers are serialized by the FileLock
+        # below plus busy_timeout (finding 2.1).
+        self._conn = sqlite3.connect(str(db_path), check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA foreign_keys = ON")
         # Wait out transient contention at the SQLite layer; serialize file-level
         # writers with an advisory lock alongside the db file.
         self._conn.execute("PRAGMA busy_timeout = 5000")
         self._lock = None if str(db_path) == ":memory:" else FileLock(str(db_path) + ".lock")
+        # In-process serialization: the shared connection and the per-instance
+        # FileLock (which is reentrant per instance) do not serialize threads on
+        # their own, so guard writes with a thread lock too (finding 2.1).
+        self._thread_lock = threading.RLock()
         self.initialize()
 
+    @contextmanager
     def _write_lock(self):
-        return self._lock if self._lock is not None else nullcontext()
+        with self._thread_lock:
+            if self._lock is not None:
+                with self._lock:
+                    yield
+            else:
+                yield
 
     def initialize(self) -> None:
         apply_schema(self._conn)
