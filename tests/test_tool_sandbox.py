@@ -35,7 +35,9 @@ def test_command_requires_approval_and_runs_confined(tmp_path):
     sandbox = Sandbox(permissions="read_only", safety=FakeSafety(), workspace_root=tmp_path)
     denied = sandbox.run(ExecRequest(argv=["echo", "hi"], cwd="."), approval=None)
     assert denied.ok is False
-    assert denied.error == "approval required"
+    # read_only session vs engine_write command: the ceiling gate fires first
+    # (finding 1.3 splits this from a missing-approval denial).
+    assert denied.error == "insufficient_permission"
 
     sandbox2 = Sandbox(permissions="system_write", safety=FakeSafety(), workspace_root=tmp_path)
     ok = sandbox2.run(

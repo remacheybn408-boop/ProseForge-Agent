@@ -7,6 +7,8 @@ Only the boundaries that exist today are defined here. Memory and retrieval
 error types are introduced by the tasks that add those subsystems.
 """
 
+from __future__ import annotations
+
 
 class ProseForgeAgentError(Exception):
     """Base class for all ProseForge Agent errors."""

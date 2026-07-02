@@ -130,7 +130,7 @@ class PyPIPublisher:
 
         if dry_run:
             steps.append(f"build: dry_run -> {' '.join(plan.build_command)}")
-            steps.append(f"upload: dry_run -> {_redact_argv(plan.upload_command)}")
+            steps.append(f"upload: dry_run -> {_format_argv(plan.upload_command)}")
             summary = f"dry_run publish plan for {repository} @ {version}"
             print(f"[publish] {summary}")
             return PublishReport(
@@ -215,7 +215,9 @@ def _redact_env(env: dict[str, str]) -> dict[str, str]:
     return redacted
 
 
-def _redact_argv(argv: list[str]) -> str:
+def _format_argv(argv: list[str]) -> str:
+    # Renamed from _redact_argv: it does not redact — secrets never reach argv
+    # (they travel via runner.env). Kept as a plain formatter (finding 3.4).
     return " ".join(argv)
 
 

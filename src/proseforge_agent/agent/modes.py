@@ -1,5 +1,7 @@
 """Conversation mode and intent vocabularies."""
 
+from __future__ import annotations
+
 CONVERSATION_MODES: tuple[str, ...] = (
     "general_chat",
     "project_chat",
