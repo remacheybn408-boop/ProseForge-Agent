@@ -876,6 +876,7 @@ def build_parser() -> argparse.ArgumentParser:
             group.add_argument("--native", action="store_true", help="initialize native app directories")
             group.add_argument("--proseforge-root", default="${PROSEFORGE_ROOT}", help="ProseForge engine root")
             group.add_argument("--non-interactive", action="store_true", help="run without prompts")
+            group.add_argument("--config", action="store_true", help="write an annotated example config seed instead of running first-run")
         if name == "doctor":
             group.add_argument("--section", default=None, help="diagnostic section to run")
         if name == "completions":
@@ -5290,6 +5291,9 @@ def _handle_setup(args: argparse.Namespace) -> int:
 
 
 def _handle_init(args: argparse.Namespace) -> int:
+    if getattr(args, "config", False):
+        return _handle_init_config(args)
+
     from .install.first_run import FirstRunWizard
 
     result = FirstRunWizard(Path(".pf-agent")).run(
@@ -5324,6 +5328,33 @@ def _handle_init(args: argparse.Namespace) -> int:
             "mode": result.mode,
             "status": result.status,
         },
+    )
+    return _emit(report, args.format)
+
+
+def _handle_init_config(args: argparse.Namespace) -> int:
+    from .setup.config_generator import example_config_text, known_config_keys
+
+    text = example_config_text()
+    out_path = Path(args.out) if getattr(args, "out", None) else Path(".pf-agent") / "config.yaml"
+    if not args.dry_run:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(text, encoding="utf-8", newline="\n")
+    report = Report(
+        title="Config Seed",
+        status="ok",
+        next_action="Edit the seed, then run `pf-agent setup` to finish onboarding",
+        sections=[
+            ReportSection(
+                "Seed",
+                [
+                    f"path={out_path}",
+                    f"dry_run={args.dry_run}",
+                    f"known_keys={len(known_config_keys())}",
+                ],
+            )
+        ],
+        data={"config_path": str(out_path), "known_keys": list(known_config_keys())},
     )
     return _emit(report, args.format)
 

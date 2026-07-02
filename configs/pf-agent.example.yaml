@@ -1,0 +1,48 @@
+# ProseForge Agent — example configuration (Task 195).
+# Copy to `.pf-agent/config.yaml` (or generate with `pf-agent init --config`)
+# and edit. Secrets are NOT stored here: providers reference a key by name via
+# `api_key_ref`, resolved from the environment (.env) or the OS keyring.
+
+setup:
+  # Whether guided setup finished. `pf-agent setup` flips this to true.
+  completed: false
+  # Onboarding depth: minimal | standard | full.
+  mode: minimal
+
+agent:
+  # Named behavior profile.
+  profile: default
+  # UI / drafting language (e.g. zh-CN, en-US).
+  language: zh-CN
+  # System-prompt template id from the prompt registry.
+  system_prompt_template: professional_novel_editor
+
+llm:
+  # Provider used by default when a command does not name one.
+  default_provider: fake
+  # Provider used when the primary is unavailable (keep offline-safe).
+  fallback_provider: fake
+  # Provider registry. `fake` is deterministic and needs no key.
+  providers:
+    fake:
+      enabled: true
+      configured: true
+      kind: fake
+      model: fake
+      status: ok
+    openai:
+      enabled: false
+      configured: false
+      kind: llm
+      model: gpt-4o-mini
+      status: unconfigured
+      # Name of the env var / keyring entry holding the key (never the key).
+      api_key_ref: OPENAI_API_KEY
+
+paths:
+  # Portable workspace root the agent owns.
+  workspace_root: .pf-agent
+
+engine:
+  # Enable the authoritative ProseForge engine boundary ($PROSEFORGE_ROOT).
+  enabled: false
