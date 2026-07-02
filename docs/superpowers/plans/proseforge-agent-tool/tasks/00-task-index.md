@@ -308,6 +308,25 @@ into the same early bootstrap.
 194. [Community And Agent Docs / 社区与代理文档](194-community-and-agent-docs.md) — `CONTRIBUTING.md`, `SECURITY.md`, `AGENTS.md`, and a `docs/security/threat-model.md`; required-section tests block regressions.
 195. [CLI Config YAML Example Seed / CLI 配置样板](195-cli-config-yaml-example-seed.md) — master `configs/pf-agent.example.yaml` covering every knob; `pf-agent init --config` copies it to the resolved config path with env-var substitution; golden test enforces coverage.
 
+## Hotfix Cards From 2026-07-01 Core Review (196–203)
+
+These cards fix the Critical/High findings from the core code review
+(`docs/review/core-review-2026-07-01.md`). Each card maps to numbered findings
+and is independently reviewable; the highest-value trio is **196 → 197 → 198**
+(they close the biggest architectural/security gaps), after which 199–203 touch
+independent modules and may proceed in any order. Card 203 also lists the
+deferred low-severity findings (1.3, 2.3, 2.4, 3.4, 7.1) and the un-reviewed
+subsystems that are intentionally NOT carded in this batch.
+
+196. [Wire The Middleware Chain / 中间件链接线](196-wire-middleware-chain.md) — finding **1.5**: the `MiddlewareRegistry` has zero callers; wire `apply_tool_request/execution` (and `apply_llm_*`) into dispatch and re-authorize rewritten requests. Prerequisite gate for 1.7.
+197. [Enforce MCP Policy In Client / MCP 客户端强制策略](197-enforce-mcp-policy-in-client.md) — finding **1.6**: `MCPClient.call_tool` never consults `MCPPolicy`; add optional `policy` + `approval_gate` and block denied tools before the transport runs.
+198. [Unify Redaction + Nested Trajectory / 统一脱敏](198-unify-redaction-and-nested-trajectory.md) — findings **1.8 / 3.1 / 3.2**: `events._redact` ignores string values; unify on the string-scanning redactor, expand sensitive keys, and recurse trajectory `text_fields`.
+199. [Harden fs.edit + ToolRegistry / 加固工具层](199-harden-fs-edit-and-tool-registry.md) — findings **1.7 / 1.9**: reject empty `old` in `_fs_edit`; make `ToolRegistry.invoke` refuse disabled stub tools. Land after 196.
+200. [ExecutionGuard Real Timeout / 执行护栏真实超时](200-execution-guard-real-timeout.md) — finding **1.1**: the guard measures elapsed time after `func` returns; enforce the timeout via `ThreadPoolExecutor.submit().result(timeout=…)`.
+201. [Store Concurrency + Idempotency Atomicity / 存储并发与幂等](201-store-concurrency-and-idempotency-atomicity.md) — findings **2.1 / 2.2**: `MemoryStore` crashes cross-thread; `IdempotencyStore` has a lost-update race. Fix via `check_same_thread=False` + `FileLock` and atomic `os.replace`.
+202. [Loud Placeholders + Doctor Wiring / 占位传输显式化](202-loud-placeholders-and-doctor-wiring.md) — findings **4.1 / 4.2 / 4.3** (and 5.2): placeholder MCP/gateway/execution transports silently "succeed"; make them refuse and add `pf-agent doctor --section wiring`.
+203. [InjectionGuard CJK Regex Precision / 注入护栏中文正则](203-injection-guard-cjk-regex-precision.md) — finding **1.2**: a bare Chinese verb regex flags ordinary novel prose; require a dotted tool token to co-occur. Also carries the deferred-findings ledger.
+
 ## Execution Rule
 
 Execute one card at a time. Run the card's verification commands before starting the next card. If verification fails, stop and fix the current card instead of carrying broken assumptions forward.
