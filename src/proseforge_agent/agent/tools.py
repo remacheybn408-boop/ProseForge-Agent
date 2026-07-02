@@ -96,6 +96,10 @@ class ToolRegistry:
         tool = self.get(name)
         if tool is None:
             raise ConfigurationError(f"unknown tool {name!r}")
+        if not tool.enabled:
+            # A disabled tool must never execute — otherwise a stub could return
+            # a fake success. See finding 1.9.
+            raise ConfigurationError(f"tool {name!r} is disabled")
         self._validate_payload(tool, payload)
         try:
             result = tool.invoke(payload, context)
@@ -174,9 +178,14 @@ def _fs_write(payload: dict[str, Any], context: ToolContext | None = None) -> To
 
 def _fs_edit(payload: dict[str, Any], context: ToolContext | None = None) -> ToolResult:
     ctx = _require_context(context)
+    old = str(payload["old"])
+    if not old:
+        # An empty `old` would make str.replace prepend `new` to the file
+        # ("" in text is always True). Refuse it so a rewritten/crafted request
+        # cannot inject content at the file head. See finding 1.7.
+        return ToolResult(ok=False, error="old must be non-empty", provenance="workspace")
     path = _resolve_workspace_path(ctx, str(payload["path"]))
     text = path.read_text(encoding="utf-8")
-    old = str(payload["old"])
     if old not in text:
         return ToolResult(ok=False, error="old text not found", provenance="workspace")
     path.write_text(text.replace(old, str(payload["new"]), 1), encoding="utf-8")
@@ -332,7 +341,15 @@ def register_writing_domain_tools(registry: ToolRegistry) -> ToolRegistry:
 
 
 def default_tool_registry() -> ToolRegistry:
-    """Build the current set of built-in tool declarations."""
+    """Build the current set of built-in tool declarations.
+
+    The tools registered in the explicit loop below use planning-stub callables
+    (`_ok`): their real execution lives in the CLI ``_handle_*`` handlers. They
+    are kept ``enabled=True`` because the kernel tool interface and
+    ``function_calling`` depend on them returning a planned result. To make a
+    tool refuse execution, register it with ``enabled=False`` — ``invoke`` now
+    rejects disabled tools (finding 1.9).
+    """
     registry = ToolRegistry()
     for name, permission, description in (
         ("memory.search", "read_only", "Search memory records"),
