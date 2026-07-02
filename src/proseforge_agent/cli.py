@@ -1520,7 +1520,14 @@ def _handle_mcp(args: argparse.Namespace) -> int:
     except Exception:
         client = default_demo_client(server)
     else:
-        client = MCPClient(config.to_spec())
+        # Attach a configured policy so any tool call through this client is
+        # policy-enforced (finding 1.6). The inspect/tools paths are read-only,
+        # but a policy-less client is unsafe for production tool execution.
+        try:
+            server_policy = MCPPolicyStore(Path(".pf-agent")).get(server)
+        except Exception:
+            server_policy = None
+        client = MCPClient(config.to_spec(), policy=server_policy)
     client.start()
     try:
         if args.subcommand == "inspect":

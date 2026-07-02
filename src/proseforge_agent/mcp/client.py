@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 from ..agent.tools import ToolResult
 from ..errors import ConfigurationError
+from .policy import MCPPolicy, MCPPolicyDecision
+
+if TYPE_CHECKING:  # avoid client<-approval<-credentials<-registry<-client cycle
+    from .approval import MCPApprovalGate
 
 
 @dataclass(frozen=True)
@@ -169,11 +173,27 @@ class PlaceholderMCPTransport(StdioMCPTransport):
 
 
 class MCPClient:
-    """Small provider-neutral MCP client wrapper."""
+    """Small provider-neutral MCP client wrapper.
 
-    def __init__(self, spec: MCPServerSpec, *, transport: MCPTransport | None = None) -> None:
+    A client constructed without a ``policy`` performs no policy enforcement and
+    is **unsafe for production transports** — it will run any tool the transport
+    accepts. Production wiring must pass an :class:`MCPPolicy` (and, for
+    write-class tools, an :class:`MCPApprovalGate`). See finding 1.6 of
+    ``docs/review/core-review-2026-07-01.md``.
+    """
+
+    def __init__(
+        self,
+        spec: MCPServerSpec,
+        *,
+        transport: MCPTransport | None = None,
+        policy: MCPPolicy | None = None,
+        approval_gate: "MCPApprovalGate | None" = None,
+    ) -> None:
         self.spec = spec
         self.transport = transport or _transport_for(spec)
+        self._policy = policy
+        self._approval_gate = approval_gate
 
     def start(self) -> None:
         self.transport.start()
@@ -219,6 +239,10 @@ class MCPClient:
         ]
 
     def call_tool(self, name: str, arguments: dict[str, Any]) -> ToolResult:
+        if self._policy is not None:
+            blocked = self._enforce_policy(name, arguments)
+            if blocked is not None:
+                return blocked
         payload = self.transport.call_tool(name, arguments)
         ok = payload.get("ok", True) is not False
         return ToolResult(
@@ -227,6 +251,55 @@ class MCPClient:
             error="" if ok else str(payload.get("error", "MCP tool failed")),
             provenance=f"mcp:{self.spec.id}",
         )
+
+    def _enforce_policy(self, name: str, arguments: dict[str, Any]) -> ToolResult | None:
+        """Consult policy (and the approval gate) before the transport runs.
+
+        Returns a denial ``ToolResult`` to block the call, or ``None`` to allow
+        it. The tool-name -> (operation, target) derivation mirrors
+        :meth:`MCPApprovalGate._requires_approval` so both paths agree.
+        """
+        assert self._policy is not None
+        decision = self._decide(name, arguments)
+        if not decision.allowed and not decision.requires_approval:
+            return ToolResult(
+                ok=False,
+                error=f"blocked by MCP policy: {decision.reason}",
+                provenance=f"mcp:{self.spec.id}",
+            )
+        if self._approval_gate is not None:
+            request = self._approval_gate.enqueue_if_required(
+                server_id=self.spec.id,
+                tool_name=name,
+                arguments=arguments,
+                policy=self._policy,
+            )
+            if request is not None and request.status != "approved":
+                return ToolResult(
+                    ok=False,
+                    error=f"MCP tool requires approval: {request.id}",
+                    provenance=f"mcp:{self.spec.id}",
+                )
+        elif decision.requires_approval:
+            return ToolResult(
+                ok=False,
+                error="MCP tool requires approval but no approval gate is configured",
+                provenance=f"mcp:{self.spec.id}",
+            )
+        return None
+
+    def _decide(self, name: str, arguments: dict[str, Any]) -> MCPPolicyDecision:
+        assert self._policy is not None
+        target = str(arguments.get("path") or arguments.get("target") or "")
+        if not target:
+            return MCPPolicyDecision(True, reason="no policy-relevant target")
+        lowered = name.lower()
+        operation = (
+            "fs.write"
+            if any(token in lowered for token in ("write", "delete", "remove", "overwrite"))
+            else "fs.read"
+        )
+        return self._policy.decide(operation, target)
 
 
 def default_demo_client(server_id: str = "filesystem") -> MCPClient:
