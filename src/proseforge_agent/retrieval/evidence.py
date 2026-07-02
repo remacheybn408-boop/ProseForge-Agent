@@ -104,6 +104,7 @@ class EvidencePackBuilder:
                     )
                 )
         candidates = _dedupe_by_source(candidates)
+        candidates.sort(key=lambda item: (-item.score, item.source))
 
         sections: dict[str, list[EvidenceItem]] = {key: [] for key in SECTION_KEYS}
         included: list[EvidenceItem] = []
@@ -159,7 +160,7 @@ class EvidencePackBuilder:
             if not section_items:
                 lines.append("_(none)_")
             for item in section_items:
-                lines.append(f"- {item.text} _(source: {item.source})_")
+                lines.extend(_render_item_markdown(item))
             lines.append("")
         return "\n".join(lines)
 
@@ -187,6 +188,20 @@ class EvidencePackBuilder:
             "items": [dump(i) for i in pack.items],
             "excluded": [dump(i) for i in pack.excluded],
         }
+
+
+def _render_item_markdown(item: EvidenceItem) -> list[str]:
+    if item.type != "rag_chunk":
+        return [f"- {item.text} _(source: {item.source})_"]
+    lines = [f"- RAG chunk _(source: {item.source})_", "  ```text"]
+    safe_text = _prompt_safe_untrusted_text(item.text)
+    lines.extend(f"  {line}" for line in safe_text.splitlines() or [""])
+    lines.append("  ```")
+    return lines
+
+
+def _prompt_safe_untrusted_text(text: str) -> str:
+    return text.replace("source:", "source\\:").replace("Source:", "Source\\:")
 
 
 __all__ = ["SECTION_KEYS", "EvidencePack", "EvidencePackBuilder"]

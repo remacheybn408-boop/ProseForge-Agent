@@ -11,6 +11,7 @@ from .embeddings import EmbeddingProvider, FakeEmbeddingProvider
 from .vector_store import JsonlVectorStore, VectorStore
 
 _SUPPORTED_SUFFIXES = {".md", ".txt", ".yaml", ".yml", ".json"}
+_MAX_CHUNK_CHARS = 1200
 
 
 @dataclass(frozen=True)
@@ -44,32 +45,33 @@ class RagIngestionPipeline:
     def ingest_project(self, slug: str) -> RagIngestionReport:
         project_dir = self.workspace / slug
         chunks = [
-            self._chunk_for_file(path, slug=slug, project_dir=project_dir)
+            chunk
             for path in sorted(project_dir.rglob("*"))
             if path.is_file() and path.suffix.lower() in _SUPPORTED_SUFFIXES and "rag" not in path.relative_to(project_dir).parts
+            for chunk in self._chunks_for_file(path, slug=slug, project_dir=project_dir)
         ]
         return self._write_chunks(slug, chunks)
 
     def ingest_file(self, path: str | Path, *, slug: str) -> RagIngestionReport:
         file_path = Path(path)
         text = file_path.read_text(encoding="utf-8-sig")
-        chunk = self._chunk(
+        chunks = self._chunks(
             slug=slug,
             source=str(file_path),
             source_type="imported_file",
             text=text,
             metadata={"source": str(file_path), "source_type": "imported_file"},
         )
-        return self._write_chunks(slug, [chunk])
+        return self._write_chunks(slug, chunks)
 
     def status(self, slug: str) -> RagIngestionReport:
         chunks = self._read_chunks(slug)
         return RagIngestionReport(slug=slug, total_chunks=len(chunks))
 
-    def _chunk_for_file(self, path: Path, *, slug: str, project_dir: Path) -> dict:
+    def _chunks_for_file(self, path: Path, *, slug: str, project_dir: Path) -> list[dict]:
         relative = path.relative_to(project_dir).as_posix()
         source_type = _source_type(path.relative_to(project_dir).parts)
-        return self._chunk(
+        return self._chunks(
             slug=slug,
             source=relative,
             source_type=source_type,
@@ -77,20 +79,30 @@ class RagIngestionPipeline:
             metadata={"source": relative, "source_type": source_type},
         )
 
-    def _chunk(self, *, slug: str, source: str, source_type: str, text: str, metadata: dict) -> dict:
-        checksum = hashlib.sha256(text.encode("utf-8")).hexdigest()
-        chunk_id = hashlib.sha1(f"{slug}:{source}:0".encode("utf-8")).hexdigest()[:16]
-        return {
-            "id": chunk_id,
-            "source_type": source_type,
-            "project_slug": slug,
-            "chapter_id": _chapter_id(source),
-            "scene_id": _scene_id(source),
-            "text": text,
-            "checksum": checksum,
-            "embedding_status": "embedded",
-            "metadata": {**metadata, "checksum": checksum, "project_slug": slug},
-        }
+    def _chunks(self, *, slug: str, source: str, source_type: str, text: str, metadata: dict) -> list[dict]:
+        chunks = []
+        for index, chunk_text in enumerate(_split_text(text)):
+            checksum = hashlib.sha256(chunk_text.encode("utf-8")).hexdigest()
+            chunk_hash = hashlib.sha1(f"{slug}:{source}:{index}".encode("utf-8")).hexdigest()[:16]
+            chunks.append(
+                {
+                    "id": f"{chunk_hash}:{index}",
+                    "source_type": source_type,
+                    "project_slug": slug,
+                    "chapter_id": _chapter_id(source),
+                    "scene_id": _scene_id(source),
+                    "text": chunk_text,
+                    "checksum": checksum,
+                    "embedding_status": "embedded",
+                    "metadata": {
+                        **metadata,
+                        "checksum": checksum,
+                        "project_slug": slug,
+                        "chunk_index": index,
+                    },
+                }
+            )
+        return chunks
 
     def _write_chunks(self, slug: str, incoming: list[dict]) -> RagIngestionReport:
         existing = {chunk["id"]: chunk for chunk in self._read_chunks(slug)}
@@ -125,7 +137,17 @@ class RagIngestionPipeline:
         path = self._chunks_path(slug)
         if not path.exists():
             return []
-        return [json.loads(line) for line in path.read_text(encoding="utf-8-sig").splitlines() if line.strip()]
+        chunks: list[dict] = []
+        for line in path.read_text(encoding="utf-8-sig").splitlines():
+            if not line.strip():
+                continue
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(payload, dict):
+                chunks.append(payload)
+        return chunks
 
     def _chunks_path(self, slug: str) -> Path:
         return self.workspace / slug / "rag" / "chunks.jsonl"
@@ -160,6 +182,35 @@ def _chapter_id(source: str) -> str:
 def _scene_id(source: str) -> str:
     path = Path(source)
     return path.stem if "scene" in source.lower() or "scenes" in source.lower() else ""
+
+
+def _split_text(text: str, *, max_chars: int = _MAX_CHUNK_CHARS) -> list[str]:
+    paragraphs = [paragraph.strip() for paragraph in text.split("\n\n") if paragraph.strip()]
+    if not paragraphs:
+        stripped = text.strip()
+        return [stripped] if stripped else [""]
+    chunks: list[str] = []
+    current: list[str] = []
+    current_len = 0
+    for paragraph in paragraphs:
+        if len(paragraph) > max_chars:
+            if current:
+                chunks.append("\n\n".join(current))
+                current = []
+                current_len = 0
+            chunks.extend(paragraph[start : start + max_chars] for start in range(0, len(paragraph), max_chars))
+            continue
+        next_len = current_len + len(paragraph) + (2 if current else 0)
+        if current and next_len > max_chars:
+            chunks.append("\n\n".join(current))
+            current = [paragraph]
+            current_len = len(paragraph)
+        else:
+            current.append(paragraph)
+            current_len = next_len
+    if current:
+        chunks.append("\n\n".join(current))
+    return chunks
 
 
 __all__ = ["RagIngestionPipeline", "RagIngestionReport"]
