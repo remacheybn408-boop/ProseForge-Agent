@@ -11,8 +11,10 @@ def test_cli_lists_required_command_groups(capsys):
         assert name in out
 
 
-def test_cli_no_args_prints_help_and_exits_zero(capsys):
-    code = main([])
+def test_cli_no_args_with_no_default_prints_help_and_exits_zero(capsys):
+    # Task 186: bare `pf-agent` launches the default chat REPL / first-run
+    # routing; `--no-default` restores the pre-186 print-help behavior.
+    code = main(["--no-default"])
     out = capsys.readouterr().out
     assert code == 0
     assert "usage" in out.lower()

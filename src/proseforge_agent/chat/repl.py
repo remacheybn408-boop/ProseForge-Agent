@@ -141,4 +141,45 @@ class ChatRepl:
         print(text, file=self.output_stream)
 
 
-__all__ = ["ChatRepl"]
+def run_repl(
+    argv: list[str] | None = None,
+    *,
+    provider: str = "fake",
+    root: str = ".pf-agent",
+    mode: str = "general_chat",
+    project_slug: str | None = None,
+    stream: bool = False,
+) -> int:
+    """Programmatic entry point for the interactive chat REPL.
+
+    Builds a fake-provider-backed REPL over a durable session store and runs
+    it until ``/exit`` or EOF. This is the callable the bare ``pf-agent``
+    command dispatches to when the workspace is already configured.
+    """
+    from pathlib import Path
+
+    from ..llm import FakeProvider
+    from .session import ChatSessionStore
+
+    fake = FakeProvider(name=provider or "fake", model=provider or "fake")
+    session_store = ChatSessionStore(Path(root))
+    repl = ChatRepl(
+        provider=fake,
+        session_store=session_store,
+        mode=mode,
+        project_slug=project_slug,
+        stream=stream,
+    )
+    return repl.run()
+
+
+def main(argv: list[str] | None = None) -> int:
+    """``python -m proseforge_agent.chat.repl`` entry point."""
+    return run_repl(argv)
+
+
+__all__ = ["ChatRepl", "run_repl", "main"]
+
+
+if __name__ == "__main__":  # pragma: no cover
+    raise SystemExit(main())
