@@ -20,6 +20,7 @@ from __future__ import annotations
 import os
 import sqlite3
 import time
+import warnings
 from pathlib import Path
 from typing import Callable, TypeVar
 
@@ -59,10 +60,21 @@ class FileLock:
         self.timeout = timeout
         self.poll_interval = poll_interval
         self._fd: int | None = None
+        # True when no OS lock primitive is available and the lock is advisory
+        # in-name-only. Surfaced so callers/tests can detect the degraded mode
+        # instead of it failing silently (finding 2.3).
+        self.degraded = not (_HAVE_FCNTL or _HAVE_MSVCRT)
 
     def acquire(self) -> "FileLock":
         if self._fd is not None:
             return self  # already held by this instance
+        if self.degraded:
+            warnings.warn(
+                "FileLock has no OS locking primitive (fcntl/msvcrt); writers are "
+                "NOT serialized across processes on this platform",
+                RuntimeWarning,
+                stacklevel=2,
+            )
         self.path.parent.mkdir(parents=True, exist_ok=True)
         fd = os.open(str(self.path), os.O_RDWR | os.O_CREAT, 0o644)
         deadline = time.monotonic() + self.timeout
@@ -126,11 +138,15 @@ def with_sqlite_retry(
     any other operational error.
     """
     deadline = time.monotonic() + busy_timeout
+    busy_code = getattr(sqlite3, "SQLITE_BUSY", 5)
     while True:
         try:
             return operation()
         except sqlite3.OperationalError as exc:
-            if "database is locked" not in str(exc).lower():
+            # Prefer the stable errorcode (Python 3.11+); fall back to the
+            # message for older interpreters / drivers (finding 2.4).
+            is_busy = getattr(exc, "sqlite_errorcode", None) == busy_code
+            if not is_busy and "database is locked" not in str(exc).lower():
                 raise
             if time.monotonic() >= deadline:
                 raise

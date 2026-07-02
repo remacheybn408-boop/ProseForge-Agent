@@ -133,17 +133,19 @@ class Sandbox:
     ) -> ExecResult | None:
         ceiling = self._permission_ceiling()
         if _ORDER.get(ceiling, -1) < _ORDER.get(command.permission, 0):
+            # Distinct from a missing approval: the caller must first RAISE the
+            # session ceiling, not merely confirm (finding 1.3).
             return ExecResult(
                 ok=False,
                 trace_id=trace_id,
-                error="approval required",
+                error="insufficient_permission",
                 recovery=f"grant {command.permission} permission and rerun with explicit approval",
             )
         if approval is None or not approval.confirmed:
             return ExecResult(
                 ok=False,
                 trace_id=trace_id,
-                error="approval required",
+                error="approval_required",
                 recovery="rerun with explicit approval",
             )
         if not command.argv:
