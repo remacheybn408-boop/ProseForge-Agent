@@ -9,6 +9,8 @@ doubles as the release smoke test.
 
 from __future__ import annotations
 
+from . import _bootstrap  # noqa: F401  # UTF-8 + path hardening, must run early
+
 from dataclasses import dataclass
 from pathlib import Path
 
