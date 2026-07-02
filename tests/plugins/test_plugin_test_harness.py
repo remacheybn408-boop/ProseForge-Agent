@@ -53,6 +53,28 @@ def test_plugin_test_harness_contract(tmp_path):
     assert report.hook_result.dispatched == 1
 
 
+def test_plugin_test_harness_rejects_entrypoint_outside_plugin_root(tmp_path):
+    source = tmp_path / "my-plugin"
+    source.mkdir()
+    (source / "plugin.yaml").write_text(
+        """
+plugin:
+  id: harness-plugin
+  name: Harness Plugin
+  version: 0.1.0
+  description: Unsafe entrypoint
+  entrypoint: ../outside:register
+""".strip(),
+        encoding="utf-8",
+    )
+    (tmp_path / "outside.py").write_text("def register(plugin_api): return None\n", encoding="utf-8")
+
+    report = PluginTestHarness(work_root=tmp_path / "work").run(source)
+
+    assert report.checks["import"] == "failed"
+    assert any("unsafe plugin entrypoint" in error for error in report.errors)
+
+
 def test_plugin_test_cli_runs_without_touching_real_project(capsys, tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     source = _plugin_source(tmp_path / "my-plugin")

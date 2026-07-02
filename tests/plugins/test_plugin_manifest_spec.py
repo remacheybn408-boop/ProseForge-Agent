@@ -45,3 +45,21 @@ def test_plugin_manifest_rejects_missing_required_fields(tmp_path):
 
     with pytest.raises(ConfigurationError, match="missing required plugin field"):
         PluginManifest.load(manifest_path)
+
+
+def test_plugin_manifest_rejects_path_escape_id(tmp_path):
+    manifest_path = tmp_path / "plugin.yaml"
+    manifest_path.write_text(
+        """
+plugin:
+  id: ../outside
+  name: Escape
+  version: 0.1.0
+  description: Unsafe id
+  entrypoint: plugin:register
+""".strip(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ConfigurationError, match="unsafe plugin id"):
+        PluginManifest.load(manifest_path)

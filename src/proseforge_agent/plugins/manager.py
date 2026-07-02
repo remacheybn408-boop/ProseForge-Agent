@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from ..errors import ConfigurationError
-from .manifest import PluginManifest
+from .manifest import PluginManifest, validate_plugin_id
 
 
 @dataclass(frozen=True)
@@ -35,7 +35,7 @@ class PluginManager:
 
     def install(self, source: str | Path) -> PluginActionResult:
         manifest = PluginManifest.load(Path(source) / "plugin.yaml")
-        target = self.plugins_dir / manifest.id
+        target = self._target_for(manifest.id)
         if target.exists():
             shutil.rmtree(target)
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -45,7 +45,7 @@ class PluginManager:
 
     def update(self, source: str | Path) -> PluginActionResult:
         manifest = PluginManifest.load(Path(source) / "plugin.yaml")
-        target = self.plugins_dir / manifest.id
+        target = self._target_for(manifest.id)
         backup_path = ""
         if target.exists():
             backup_root = self.plugins_dir / ".backups"
@@ -61,32 +61,47 @@ class PluginManager:
 
     def enable(self, plugin_id: str) -> PluginActionResult:
         self._require_installed(plugin_id)
-        self._set_enabled(plugin_id, True)
-        return PluginActionResult(plugin_id=plugin_id, status="enabled", path=str(self.plugins_dir / plugin_id))
+        safe_id = validate_plugin_id(plugin_id)
+        self._set_enabled(safe_id, True)
+        return PluginActionResult(plugin_id=safe_id, status="enabled", path=str(self._target_for(safe_id)))
 
     def disable(self, plugin_id: str) -> PluginActionResult:
         self._require_installed(plugin_id)
-        self._set_enabled(plugin_id, False)
-        return PluginActionResult(plugin_id=plugin_id, status="disabled", path=str(self.plugins_dir / plugin_id))
+        safe_id = validate_plugin_id(plugin_id)
+        self._set_enabled(safe_id, False)
+        return PluginActionResult(plugin_id=safe_id, status="disabled", path=str(self._target_for(safe_id)))
 
     def remove(self, plugin_id: str) -> PluginActionResult:
-        target = self._require_installed(plugin_id)
+        safe_id = validate_plugin_id(plugin_id)
+        target = self._require_installed(safe_id)
         shutil.rmtree(target)
         state = self._state()
-        state.pop(plugin_id, None)
+        state.pop(safe_id, None)
         self._write_state(state)
-        return PluginActionResult(plugin_id=plugin_id, status="removed")
+        return PluginActionResult(plugin_id=safe_id, status="removed")
 
     def _require_installed(self, plugin_id: str) -> Path:
-        target = self.plugins_dir / plugin_id
+        safe_id = validate_plugin_id(plugin_id)
+        target = self._target_for(safe_id)
         if not (target / "plugin.yaml").exists():
-            raise ConfigurationError(f"plugin not installed: {plugin_id}")
+            raise ConfigurationError(f"plugin not installed: {safe_id}")
         return target
 
     def _set_enabled(self, plugin_id: str, enabled: bool) -> None:
+        plugin_id = validate_plugin_id(plugin_id)
         state = self._state()
         state[plugin_id] = {"enabled": enabled}
         self._write_state(state)
+
+    def _target_for(self, plugin_id: str) -> Path:
+        safe_id = validate_plugin_id(plugin_id)
+        base = self.plugins_dir.resolve()
+        target = (self.plugins_dir / safe_id).resolve()
+        try:
+            target.relative_to(base)
+        except ValueError as exc:
+            raise ConfigurationError(f"unsafe plugin id: {plugin_id}") from exc
+        return target
 
     def _state(self) -> dict:
         if not self.state_path.exists():

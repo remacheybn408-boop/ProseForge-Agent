@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import pytest
+
+from proseforge_agent.errors import ConfigurationError
 from proseforge_agent.plugins import PluginManager
 from proseforge_agent.cli import main
 
@@ -40,6 +43,40 @@ def test_plugin_manager_installs_updates_disables_enables_and_removes(tmp_path):
     assert removed.status == "removed"
     assert (tmp_path / "agent" / "plugins" / ".backups").exists()
     assert not (tmp_path / "agent" / "plugins" / "example-plugin").exists()
+
+
+def test_plugin_manager_rejects_install_manifest_path_escape(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "plugin.yaml").write_text(
+        """
+plugin:
+  id: ../outside
+  name: Escape
+  version: 0.1.0
+  description: Unsafe plugin
+  entrypoint: plugin:register
+""".strip(),
+        encoding="utf-8",
+    )
+    manager = PluginManager(tmp_path / "agent")
+
+    with pytest.raises(ConfigurationError, match="unsafe plugin id"):
+        manager.install(source)
+
+    assert not (tmp_path / "agent" / "outside").exists()
+
+
+def test_plugin_manager_rejects_remove_path_escape_without_deleting_outside(tmp_path):
+    manager = PluginManager(tmp_path / "agent")
+    outside = tmp_path / "agent" / "outside"
+    outside.mkdir(parents=True)
+    (outside / "plugin.yaml").write_text("plugin: {}\n", encoding="utf-8")
+
+    with pytest.raises(ConfigurationError, match="unsafe plugin id"):
+        manager.remove("../outside")
+
+    assert outside.exists()
 
 
 def test_plugin_cli_install_update_remove_enable_disable(capsys, tmp_path, monkeypatch):
