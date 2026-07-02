@@ -32,6 +32,25 @@ def test_session_export_redacts_and_can_exclude_tools_and_evidence(tmp_path):
     assert payload["messages"][0]["evidence_refs"] == []
 
 
+def test_session_export_bundle_redacts_bearer_jwt_and_raw_tokens(tmp_path):
+    store = ChatSessionStore(tmp_path)
+    session = store.create(mode="general_chat", session_id="session_001")
+    raw_token = "a" * 40
+    jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMifQ.signature"
+    store.append_message(
+        session.id,
+        "assistant",
+        f"Authorization: Bearer {jwt}\nrefresh_token={raw_token}\nx-api-key: sk-secret",
+    )
+
+    serialized = json.dumps(store.export_bundle(session.id, redact=True), ensure_ascii=False)
+
+    assert jwt not in serialized
+    assert raw_token not in serialized
+    assert "sk-secret" not in serialized
+    assert "[redacted]" in serialized
+
+
 def test_session_import_round_trips_json_bundle(tmp_path):
     source = ChatSessionStore(tmp_path / "source")
     session = source.create(mode="general_chat", session_id="session_001")

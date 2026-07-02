@@ -5,7 +5,8 @@ import pytest
 
 from proseforge_agent.agent.kernel import AgentKernel
 from proseforge_agent.agent.types import AgentTurnRequest
-from proseforge_agent.llm import FakeProvider
+from proseforge_agent.chat.session import ChatSessionStore
+from proseforge_agent.llm import FakeProvider, ProviderResult
 
 
 FIXTURE = Path(__file__).parent / "fixtures" / "agent" / "kernel_turn.json"
@@ -69,6 +70,21 @@ class BrokenProvider:
 
     def generate_stream(self, request):
         raise RuntimeError("provider failed")
+
+
+class CapturingProvider:
+    name = "capture"
+    model = "capture-model"
+
+    def __init__(self):
+        self.requests = []
+
+    def generate(self, request):
+        self.requests.append(request)
+        return ProviderResult(provider=self.name, model=self.model, text="captured")
+
+    def generate_stream(self, request):
+        raise NotImplementedError
 
 
 @pytest.fixture
@@ -191,6 +207,35 @@ def test_kernel_saves_memory_candidate_for_durable_user_preference(fake_provider
     )
     assert result.memory_candidate_ids == ["mem-1"]
     assert fake_session_store.memory_candidates[0]["text"] == "remember I prefer concise reports"
+
+
+def test_kernel_sends_effective_session_context_to_provider(tmp_path, fake_tools):
+    provider = CapturingProvider()
+    store = ChatSessionStore(tmp_path / ".pf-agent")
+    kernel = AgentKernel(provider=provider, tools=fake_tools, session_store=store)
+    request = AgentTurnRequest(
+        session_id="s1",
+        text="first",
+        mode="general_chat",
+        project_slug=None,
+        permission_level="read_only",
+    )
+    kernel.run_turn(request)
+
+    kernel.run_turn(
+        AgentTurnRequest(
+            session_id="s1",
+            text="second",
+            mode="general_chat",
+            project_slug=None,
+            permission_level="read_only",
+        )
+    )
+
+    contents = [message.content for message in provider.requests[-1].messages]
+    assert contents[0] == "first"
+    assert contents[1].startswith("captured\nTrace: trace-")
+    assert contents[-1] == "second"
 
 
 def test_kernel_fixture_is_portable_utf8():

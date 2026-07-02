@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from ..agent.events import redact_sensitive
+from ..concurrency import FileLock
 from ..errors import ConfigurationError
 from .transcript import append_jsonl, read_jsonl
 
@@ -187,18 +189,19 @@ class ChatSessionStore:
         provider_metadata: dict[str, Any] | None = None,
     ) -> ChatMessage:
         """Append a transcript message and update session metadata."""
-        session = self._load_session(session_id)
-        message = ChatMessage(
-            role=role,
-            content=content,
-            created_at=_now(),
-            evidence_refs=list(evidence_refs or []),
-            tool_calls=list(tool_calls or []),
-            provider_metadata=dict(provider_metadata or {}),
-        )
-        append_jsonl(self._messages_file(session), asdict(message))
-        self._write_session(_replace_session(session, updated_at=message.created_at))
-        return message
+        with self._file_lock():
+            session = self._load_session(session_id)
+            message = ChatMessage(
+                role=role,
+                content=content,
+                created_at=_now(),
+                evidence_refs=list(evidence_refs or []),
+                tool_calls=list(tool_calls or []),
+                provider_metadata=dict(provider_metadata or {}),
+            )
+            append_jsonl(self._messages_file(session), asdict(message))
+            self._write_session(_replace_session(session, updated_at=message.created_at))
+            return message
 
     def list(
         self,
@@ -245,11 +248,18 @@ class ChatSessionStore:
                 cleaned.append(self.delete(session.id))
         return sorted(cleaned, key=lambda item: item.id)
 
-    def load_context(self, session_id: str, *, limit: int | None = None) -> ChatContext:
+    def load_context(
+        self,
+        session_id: str,
+        *,
+        limit: int | None = None,
+        include_inactive: bool = False,
+    ) -> ChatContext:
         """Load session metadata and transcript messages."""
         session = self._load_session(session_id)
-        rows, warnings = read_jsonl(self._messages_file(session))
-        messages = [self._message_from_dict(row) for row in rows]
+        messages, warnings = self._load_messages(session)
+        if not include_inactive:
+            messages = [message for _, message in self._effective_step_messages(messages)]
         if limit is not None and limit >= 0:
             messages = messages[-limit:] if limit else []
         return ChatContext(session=session, messages=messages, warnings=warnings)
@@ -373,7 +383,7 @@ class ChatSessionStore:
                 "redacted": redact,
             },
         }
-        return _redact_sensitive(bundle) if redact else bundle
+        return redact_sensitive(bundle) if redact else bundle
 
     def export_bundle_markdown(
         self,
@@ -501,17 +511,21 @@ class ChatSessionStore:
         only_approved: bool = False,
     ) -> SessionMergeResult:
         """Merge selected branch messages into a target session."""
-        branch_context = self.load_context(branch_id)
-        self._load_session(into_id)
+        branch_context = self.load_context(branch_id, include_inactive=True)
+        target_context = self.load_context(into_id, include_inactive=True)
         selected_steps = set(message_steps or [])
         fork_step = branch_context.session.branched_from_step or 0
+        already_merged = _merged_sources(target_context.messages)
         merged_steps: list[int] = []
         skipped_steps: list[int] = []
-        for step, message in enumerate(branch_context.messages, start=1):
+        for step, message in self._effective_step_messages(branch_context.messages):
             if selected_steps:
                 if step not in selected_steps:
                     continue
             elif step <= fork_step:
+                continue
+            if (branch_context.session.id, step) in already_merged:
+                skipped_steps.append(step)
                 continue
             if only_approved and not _message_is_approved(message):
                 skipped_steps.append(step)
@@ -542,10 +556,11 @@ class ChatSessionStore:
 
     def rewind(self, session_id: str, *, steps: int = 1, reason: str = "undo") -> SessionRewindResult:
         """Record a reversible soft-delete marker for recent transcript turns."""
-        context = self.load_context(session_id)
+        context = self.load_context(session_id, include_inactive=True)
+        effective_messages = self._effective_step_messages(context.messages)
         eligible_steps = [
             step
-            for step, message in enumerate(context.messages, start=1)
+            for step, message in effective_messages
             if message.provider_metadata.get("operation") not in {"rewind", "retry", "compress"}
         ]
         soft_deleted_steps = eligible_steps[-max(0, steps) :] if steps else []
@@ -569,9 +584,9 @@ class ChatSessionStore:
 
     def retry(self, session_id: str) -> SessionRewindResult:
         """Record that the last assistant turn should be retried."""
-        context = self.load_context(session_id)
+        context = self.load_context(session_id, include_inactive=True)
         source_step = None
-        for step, message in reversed(list(enumerate(context.messages, start=1))):
+        for step, message in reversed(self._effective_step_messages(context.messages)):
             if message.role == "assistant" and message.provider_metadata.get("operation") is None:
                 source_step = step
                 break
@@ -596,9 +611,10 @@ class ChatSessionStore:
         summary: str | None = None,
     ) -> SessionCompressionResult:
         """Append a summary message with source-step evidence references."""
-        context = self.load_context(session_id)
-        max_step = min(upto_step or len(context.messages), len(context.messages))
-        source_steps = list(range(1, max(0, max_step) + 1))
+        context = self.load_context(session_id, include_inactive=True)
+        effective_messages = self._effective_step_messages(context.messages)
+        max_step = min(upto_step or len(effective_messages), len(effective_messages))
+        source_steps = [step for step, _ in effective_messages[: max(0, max_step)]]
         rendered_summary = summary or f"Summary of transcript steps {', '.join(map(str, source_steps)) or '(none)'}."
         evidence_refs = [f"session:{context.session.id}:step:{step}" for step in source_steps]
         self.append_message(
@@ -632,30 +648,65 @@ class ChatSessionStore:
 
     def record_event(self, event: dict[str, Any]) -> None:
         """Append a best-effort kernel event record."""
-        append_jsonl(self.root / "events.jsonl", {"created_at": _now(), **event})
+        with self._file_lock():
+            append_jsonl(self.root / "events.jsonl", {"created_at": _now(), **event})
 
     def save_memory_candidate(self, session_id: str, text: str) -> str:
         """Persist a candidate preference without accepting it as canon."""
         candidate_id = f"memcand_{uuid4().hex[:12]}"
-        append_jsonl(
-            self.root / "memory_candidates.jsonl",
-            {
-                "id": candidate_id,
-                "session_id": session_id,
-                "text": text,
-                "created_at": _now(),
-                "status": "candidate",
-            },
-        )
+        with self._file_lock():
+            append_jsonl(
+                self.root / "memory_candidates.jsonl",
+                {
+                    "id": candidate_id,
+                    "session_id": session_id,
+                    "text": text,
+                    "created_at": _now(),
+                    "status": "candidate",
+                },
+            )
         return candidate_id
 
     def _set_status(self, session_id: str, status: str) -> ChatSession:
         if status not in {"active", "archived", "pinned", "deleted", "branched"}:
             raise ConfigurationError(f"unsupported chat session status: {status}")
-        session = self._load_session(session_id)
-        updated = _replace_session(session, status=status, updated_at=_now())
-        self._write_session(updated)
-        return updated
+        with self._file_lock():
+            session = self._load_session(session_id)
+            updated = _replace_session(session, status=status, updated_at=_now())
+            self._write_session(updated)
+            return updated
+
+    def _file_lock(self) -> FileLock:
+        return FileLock(self.sessions_dir / ".sessions.lock")
+
+    def _load_messages(self, session: ChatSession) -> tuple[list[ChatMessage], list[str]]:
+        rows, warnings = read_jsonl(self._messages_file(session))
+        return [self._message_from_dict(row) for row in rows], warnings
+
+    @staticmethod
+    def _effective_step_messages(messages: list[ChatMessage]) -> list[tuple[int, ChatMessage]]:
+        hidden_steps: set[int] = set()
+        for step, message in enumerate(messages, start=1):
+            metadata = message.provider_metadata
+            operation = metadata.get("operation")
+            if operation == "rewind":
+                hidden_steps.add(step)
+                hidden_steps.update(_int_list(metadata.get("soft_deleted_steps")))
+            elif operation == "retry":
+                hidden_steps.add(step)
+                source_step = _optional_int(metadata.get("source_step"))
+                if source_step is not None:
+                    hidden_steps.add(source_step)
+            elif operation == "compress":
+                hidden_steps.update(_int_list(metadata.get("source_steps")))
+
+        effective: list[tuple[int, ChatMessage]] = []
+        for step, message in enumerate(messages, start=1):
+            operation = message.provider_metadata.get("operation")
+            if step in hidden_steps or operation in {"rewind", "retry"}:
+                continue
+            effective.append((step, message))
+        return effective
 
     def _load_session(self, session_id: str) -> ChatSession:
         session_id = self._clean_session_id(session_id)
@@ -800,6 +851,37 @@ def _message_is_approved(message: ChatMessage) -> bool:
         if str(call.get("status", "")).lower() in {"approved", "accepted"}:
             return True
     return False
+
+
+def _merged_sources(messages: list[ChatMessage]) -> set[tuple[str, int]]:
+    sources: set[tuple[str, int]] = set()
+    for message in messages:
+        merge = message.provider_metadata.get("merge")
+        if not isinstance(merge, dict):
+            continue
+        source_session_id = str(merge.get("source_session_id") or "")
+        source_step = _optional_int(merge.get("source_step"))
+        if source_session_id and source_step is not None:
+            sources.add((source_session_id, source_step))
+    return sources
+
+
+def _int_list(value: Any) -> set[int]:
+    if not isinstance(value, list):
+        return set()
+    numbers: set[int] = set()
+    for item in value:
+        number = _optional_int(item)
+        if number is not None:
+            numbers.add(number)
+    return numbers
+
+
+def _optional_int(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _replace_session(session: ChatSession, **changes: Any) -> ChatSession:

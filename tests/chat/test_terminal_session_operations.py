@@ -18,12 +18,13 @@ def test_undo_soft_deletes_last_turn(tmp_path):
     result = store.rewind(session.id, steps=1, reason="undo")
 
     context = store.load_context(session.id)
-    marker = context.messages[-1]
+    raw_context = store.load_context(session.id, include_inactive=True)
+    marker = raw_context.messages[-1]
     assert result.soft_deleted_steps == [2]
     assert marker.role == "system"
     assert marker.provider_metadata["operation"] == "rewind"
     assert marker.provider_metadata["soft_deleted_steps"] == [2]
-    assert context.messages[1].content == "world"
+    assert [message.content for message in context.messages] == ["hello"]
 
 
 def test_compress_appends_summary_with_source_refs(tmp_path):
@@ -38,6 +39,9 @@ def test_compress_appends_summary_with_source_refs(tmp_path):
     assert result.source_steps == [1, 2]
     assert marker.provider_metadata["operation"] == "compress"
     assert marker.evidence_refs == ["session:session_001:step:1", "session:session_001:step:2"]
+    assert [message.content for message in store.load_context(session.id).messages] == [
+        "Summary of transcript steps 1, 2."
+    ]
 
 
 def test_usage_and_resume_are_read_only(tmp_path):

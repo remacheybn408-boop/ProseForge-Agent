@@ -146,7 +146,7 @@ class AgentKernel:
             content = f"{request.text}\nEvidence refs: {', '.join(evidence_refs)}"
         provider_request = ProviderRequest(
             role="planner" if intent.name == "retrieve_context" else "drafter",
-            messages=[Message(role="user", content=content)],
+            messages=self._provider_messages(request, content),
         )
 
         pieces: list[str] = []
@@ -407,7 +407,7 @@ class AgentKernel:
             content = f"{request.text}\nEvidence refs: {', '.join(evidence_refs)}"
         provider_request = ProviderRequest(
             role="planner" if intent.name == "retrieve_context" else "drafter",
-            messages=[Message(role="user", content=content)],
+            messages=self._provider_messages(request, content),
         )
 
         # LLM-request middleware may rewrite messages/parameters before the
@@ -479,6 +479,27 @@ class AgentKernel:
                 self._session_store.record_event(event)
             except Exception:  # noqa: BLE001 - event persistence must not crash the turn
                 continue
+
+    def _provider_messages(self, request: AgentTurnRequest, current_content: str) -> list[Message]:
+        if self._session_store is None or not hasattr(self._session_store, "load_context"):
+            return [Message(role="user", content=current_content)]
+        try:
+            context = self._session_store.load_context(request.session_id)
+        except Exception:  # noqa: BLE001 - persistence is best-effort for provider context
+            return [Message(role="user", content=current_content)]
+        messages: list[Message] = []
+        for message in getattr(context, "messages", []):
+            role = getattr(message, "role", "")
+            if role not in {"system", "user", "assistant"}:
+                continue
+            messages.append(Message(role=role, content=str(getattr(message, "content", ""))))
+        if not messages:
+            return [Message(role="user", content=current_content)]
+        if messages[-1].role == "user":
+            messages[-1] = Message(role="user", content=current_content)
+        else:
+            messages.append(Message(role="user", content=current_content))
+        return messages
 
     def _tool_permission(self, tool_name: str | None) -> str | None:
         if tool_name and self._tools is not None and hasattr(self._tools, "required_permission"):

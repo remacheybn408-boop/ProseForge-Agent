@@ -1,8 +1,11 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from proseforge_agent.chat.memory import ChatMemoryExtractor, MemoryCandidate
 from proseforge_agent.cli import main
+from proseforge_agent.errors import ConfigurationError
 
 
 FIXTURE = (
@@ -35,6 +38,17 @@ def test_project_preferences_go_to_project_queue(tmp_path):
     project_queue = tmp_path / "memory_candidates" / "projects" / "demo.jsonl"
     assert not global_queue.exists()
     assert project_queue.exists()
+
+
+def test_project_memory_queue_rejects_path_traversal(tmp_path):
+    with pytest.raises(ConfigurationError, match="unsafe project slug"):
+        ChatMemoryExtractor().write_candidates(
+            tmp_path,
+            "remember project default tone",
+            project_slug="../../evil",
+        )
+
+    assert not (tmp_path / "evil.jsonl").exists()
 
 
 def test_candidates_are_not_accepted_canon_writes(tmp_path):
