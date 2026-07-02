@@ -1,0 +1,20 @@
+# ProseForge Agent — Linux/macOS Compose (Task 192).
+#
+#   docker compose up
+#
+services:
+  pf-agent:
+    build: .
+    image: proseforge-agent:latest
+    stdin_open: true
+    tty: true
+    environment:
+      PF_AGENT_WORKSPACE: /data
+      PROSEFORGE_ROOT: /opt/proseforge
+      PF_AGENT_SKIP_FIRST_RUN: "1"
+    volumes:
+      - ./data:/data
+      - ./config:/config:ro
+    ports:
+      - "${PF_AGENT_SERVICE_PORT:-8765}:8765"
+    command: ["--help"]

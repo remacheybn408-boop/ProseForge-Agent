@@ -1,0 +1,26 @@
+# ProseForge Agent — Windows Docker Desktop Compose (Task 192).
+#
+#   docker compose -f docker-compose.windows.yml up
+#
+# Uses a NAMED volume for /data because NTFS bind-mounts break SQLite locking.
+services:
+  pf-agent:
+    build: .
+    image: proseforge-agent:latest
+    stdin_open: true
+    tty: true
+    environment:
+      PF_AGENT_WORKSPACE: /data
+      PROSEFORGE_ROOT: /opt/proseforge
+      PF_AGENT_SKIP_FIRST_RUN: "1"
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: "utf-8"
+    volumes:
+      - pf-agent-data:/data
+      - ./config:/config:ro
+    ports:
+      - "${PF_AGENT_SERVICE_PORT:-8765}:8765"
+    command: ["--help"]
+
+volumes:
+  pf-agent-data:
