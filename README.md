@@ -1,3 +1,5 @@
+> 🌐 [English](README.md) · [简体中文](README.zh-CN.md)
+
 # ProseForge Agent
 
 An agentic orchestration layer for long-form novel production. It wraps the
