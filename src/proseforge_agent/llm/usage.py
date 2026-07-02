@@ -110,20 +110,31 @@ class BudgetPolicy:
     per_run: float | None = None
     per_day: float | None = None
 
-    def check(self, spent: float, day_spent: float | None = None) -> None:
+    def check(
+        self,
+        spent: float,
+        day_spent: float | None = None,
+        *,
+        pending_spend: float = 0.0,
+    ) -> None:
         """Raise :class:`ProviderError` if this spend would exceed a cap.
 
         Called *before* the provider request is sent, so the caller still holds
         the prompt pack and can resume the step once the budget is raised.
+        ``spent`` may already include the next call for legacy callers; newer
+        callers can pass current spend plus ``pending_spend`` for a clearer
+        preflight check.
         """
-        if self.per_run is not None and spent > self.per_run:
+        projected = spent + pending_spend
+        if self.per_run is not None and projected > self.per_run:
             raise ProviderError(
-                f"per-run budget exceeded: {spent:.6f} > {self.per_run:.6f}"
+                f"per-run budget exceeded: {projected:.6f} > {self.per_run:.6f}"
             )
         day = day_spent if day_spent is not None else spent
-        if self.per_day is not None and day > self.per_day:
+        projected_day = day + pending_spend
+        if self.per_day is not None and projected_day > self.per_day:
             raise ProviderError(
-                f"per-day budget exceeded: {day:.6f} > {self.per_day:.6f}"
+                f"per-day budget exceeded: {projected_day:.6f} > {self.per_day:.6f}"
             )
 
 
@@ -133,6 +144,8 @@ def guarded_call(
     prompt_pack: object,
     call: Callable[[], T],
     day_spent: float | None = None,
+    *,
+    pending_spend: float = 0.0,
 ) -> T:
     """Run ``call`` only if ``policy`` permits the spend.
 
@@ -140,7 +153,7 @@ def guarded_call(
     is left untouched so the step is resumable. ``prompt_pack`` is accepted purely
     to make the preservation contract explicit at the call site.
     """
-    policy.check(spent, day_spent=day_spent)
+    policy.check(spent, day_spent=day_spent, pending_spend=pending_spend)
     return call()
 
 

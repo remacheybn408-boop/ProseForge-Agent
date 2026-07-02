@@ -73,6 +73,26 @@ def test_prompt_pack_is_preserved_when_budget_blocks_a_call():
     assert prompt_pack == original
 
 
+def test_pending_spend_blocks_budget_before_call():
+    policy = BudgetPolicy(per_run=0.01)
+    with pytest.raises(ProviderError):
+        policy.check(spent=0.009, pending_spend=0.002)
+
+
+def test_guarded_call_pending_spend_blocks_without_calling_provider():
+    policy = BudgetPolicy(per_run=0.01)
+    calls: list[str] = []
+
+    def call():
+        calls.append("ran")
+        return "result"
+
+    with pytest.raises(ProviderError):
+        guarded_call(policy, spent=0.009, pending_spend=0.002, prompt_pack={}, call=call)
+
+    assert calls == []
+
+
 def test_rate_limit_backoff_delays_increase_and_are_bounded():
     backoff = RateLimitBackoff(base=0.5, factor=2.0, max_delay=8.0, max_attempts=5)
     delays = [backoff.next_delay(i) for i in range(5)]

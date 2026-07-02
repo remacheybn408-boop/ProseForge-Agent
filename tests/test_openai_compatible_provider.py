@@ -34,6 +34,18 @@ def _provider(http, **kwargs):
     return OpenAICompatibleProvider(**params)
 
 
+class CountingStreamTransport(FakeHttpTransport):
+    def __init__(self, stream_lines: list[str]):
+        super().__init__(stream_lines=stream_lines)
+        self.consumed = 0
+
+    def post_json_stream(self, request):
+        self.requests.append(request)
+        for line in self.stream_lines:
+            self.consumed += 1
+            yield line
+
+
 def test_chat_request_shape_uses_configured_base_url(fake_http):
     provider = OpenAICompatibleProvider(
         name="compat",
@@ -79,6 +91,17 @@ def test_temperature_is_passed_through(fake_http):
         )
     )
     assert fake_http.requests[0].json["temperature"] == 0.2
+
+
+def test_tools_are_passed_through(fake_http):
+    tool = {
+        "type": "function",
+        "function": {"name": "lookup", "description": "Lookup", "parameters": {"type": "object"}},
+    }
+    _provider(fake_http).generate(
+        ProviderRequest(role="drafter", messages=[Message(role="user", content="Hi")], tools=[tool])
+    )
+    assert fake_http.requests[0].json["tools"] == [tool]
 
 
 def test_401_raises_auth_error_without_leaking_key():
@@ -129,3 +152,18 @@ def test_streaming_aggregates_to_text():
     aggregated = "".join(chunk.text for chunk in chunks)
     assert aggregated == "Hello world"
     assert chunks[-1].done is True
+
+
+def test_streaming_yields_before_transport_is_exhausted():
+    lines = [
+        'data: {"choices":[{"delta":{"content":"Hello"}}]}',
+        'data: {"choices":[{"delta":{"content":" world"}}]}',
+        "data: [DONE]",
+    ]
+    http = CountingStreamTransport(stream_lines=lines)
+    stream = _provider(http).generate_stream(_request())
+
+    first = next(stream)
+
+    assert first.text == "Hello"
+    assert http.consumed == 1

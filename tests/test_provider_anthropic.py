@@ -28,6 +28,18 @@ def _request(content="one line"):
     return ProviderRequest(role="drafter", messages=[Message(role="user", content=content)])
 
 
+class CountingStreamTransport(FakeHttpTransport):
+    def __init__(self, stream_lines: list[str]):
+        super().__init__(stream_lines=stream_lines)
+        self.consumed = 0
+
+    def post_json_stream(self, request):
+        self.requests.append(request)
+        for line in self.stream_lines:
+            self.consumed += 1
+            yield line
+
+
 @pytest.fixture
 def fake_http():
     return FakeHttpTransport(responses=[HttpResponse(status_code=200, text=SUCCESS)])
@@ -49,6 +61,27 @@ def test_anthropic_request_includes_max_tokens(fake_http):
     assert fake_http.requests[0].json["max_tokens"] > 0
 
 
+def test_anthropic_request_converts_openai_style_tools(fake_http):
+    tool = {
+        "type": "function",
+        "function": {
+            "name": "lookup",
+            "description": "Lookup canon",
+            "parameters": {"type": "object", "properties": {"query": {"type": "string"}}},
+        },
+    }
+    build_provider(_profile(), http=fake_http).generate(
+        ProviderRequest(role="drafter", messages=[Message(role="user", content="one line")], tools=[tool])
+    )
+    assert fake_http.requests[0].json["tools"] == [
+        {
+            "name": "lookup",
+            "description": "Lookup canon",
+            "input_schema": {"type": "object", "properties": {"query": {"type": "string"}}},
+        }
+    ]
+
+
 def test_anthropic_parses_success_response_into_provider_result(fake_http):
     result = build_provider(_profile(), http=fake_http).generate(_request())
     assert result.text == "A single quiet line."
@@ -63,6 +96,21 @@ def test_anthropic_parses_stream_events_into_normalized_chunks():
     chunks = list(build_provider(_profile(), http=http).generate_stream(_request()))
     assert "".join(c.text for c in chunks) == "Hello from Claude"
     assert chunks[-1].done is True
+
+
+def test_anthropic_stream_yields_before_transport_is_exhausted():
+    lines = [
+        'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"Hello"}}',
+        'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":" Claude"}}',
+        'data: {"type":"message_stop"}',
+    ]
+    http = CountingStreamTransport(lines)
+    stream = build_provider(_profile(), http=http).generate_stream(_request())
+
+    first = next(stream)
+
+    assert first.text == "Hello"
+    assert http.consumed == 1
 
 
 def test_anthropic_maps_auth_rate_limit_timeout_and_invalid_response_errors():

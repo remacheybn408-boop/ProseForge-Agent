@@ -40,7 +40,7 @@ ROLES: tuple[str, ...] = (
 )
 
 RETRYABLE_ERRORS: frozenset[str] = frozenset(
-    {"timeout", "rate_limit", "temporary", "network", "server_error"}
+    {"timeout", "rate_limit", "temporary", "network", "server_error", "invalid_response"}
 )
 NON_RETRYABLE_ERRORS: frozenset[str] = frozenset(
     {"auth", "permission", "policy", "invalid_request", "quota"}

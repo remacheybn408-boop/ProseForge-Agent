@@ -21,6 +21,7 @@ from ...errors import ProviderError
 from ..base import Message, ProviderRequest, ProviderResult, StreamChunk, Usage
 from ..http import HttpRequest, HttpTimeout, HttpTransport, UrllibTransport
 from ..profiles import ProviderProfile
+from ._openai_shape import add_openai_tools, openai_message_text, stream_openai_sse_lines
 
 MINIMAX_ALIASES: tuple[str, ...] = ("minimax", "minimax_chat")
 CERT_LEVELS: tuple[str, ...] = (
@@ -95,6 +96,7 @@ class MiniMaxProvider:
         }
         if request.max_tokens is not None:
             body["max_tokens"] = request.max_tokens
+        add_openai_tools(body, request.tools)
         if stream:
             body["stream"] = True
         return body
@@ -137,36 +139,20 @@ class MiniMaxProvider:
 
     def generate_stream(self, request: ProviderRequest) -> Iterator[StreamChunk]:
         try:
-            lines = list(self._http.post_json_stream(self._http_request(request, stream=True)))
+            lines = self._http.post_json_stream(self._http_request(request, stream=True))
+            yield from stream_openai_sse_lines(
+                lines,
+                provider_name=self.name,
+                extract_delta=self._extract_delta,
+            )
         except HttpTimeout as exc:
             raise _provider_error(f"provider {self.name!r} timed out", "timeout") from exc
-
-        deltas: list[str] = []
-        for line in lines:
-            if not line.startswith("data:"):
-                continue
-            data = line[len("data:") :].strip()
-            if data == "[DONE]":
-                break
-            try:
-                obj = json.loads(data)
-                content = self._extract_delta(obj)
-            except (json.JSONDecodeError, KeyError, IndexError, TypeError) as exc:
-                raise _provider_error(
-                    f"provider {self.name!r} returned an unparseable stream chunk",
-                    "invalid_response",
-                ) from exc
-            if content:
-                deltas.append(content)
-
-        for index, piece in enumerate(deltas):
-            yield StreamChunk(text=piece, done=index == len(deltas) - 1)
 
     # -- normalization ---------------------------------------------------
 
     @staticmethod
     def _extract_text(payload: dict) -> str:
-        return payload["choices"][0]["message"]["content"]
+        return openai_message_text(payload)
 
     @staticmethod
     def _extract_delta(obj: dict) -> str:
