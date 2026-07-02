@@ -24,6 +24,10 @@ reports/
 .venv/
 venv/
 
+# Local secrets (.env.example is committed; .env / .env.local are not)
+.env
+.env.local
+
 # Local-only Claude Code settings (personal, not shared)
 .claude/settings.local.json
 config/

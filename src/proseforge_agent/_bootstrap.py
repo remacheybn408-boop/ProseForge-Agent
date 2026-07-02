@@ -70,6 +70,15 @@ def _harden_sys_path() -> None:
         STATE["warnings"].append(f"sys.path hardening failed: {exc}")
 
 
+def _load_dotenv() -> None:
+    try:
+        from .dotenv import load_default_files
+
+        STATE["dotenv"] = load_default_files()
+    except Exception as exc:  # noqa: BLE001 - .env loading must never break startup
+        STATE["warnings"].append(f".env load failed: {exc}")
+
+
 def install() -> dict[str, Any]:
     """Idempotently apply the bootstrap and return :data:`STATE`."""
     if getattr(sys, "_pf_agent_bootstrapped", False):
@@ -84,6 +93,7 @@ def install() -> dict[str, Any]:
         _reconfigure_stream("stderr", "stderr_reconfigured")
         _reconfigure_stream("stdin", "stdin_reconfigured")
         _harden_sys_path()
+        _load_dotenv()
     except Exception as exc:  # noqa: BLE001 - defense in depth
         STATE["warnings"].append(f"bootstrap error: {exc}")
 
