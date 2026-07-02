@@ -27,6 +27,22 @@ class KernelStub:
         )
 
 
+class TokenKernelStub:
+    def run_turn(self, request):
+        return AgentTurnResult(
+            text="Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMifQ.signature",
+            intent=AgentIntent(name="answer_directly"),
+            events=[
+                {
+                    "type": "provider_call",
+                    "access_token": "a" * 40,
+                    "message": "x-api-key: sk-secret",
+                }
+            ],
+            trace_id="trace-service",
+        )
+
+
 class SessionStoreStub:
     def list(self, project_slug=None):
         return [
@@ -60,15 +76,37 @@ def test_chat_serializes_kernel_turn_without_secrets():
     assert kernel.requests[0].text == "hello"
 
 
-def test_remote_bind_requires_explicit_system_write_permission():
+def test_remote_bind_requires_explicit_allow_remote_flag():
     with pytest.raises(ConfigurationError):
         LocalAgentService(
             kernel=KernelStub(),
             session_store=SessionStoreStub(),
             bind="0.0.0.0",
-            allow_remote=True,
             permission_level="project_write",
         )
+
+
+def test_remote_bind_allows_lower_permission_when_explicitly_enabled():
+    service = LocalAgentService(
+        kernel=KernelStub(),
+        session_store=SessionStoreStub(),
+        bind="0.0.0.0",
+        allow_remote=True,
+        permission_level="project_write",
+    )
+
+    assert service.health()["allow_remote"] is True
+
+
+def test_service_chat_redacts_token_variants():
+    response = LocalAgentService(kernel=TokenKernelStub(), session_store=SessionStoreStub()).chat(
+        {"message": "hello"}
+    )
+    serialized = json.dumps(response, ensure_ascii=False)
+
+    assert "eyJhbGci" not in serialized
+    assert "sk-secret" not in serialized
+    assert "a" * 40 not in serialized
 
 
 def test_sessions_provider_and_workflow_status_shapes():

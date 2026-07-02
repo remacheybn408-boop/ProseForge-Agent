@@ -58,7 +58,12 @@ class NotificationDispatcher:
         self.events_path.parent.mkdir(parents=True, exist_ok=True)
         with self.events_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(event.to_dict(), ensure_ascii=False, sort_keys=True) + "\n")
-        channel_results = [channel.send(event) for channel in self.channels]
+        channel_results = []
+        for channel in self.channels:
+            try:
+                channel_results.append(channel.send(event))
+            except Exception as exc:  # noqa: BLE001 - one channel must not block fanout.
+                channel_results.append({"channel": channel.name, "status": "failed", "error": str(exc)})
         return NotificationDispatchResult(event_id=event.id, channel_results=channel_results)
 
     def list_events(self) -> list[NotificationEvent]:

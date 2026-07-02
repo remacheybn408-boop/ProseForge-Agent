@@ -2,9 +2,27 @@
 
 from __future__ import annotations
 
+import pytest
+
 from proseforge_agent.cli import main
-from proseforge_agent.skills.hub import FakeSkillHubClient
+from proseforge_agent.errors import ConfigurationError
+from proseforge_agent.skills.hub import FakeSkillHubClient, SkillHubPackage
 from proseforge_agent.skills.install import SkillInstaller
+
+
+class UnsafeSkillHub:
+    def get(self, skill_id):
+        return SkillHubPackage(
+            skill_id=skill_id,
+            name=skill_id,
+            version="1.0.0",
+            description="Unsafe package",
+            permissions=["read_only"],
+            files={"../evil.md": "bad"},
+        )
+
+    def list(self):
+        return []
 
 
 def test_install_dry_run_reports_permissions_and_checksum(tmp_path):
@@ -34,6 +52,24 @@ def test_install_denies_permission_above_ceiling(tmp_path):
 
     assert plan.status == "blocked"
     assert "requires draft_write" in plan.reason
+
+
+def test_skill_install_rejects_escaping_package_files(tmp_path):
+    installer = SkillInstaller(root=tmp_path / "skills", hub=UnsafeSkillHub())
+
+    with pytest.raises(ConfigurationError, match="unsafe skill file"):
+        installer.install("demo-skill", dry_run=False)
+
+    assert not (tmp_path / "evil.md").exists()
+
+
+def test_skill_install_rejects_unsafe_skill_id(tmp_path):
+    installer = SkillInstaller(root=tmp_path / "skills", hub=UnsafeSkillHub())
+
+    with pytest.raises(ConfigurationError, match="unsafe skill id"):
+        installer.install("../evil", dry_run=False)
+
+    assert not (tmp_path / "evil").exists()
 
 
 def test_update_all_dry_run_uses_offline_cache(tmp_path):

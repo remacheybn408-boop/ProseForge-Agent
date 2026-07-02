@@ -10,10 +10,8 @@ from dataclasses import asdict, is_dataclass
 from typing import Any
 
 from ..agent import AgentTurnRequest
+from ..agent.events import redact_sensitive
 from ..errors import ConfigurationError
-
-
-_SECRET_KEYS = {"api_key", "apikey", "token", "secret", "password", "authorization"}
 
 
 class LocalAgentService:
@@ -57,7 +55,7 @@ class LocalAgentService:
             permission_level=str(payload.get("permission_level") or self.permission_level),
         )
         result = self.kernel.run_turn(request)
-        return _redact(_serializable(result))
+        return redact_sensitive(_serializable(result))
 
     def sessions(self, *, project_slug: str | None = None) -> dict[str, Any]:
         """Return known sessions using the injected store."""
@@ -80,8 +78,6 @@ class LocalAgentService:
             return
         if not self.allow_remote:
             raise ConfigurationError("remote service bind requires --allow-remote")
-        if self.permission_level != "system_write":
-            raise ConfigurationError("remote service bind requires system_write permission")
 
 
 def _serializable(value: Any) -> Any:
@@ -109,20 +105,6 @@ def _serializable(value: Any) -> Any:
             if key not in public and hasattr(value, key):
                 public[key] = getattr(value, key)
         return _serializable(public)
-    return value
-
-
-def _redact(value: Any) -> Any:
-    if isinstance(value, dict):
-        redacted = {}
-        for key, item in value.items():
-            if str(key).lower() in _SECRET_KEYS:
-                redacted[key] = "[redacted]"
-            else:
-                redacted[key] = _redact(item)
-        return redacted
-    if isinstance(value, list):
-        return [_redact(item) for item in value]
     return value
 
 
