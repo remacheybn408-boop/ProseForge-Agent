@@ -73,6 +73,8 @@ class InstallationDoctor:
             from .linux import LinuxChecks
 
             return DoctorReport(checks=LinuxChecks(self.env).run())
+        if section == "wiring":
+            return DoctorReport(checks=self._wiring_checks())
         checks = [
             self._os_check(),
             self._python_check(),
@@ -88,6 +90,54 @@ class InstallationDoctor:
         if section:
             checks = [check for check in checks if check.section == section]
         return DoctorReport(checks=checks)
+
+    def _wiring_checks(self) -> list[DoctorCheck]:
+        """Report which transport is bound for each pluggable subsystem.
+
+        Contract-only transports (placeholder MCP, fake gateway adapters,
+        dry-run execution backends) look green in dev but silently fail or fake
+        success in production. This section makes each binding visible so the
+        gap cannot hide behind generic telemetry (findings 4.1-4.3, 5.2).
+        """
+        checks: list[DoctorCheck] = []
+
+        placeholder_ok = self.env.get("PF_AGENT_ALLOW_PLACEHOLDER_MCP") == "1"
+        checks.append(
+            DoctorCheck(
+                "mcp",
+                "wiring",
+                "warn",
+                (
+                    "stdio/http transports are placeholders"
+                    + (" (opt-in enabled)" if placeholder_ok else "")
+                ),
+                "wire a real MCP transport, or set PF_AGENT_ALLOW_PLACEHOLDER_MCP=1 for local use",
+            )
+        )
+
+        for platform_name in ("telegram", "discord", "slack", "signal", "email"):
+            checks.append(
+                DoctorCheck(
+                    f"gateway.{platform_name}",
+                    "wiring",
+                    "warn",
+                    "fake transport by default; delivery is simulated",
+                    "pass a real platform client for production delivery",
+                )
+            )
+
+        for backend in ("local", "docker", "ssh", "singularity", "modal", "daytona"):
+            status = "ok" if backend == "local" else "warn"
+            checks.append(
+                DoctorCheck(
+                    f"environment.{backend}",
+                    "wiring",
+                    status,
+                    "real runner" if backend == "local" else "planner only; emits dry-run plans",
+                    None if backend == "local" else "inject a real command runner to execute",
+                )
+            )
+        return checks
 
     def _os_check(self) -> DoctorCheck:
         return DoctorCheck("os", "platform", "ok", self.env.get("OS") or platform.system() or "unknown")
