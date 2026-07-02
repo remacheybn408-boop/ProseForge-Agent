@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from proseforge_agent.cli import main
-from proseforge_agent.environments import DaytonaExecutionBackend, ModalExecutionBackend
+from proseforge_agent.environments import DaytonaBackendPlanner, ModalBackendPlanner
 
 
 def test_serverless_backend_reports_hibernation_plan():
-    backend = ModalExecutionBackend(config={"token": "secret", "app": "demo"}, fake_state="hibernating")
+    backend = ModalBackendPlanner(config={"token": "secret", "app": "demo"}, fake_state="hibernating")
 
     plan = backend.check(dry_run=True)
 
@@ -20,8 +20,8 @@ def test_serverless_backend_reports_hibernation_plan():
 
 
 def test_serverless_backend_reports_missing_config_and_unavailable_provider():
-    modal = ModalExecutionBackend(config={}, fake_state="missing_config")
-    daytona = DaytonaExecutionBackend(config={"api_key": "secret"}, fake_state="unavailable")
+    modal = ModalBackendPlanner(config={}, fake_state="missing_config")
+    daytona = DaytonaBackendPlanner(config={"api_key": "secret"}, fake_state="unavailable")
 
     assert modal.check(dry_run=True).status == "missing_config"
     unavailable = daytona.check(dry_run=True)

@@ -5007,7 +5007,7 @@ def _handle_environments(args: argparse.Namespace) -> int:
             args.format,
         )
     if args.subcommand == "check":
-        from .environments import DockerExecutionBackend, LocalExecutionBackend
+        from .environments import DockerBackendPlanner, LocalExecutionBackend
 
         backend = args.environment_arg or "local"
         if backend == "local":
@@ -5029,7 +5029,7 @@ def _handle_environments(args: argparse.Namespace) -> int:
                 args.format,
             )
         if backend == "docker":
-            plan = DockerExecutionBackend(workspace_root=Path("."), docker_available=False).check(
+            plan = DockerBackendPlanner(workspace_root=Path("."), docker_available=False).check(
                 image=args.image,
                 dry_run=args.dry_run,
             )
@@ -5054,9 +5054,9 @@ def _handle_environments(args: argparse.Namespace) -> int:
                 args.format,
             )
         if backend == "ssh":
-            from .environments import SSHExecutionBackend
+            from .environments import SSHBackendPlanner
 
-            plan = SSHExecutionBackend(ssh_available=False).check(profile=args.profile, host="demo@example.com", token="demo", dry_run=args.dry_run)
+            plan = SSHBackendPlanner(ssh_available=False).check(profile=args.profile, host="demo@example.com", token="demo", dry_run=args.dry_run)
             return _emit(
                 Report(
                     title="SSH Environment",
@@ -5078,9 +5078,9 @@ def _handle_environments(args: argparse.Namespace) -> int:
                 args.format,
             )
         if backend == "singularity":
-            from .environments import SingularityExecutionBackend
+            from .environments import SingularityBackendPlanner
 
-            plan = SingularityExecutionBackend(singularity_available=False).check(image=args.image, dry_run=args.dry_run)
+            plan = SingularityBackendPlanner(singularity_available=False).check(image=args.image, dry_run=args.dry_run)
             return _emit(
                 Report(
                     title="Singularity Environment",
@@ -5102,13 +5102,13 @@ def _handle_environments(args: argparse.Namespace) -> int:
                 args.format,
             )
         if backend in {"modal", "daytona"}:
-            from .environments import DaytonaExecutionBackend, ModalExecutionBackend
+            from .environments import DaytonaBackendPlanner, ModalBackendPlanner
 
             config = {"token": "dry-run-token"} if backend == "modal" else {"api_key": "dry-run-key"}
             plan = (
-                ModalExecutionBackend(config=config, fake_state="hibernating").check(dry_run=args.dry_run)
+                ModalBackendPlanner(config=config, fake_state="hibernating").check(dry_run=args.dry_run)
                 if backend == "modal"
-                else DaytonaExecutionBackend(config=config, fake_state="hibernating").check(dry_run=args.dry_run)
+                else DaytonaBackendPlanner(config=config, fake_state="hibernating").check(dry_run=args.dry_run)
             )
             title = "Modal Environment" if backend == "modal" else "Daytona Environment"
             return _emit(

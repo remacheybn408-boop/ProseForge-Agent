@@ -5,7 +5,9 @@ from __future__ import annotations
 from .serverless import ServerlessPlan, build_serverless_plan
 
 
-class ModalExecutionBackend:
+class ModalBackendPlanner:
+    """Planner only: emits a :class:`ServerlessPlan` and never invokes Modal."""
+
     environment_id = "modal"
 
     def __init__(self, *, config: dict[str, str] | None = None, fake_state: str = "ready") -> None:
@@ -16,4 +18,4 @@ class ModalExecutionBackend:
         return build_serverless_plan(backend="modal", config=self.config, fake_state=self.fake_state, dry_run=dry_run)
 
 
-__all__ = ["ModalExecutionBackend"]
+__all__ = ["ModalBackendPlanner"]

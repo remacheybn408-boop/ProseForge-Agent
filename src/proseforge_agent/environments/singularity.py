@@ -21,8 +21,8 @@ class SingularityPlan:
         return asdict(self)
 
 
-class SingularityExecutionBackend:
-    """Dry-run Singularity backend."""
+class SingularityBackendPlanner:
+    """Planner only: emits a :class:`SingularityPlan` and never runs the runtime."""
 
     def __init__(self, *, singularity_available: bool = False) -> None:
         self.environment_id = "singularity"
@@ -42,4 +42,4 @@ class SingularityExecutionBackend:
         )
 
 
-__all__ = ["SingularityExecutionBackend", "SingularityPlan"]
+__all__ = ["SingularityBackendPlanner", "SingularityPlan"]

@@ -2,19 +2,19 @@
 
 from .base import ExecutionCapabilities, ExecutionEnvironment, ExecutionResult, FakeExecutionEnvironment
 from .checkpoints import EnvironmentCheckpoint
-from .daytona import DaytonaExecutionBackend
-from .docker import DockerExecutionBackend, DockerPlan
+from .daytona import DaytonaBackendPlanner
+from .docker import DockerBackendPlanner, DockerPlan
 from .file_sync import FileSyncPlan, FileSyncPlanner
 from .local import LocalExecutionBackend
-from .modal import ModalExecutionBackend
+from .modal import ModalBackendPlanner
 from .process_registry import FakeProcessBackend, ProcessEntry, ProcessReadResult, ProcessRegistry
 from .serverless import SERVERLESS_STATES, ServerlessPlan
-from .singularity import SingularityExecutionBackend, SingularityPlan
-from .ssh import SSHExecutionBackend, SSHPlan
+from .singularity import SingularityBackendPlanner, SingularityPlan
+from .ssh import SSHBackendPlanner, SSHPlan
 
 __all__ = [
-    "DaytonaExecutionBackend",
-    "DockerExecutionBackend",
+    "DaytonaBackendPlanner",
+    "DockerBackendPlanner",
     "DockerPlan",
     "EnvironmentCheckpoint",
     "ExecutionCapabilities",
@@ -25,14 +25,14 @@ __all__ = [
     "FileSyncPlan",
     "FileSyncPlanner",
     "LocalExecutionBackend",
-    "ModalExecutionBackend",
+    "ModalBackendPlanner",
     "ProcessEntry",
     "ProcessReadResult",
     "ProcessRegistry",
-    "SSHExecutionBackend",
+    "SSHBackendPlanner",
     "SSHPlan",
     "SERVERLESS_STATES",
     "ServerlessPlan",
-    "SingularityExecutionBackend",
+    "SingularityBackendPlanner",
     "SingularityPlan",
 ]

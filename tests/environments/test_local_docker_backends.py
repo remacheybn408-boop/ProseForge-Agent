@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from proseforge_agent.cli import main
-from proseforge_agent.environments import DockerExecutionBackend, LocalExecutionBackend
+from proseforge_agent.environments import DockerBackendPlanner, LocalExecutionBackend
 
 
 class FakeProcessRunner:
@@ -30,7 +30,7 @@ def test_local_backend_uses_safe_process_runner(tmp_path):
 
 
 def test_docker_backend_returns_dry_run_plan_without_docker(tmp_path):
-    backend = DockerExecutionBackend(workspace_root=tmp_path, docker_available=False)
+    backend = DockerBackendPlanner(workspace_root=tmp_path, docker_available=False)
 
     plan = backend.check(image="python:3.11", dry_run=True, env_allowlist=["PATH"])
 
