@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import asdict, dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol
 
@@ -131,6 +132,24 @@ class StaticMCPTransport:
         return dict(self._tool_results[name])
 
 
+_PLACEHOLDER_OPT_IN_ENV = "PF_AGENT_ALLOW_PLACEHOLDER_MCP"
+
+
+def _require_placeholder_opt_in(kind: str) -> None:
+    """Make placeholder MCP transports fail loud (finding 4.1).
+
+    A placeholder transport cannot actually talk to a server; starting one in
+    production silently fails every call. Refuse to start unless the operator
+    explicitly opts in via ``PF_AGENT_ALLOW_PLACEHOLDER_MCP=1`` (used by tests
+    and local demos).
+    """
+    if os.environ.get(_PLACEHOLDER_OPT_IN_ENV) != "1":
+        raise ConfigurationError(
+            f"{kind} MCP transport is a placeholder; wire a real transport before "
+            f"production, or set {_PLACEHOLDER_OPT_IN_ENV}=1 to allow it explicitly"
+        )
+
+
 class StdioMCPTransport:
     """Placeholder for a real stdio MCP process lifecycle."""
 
@@ -141,6 +160,7 @@ class StdioMCPTransport:
     def start(self) -> None:
         if not self.spec.command:
             raise ConfigurationError("stdio MCP server requires a command")
+        _require_placeholder_opt_in("stdio")
         self.started = True
 
     def close(self) -> None:
@@ -166,6 +186,7 @@ class PlaceholderMCPTransport(StdioMCPTransport):
     """HTTP/SSE transport placeholder."""
 
     def start(self) -> None:
+        _require_placeholder_opt_in(self.spec.transport or "http")
         self.started = True
 
     def capabilities(self) -> dict[str, Any]:
